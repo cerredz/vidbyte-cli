@@ -110,7 +110,9 @@ vidbyte-cli --json --no-input agents suggest run \
     The agent can edit `inputs.json` between the two if the user wants an item dropped or added.
   - `report` (free, offline) maps each returned idea back to the items it cites and prints the
     top five with URLs and the "safe to ignore today" list.
-- **Gather.** Every call is a read; none marks a notification read or writes to GitHub.
+- **Gather.** Every call is a read; none marks a notification read or writes to GitHub. The
+  script first checks the login with `gh api user --jq .login`, which works on every `gh` version
+  (newer `gh auth status` exits 1 when any stored account is broken), and never prints the login.
   - Notifications: `gh api --method GET notifications -f since=<cutoff> -f per_page=50 -f page=N`,
     pages 1 to 4 (at most 200). `since` is GitHub's ISO 8601 "last updated after" parameter; with
     the default `all=false` only unread threads come back. The cutoff defaults to 16 hours
@@ -130,7 +132,9 @@ vidbyte-cli --json --no-input agents suggest run \
   - The user's own PRs: `gh search prs --author=@me --state=open --archived=false`, plus the same
     search with `--checks=failure`, `--review=changes_requested`, and `--review=approved` to label
     each PR. For up to five failing PRs, `gh pr checks <url> --json name,bucket,link` names the
-    failing checks, so the first action can be concrete ("fix the lint job").
+    failing checks, so the first action can be concrete ("fix the lint job"). A PR nobody updated
+    for 30 days is marked low priority and left out of the flags, even with red checks: it is not
+    today's work, and users with dozens of open PRs would otherwise drown the ranking.
   - Optional sources: Sentry, when `sentry-cli` is on `PATH` and an org and a project are known
     (from `--sentry-org`/`--sentry-project` or `sentry-cli info --config-status-json`):
     `sentry-cli issues list --org <org> --project <project> --query "is:unresolved firstSeen:-<N>h" --max-rows 20`,
