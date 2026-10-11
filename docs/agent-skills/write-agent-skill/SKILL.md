@@ -32,8 +32,8 @@ reason is not obvious, and leave out everything the agent does not need in order
 The goal is a `SKILL.md` that takes a coding agent from the user's request to a delivered,
 verified result with exactly one Vidbyte agent run (or a small, named chain of them), with the
 user told the cost and asked for consent before anything is spent or any file is changed. A
-reader should be able to tell from the first screen what problem the skill solves, when to pick a
-sibling skill instead, and what "done" looks like.
+reader should be able to tell from the first screen what problem the skill solves, how
+`vidbyte-cli` solves it, and what "done" looks like.
 
 Each skill encodes judgment the CLI cannot supply on its own: which agent fits the problem, which
 flags fit the problem, what context to gather from the repository before running, and how to turn
@@ -104,7 +104,7 @@ metadata:
 | Field | Rule |
 |---|---|
 | `name` | Equals the folder name exactly. The website refuses to render a file whose `name` differs from its slug. |
-| `description` | Starts with "Use when", quotes two or three phrasings a user would actually type, says what the skill gets done, and names the Vidbyte agent and `vidbyte-cli`. At most 1024 characters. The website catalog entry's `description` is a verbatim copy of this field, so edit both together. No price figures: on the website every price must trace to the backend's price table, and lint rule N038 checks only agent catalog entries and the sentences bound in `lint/allowlists/price_sources.txt`, so a price here would ship unchecked. Prices go in `metadata.cost` and the Cost and consent section. |
+| `description` | Starts with "Use when", quotes two or three phrasings a user would actually type, says what the skill gets done, and names the Vidbyte agent and `vidbyte-cli`. It is the only place the skill says when to use it (section 4). At most 1024 characters. The website catalog entry's `description` is a verbatim copy of this field, so edit both together. No price figures: on the website every price must trace to the backend's price table, and lint rule N038 checks only agent catalog entries and the sentences bound in `lint/allowlists/price_sources.txt`, so a price here would ship unchecked. Prices go in `metadata.cost` and the Cost and consent section. |
 | `metadata.agent` | The agent id, from the website vocabulary: `suggestion-agent`, `persistent-researcher`, `persistent-agent`, `ensemble-agent`, `task-board`, `stages-agent`, or `bug-finder`. |
 | `metadata.commands` | The command paths the skill runs, without the `vidbyte-cli` prefix, separated by commas. |
 | `metadata.cost` | The exact Vidbyte charge plus any provider usage, in the same words the Cost and consent section uses. |
@@ -122,18 +122,31 @@ ready to fill in.
 
 | Section | What it holds |
 |---|---|
-| Title and opening | One or two sentences: the problem and what the user has at the end. |
-| When to use | Phrases and situations the user would recognize, in their own words. |
-| When not to use | Each line names the sibling skill, or the plain action, that fits better. |
+| Title | One `#` heading that names the problem in plain words. |
+| The problem | The problem in detail, in several paragraphs: who has it and in what situation, what goes wrong in concrete terms (a short list is fine when the failures are distinct), what it costs the user, and why it is hard to catch or solve without help. Close with what the skill does not cover when that limit matters, such as "a first pass, not a penetration test". |
+| How vidbyte-cli solves it | One or two paragraphs that name `vidbyte-cli`, the Vidbyte agent, and its commands, say what the agent does that the user's coding agent cannot do well alone, and say what the user has at the end. |
 | Goal and done-when | One goal paragraph and one observable completion check. Do not restate the goal as a mission and an objective too; one statement is enough and costs fewer tokens every time the skill loads. |
 | Preflight | `vidbyte-cli --version`, `vidbyte-cli --json whoami`, and one agent-specific check. On failure, read `references/setup.md`. |
 | Gather inputs | What to read from the repository before asking the user anything, and the one or two questions only the user can answer. |
+| Steps | A numbered, high-level list of the whole procedure, from preflight to hand-back. Each step is one or two lines, names the `vidbyte-cli` command it runs if it runs one, and ends with the section that holds its details, such as "(Run)". |
+| CLI commands | A table of every `vidbyte-cli` command the skill runs or asks the user to run, in the order they come up: the full command with root options first, the section that uses it, and what the command does, what it costs, and whether it writes files. Describe each command from its help text in the CLI source (`src/vidbyte_cli/commands/**/prompts/*.md` on the internal repository), never from memory. |
 | Cost and consent | The exact charge, whether files change, the consent question, and how to make the idempotency key. |
 | Run | The exact command, always `vidbyte-cli --json --no-input ...`, with a one-line reason for each non-default flag. |
 | Read the result | The result `kind` and the `data` fields the next step uses. |
 | Deliver | How to present the result and which skill to chain to next. |
 | Troubleshooting | The exit-code table: 2 fix the command, 4 setup, 5 stop and ask, anything else `references/troubleshooting.md`. |
 | Guardrails | The standing rules from section 5 plus any rule specific to this skill. |
+
+Do not add "When to use" or "When not to use" sections. The frontmatter `description` already
+holds the phrasings the host agent matches a request against, so the lists only repeat it and cost
+tokens every time the skill loads. A limit that changes what the agent does, such as "stop unless
+the user owns the app", goes in Preflight, Gather inputs, or Guardrails, where the agent acts on
+it. A sibling skill that fits a nearby request goes in Deliver, as the next step to offer.
+
+"The problem" and "How vidbyte-cli solves it" come first because the website renders the whole
+body at `/agents/skills/<slug>`, so they are what a visitor reads before installing. "Steps" and
+"CLI commands" come after "Gather inputs", so the agent sees the whole plan and every command it
+will run before it asks the user for consent.
 
 ## 5. Consent and spending
 
@@ -193,7 +206,12 @@ Never fix one public copy by hand.
 - [ ] The folder name, `name`, and website slug are identical, lowercase, and hyphenated.
 - [ ] `description` starts with "Use when", quotes real user phrasings, has no price, and is at most 1024 characters.
 - [ ] Every `metadata` field is present and matches the body (cost, commands, writes-files).
-- [ ] Every section from section 4 is present, in order.
+- [ ] Every section from section 4 is present, in order, and there is no "When to use" or "When not to use" section.
+- [ ] "The problem" explains the situation, the concrete failures, and why they are hard to catch,
+      and "How vidbyte-cli solves it" names `vidbyte-cli`, the agent, and its commands.
+- [ ] Steps covers the whole procedure from preflight to hand-back, and each step names its section.
+- [ ] The CLI commands table lists every `vidbyte-cli` command in the body, each described from its
+      help text in the CLI source.
 - [ ] Every `vidbyte-cli` line uses the full binary name with root options first, and every
       command path and long option exists in `contracts/cli-commands.json` and in `min-cli-version`.
 - [ ] The cost is stated before the run, and the skill waits for consent.

@@ -12,31 +12,57 @@ metadata:
 
 # Implement the GitHub issues you name, one fresh agent per issue
 
-The user names the issues; this skill turns each one into a task on one Vidbyte Task Board, so
-each issue gets its own fresh Codex agent that sees only that issue. Each issue's changes land on
-their own local branch, `issue-tasks/<number>`, and the user decides which ones become draft pull
-requests.
+## The problem
 
-## When to use
+A maintainer, or a small team, has more open GitHub issues than time to work on them. Many of the
+issues are small and well described: a wrong default, a missing option, a crash with clear steps to
+reproduce. The maintainer wants to pick a few of them, say "implement issues 1, 3, 238, and 384",
+and come back to one change per issue that they can review, merge, or throw away on its own.
 
-- "Implement issues 1, 3, 238, and 384."
-- "Fix these issues for me: #12, #40, #41."
-- "Work through every open issue labelled `good first issue`."
-- The user has picked several independent issues and wants a reviewable change for each one,
-  without one long agent session mixing them together.
+Giving the whole list to one coding-agent session goes wrong in the same ways each time:
 
-## When not to use
+- The session's context fills with the first issues' code, test output, and discussion. Later
+  issues get less attention, and a long session can be compacted or cut off before it reaches them.
+- The changes for different issues end up mixed in one working tree, and often in one commit. They
+  can no longer be reviewed, merged, or reverted one issue at a time.
+- An idea or a half-finished edit from one issue leaks into the next. The fix for issue 238 then
+  depends on code written for issue 3, and nobody notices until issue 3's change is dropped.
+- The agent works in the user's own checkout, on top of whatever the user had in progress.
+- A pull request is opened, or an issue is commented on, before anyone has read the diff.
 
-- The user wants the backlog sorted, deduplicated, or answered, not fixed. Use the
-  `triage-issue-backlog` skill instead.
-- One small issue. Implement it directly; a board adds a charge and a setup step for no gain.
-- The issues build on each other, so issue B needs issue A's code. Every agent here starts from
-  the default branch and never sees another issue's changes. Implement them in order directly.
-- One bug pattern repeated across many files. Use the `fix-every-instance` skill instead.
-- The issue may describe a security vulnerability. Its fix would become a public branch and pull
-  request; handle it privately through the repository's `SECURITY.md`.
-- The repository is not on GitHub, or this clone's `origin` is a fork of the issues' repository.
-  This skill needs `origin` to be the repository that holds the issues.
+Keeping the issues apart by hand means one fresh session, one clean checkout, and one branch per
+issue, repeated for every issue on the list. That is slow enough that most people skip it. The
+mixing then shows up only in review, when a branch for one issue turns out to hold changes for
+three, or after merge, when reverting one fix takes another with it.
+
+This skill builds code for issues that stand alone. It does not sort, deduplicate, or answer a
+backlog, and it does not fix one bug pattern across many files in one pass. Issues that need
+another issue's code, and issues that may describe a security vulnerability, stay out of the batch
+(Gather inputs, step 1).
+
+## How vidbyte-cli solves it
+
+This skill drives `vidbyte-cli`, the Vidbyte command-line tool, and its Task Board. A free script,
+`prepare.sh`, checks every issue number with the GitHub CLI, creates a separate git worktree from
+the default branch, and turns each issue into one task file: the issue's title, body, labels, and
+last comments, plus fixed instructions to follow the project's conventions, change only what the
+issue needs, run the project's checks, and end with a short status report. Then, with the user's
+yes, `vidbyte-cli runtime task-board run` runs those tasks on one board, one after another, with
+`--context-mode isolated`. Each issue gets a fresh Codex agent that sees only its own task and
+nothing from the agents before it, and each agent is thrown away when its task ends. The user's
+coding agent stays out of the issue work itself: it prepares the batch, asks for consent, and
+reviews and publishes the results.
+
+Between tasks, the board's `--on-checkpoint` hook saves the issue's changes as one commit on its own
+local branch, `issue-tasks/<number>`, on top of the base commit, then resets the worktree, so the
+next agent starts from a clean tree. The free, offline `runtime task-board status` and
+`runtime task-board show-step` commands then show which issues completed or failed, and each
+agent's full report. The whole board is one Vidbyte charge however many issues it holds, plus
+OpenAI usage on the user's own account.
+
+At the end the user has one local branch per issue, each the default branch plus exactly that
+issue's changes; a results table with the checks that ran on each branch; and a draft pull request
+for every issue they approved, and for no other. Their own checkout is never touched.
 
 ## Goal and done-when
 
@@ -69,6 +95,10 @@ git config user.email
 
 - If `gh` is missing or not logged in, ask the user to install the GitHub CLI and run
   `gh auth login` in their own terminal. Never ask for a GitHub token in the chat.
+- If `gh repo view` fails because the repository is not on GitHub, stop: this skill needs GitHub
+  issues. If the issues live in a different repository from `origin`, such as the upstream of a
+  fork, stop too. Every branch starts from `origin`'s default branch, so this skill needs a clone
+  whose `origin` holds the issues, and `prepare.sh` refuses any other.
 - If `git config user.name` or `user.email` prints nothing, ask the user to set them; the hook
   cannot save an issue's branch without them.
 - Note `viewerPermission`. Pushing branches and opening pull requests needs `ADMIN`, `MAINTAIN`,
@@ -88,6 +118,18 @@ the folder that holds this `SKILL.md`. They need only `bash`, `git`, and `gh`.
    ```bash
    gh issue list --state open --label "good first issue" --limit 100 --json number,title
    ```
+
+   Read each issue (`gh issue view <number> --json title,body`) and settle the list with the user
+   before preparing anything:
+
+   - If only one issue is left, offer to implement it directly instead. A board adds a charge and
+     a setup step for no gain.
+   - If an issue needs another issue's code, take it out of the batch. Every agent here starts from
+     the default branch and never sees another issue's changes, so implement such issues in order,
+     directly.
+   - If an issue may describe a security vulnerability, take it out of the batch. Its fix would
+     become a public branch and pull request; tell the user to handle it privately through the
+     repository's `SECURITY.md`.
 
 2. Run the prepare script from the repository root with the numbers, separated by spaces:
 
@@ -116,6 +158,51 @@ one holds the issue's title, body (cut to 10,000 characters), labels, and last t
 plus fixed instructions: follow the project's conventions, change only what the issue needs, run
 the project's checks, run no `git` command that writes, and end with a `STATUS` report. Show one
 to the user if they want to see what each agent receives.
+
+## Steps
+
+The whole skill, in order. Each step names the section that holds its details.
+
+1. **Check the setup.** Run `vidbyte-cli --version`, `whoami`, `runtime doctor`, and
+   `provider whoami openai`, then check `gh`, the repository and the user's permission on it, and
+   the git identity. (Preflight)
+2. **Settle the issue list.** Read the numbers from the request, or list a label's matches and
+   confirm them. Leave out a lone issue, issues that need another issue's code, and possible
+   security vulnerabilities. (Gather inputs, step 1)
+3. **Prepare the batch, free.** Run `prepare.sh`. It checks every number, creates the worktree,
+   and writes one task file per issue. (Gather inputs, step 2)
+4. **Install the project's dependencies** in the worktree if its tests need them, and ask about a
+   token budget. (Gather inputs, steps 3 and 4)
+5. **Get the user's yes** for the charge and the changes. (Cost and consent)
+6. **Run the board** with `run.sh`, which calls `vidbyte-cli runtime task-board run` once: one
+   fresh Codex agent per issue, each issue saved on its own branch. (Run)
+7. **Read the result** from `result.json`, then `runtime task-board status`, and
+   `runtime task-board show-step` for each issue's full report. (Read the result)
+8. **Check the hook, build the results table, and show each branch's diff.** (Deliver, steps 1
+   to 3)
+9. **Run the project's checks** on every branch the user wants to publish. (Deliver, step 4)
+10. **Publish only the approved issues**, as draft pull requests. (Deliver, step 5)
+11. **Offer a retry** of failed issues through `run.sh`, as a new charge. (Deliver, step 6)
+12. **Hand back** the results table and the branches, and offer to remove the worktree. (Deliver,
+    step 7)
+
+## CLI commands
+
+Every `vidbyte-cli` command this skill runs or asks the user to run, in the order they come up.
+Root options such as `--json` and `--no-input` always come before the command path.
+
+| Command | Used in | What it does |
+|---|---|---|
+| `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.2.0 or newer. Free and offline. |
+| `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
+| `vidbyte-cli --json runtime doctor` | Preflight | Reports the working directory and which supported agent hosts are installed, from `PATH` alone, without reading credentials or using the network. Its `codex` row must be available. Free and offline. |
+| `vidbyte-cli --json provider whoami openai` | Preflight | Shows the OpenAI key stored for this profile and checks that it is live. The Task Board needs it. Exit 4 means none is stored. Free. |
+| `vidbyte-cli --json --no-input runtime task-board run` | Run, through `run.sh` | Runs an ordered board of tasks on this machine, one at a time, each in its own Codex agent that is thrown away when its task ends. Here each `--task-file` is one issue, `--context-mode isolated` keeps every agent from reading earlier results, and the `--on-checkpoint` hook runs after each saved step. Costs 2 cents from the Vidbyte balance for the whole board, plus OpenAI usage on the user's own account. The agents edit files in the worktree, and the board writes its checkpoints and report under `.vidbyte/issue-tasks/`. A retry (`--retry-failed-only`) or a resume (`--from`) runs through the same command and is a new charge. |
+| `vidbyte-cli --json runtime task-board status` | Read the result, Deliver | Reports one stored board's progress without running or paying for anything: which steps completed, failed, or are still pending, and the reported token total. It also returns a resume command, which this skill never pastes. Free and offline. |
+| `vidbyte-cli --json runtime task-board show-step` | Read the result, Deliver | Returns everything stored for one board step in one response: the full prompt it received, its summary, its status, its token count, and the agent's full final message. Free and offline. |
+
+This skill never runs `vidbyte-cli billing top-up` on its own. On exit 5 it follows "Out of
+credits" in `references/troubleshooting.md`, which tops up only after the user's explicit yes.
 
 ## Cost and consent
 
@@ -313,6 +400,8 @@ hook failed for that step: read `hook.log` and follow Deliver step 1.
   its own idempotency key.
 - Never push a branch, open a pull request, comment on an issue, or close an issue without the
   user's yes for that exact issue. Pull requests are always drafts.
+- Never put an issue that may describe a security vulnerability on the board. Its fix would become
+  a public branch and pull request; send the user to the repository's `SECURITY.md` instead.
 - Run the board only in the worktree `prepare.sh` created, never in the user's own checkout.
   Never run `on_step.sh` by hand, and never paste the CLI's `resume_command`.
 - Never delete a branch, force-push, or remove the worktree without the user's yes.

@@ -32,20 +32,26 @@ metadata:
 
 # <Title in plain words, named after the problem>
 
-<!-- One or two sentences: the problem, and what the user has at the end. No product pitch. -->
+## The problem
 
-## When to use
+<!-- The problem in detail, in several paragraphs. No product pitch. No "When to use" or "When not
+     to use" lists: the frontmatter description already says when to use the skill. -->
+<Who has the problem and in what situation.>
 
-<!-- Concrete situations the user would recognize, as they would say them. -->
-- "<a phrase the user might type>"
-- "<another phrasing>"
-- <a situation, such as "the same bug was fixed twice and came back a third time">
+<What goes wrong, in concrete terms. A short list is fine when the failures are distinct.>
 
-## When not to use
+<What it costs the user, and why it is hard to catch or solve without help.>
 
-<!-- Each line names the sibling skill or the plain action that fits better. -->
-- <situation> — use `<sibling-skill>` instead.
-- <situation> — just do it directly; this skill adds cost without adding value.
+<What this skill does not cover, when that limit matters.>
+
+## How vidbyte-cli solves it
+
+<!-- Name vidbyte-cli, the agent, and its commands. Say what the agent does that the user's coding
+     agent cannot do well alone, and what the user has at the end. -->
+This skill drives `vidbyte-cli` and its <Agent name>. <What the agent does, and why it fits this
+problem.>
+
+<What the user has at the end.>
 
 ## Goal and done-when
 
@@ -72,6 +78,30 @@ vidbyte-cli --json whoami              # exit 4 means no key is stored
 1. <What to read from the repo, such as `git log --oneline -30` for completed work.>
 2. <What to read next.>
 3. Ask the user only for: <the one or two things the repo cannot answer>.
+
+## Steps
+
+<!-- The whole procedure from preflight to hand-back, one or two lines per step. Name the
+     vidbyte-cli command a step runs, and end each step with the section that holds its details. -->
+1. **Check the setup.** Run `vidbyte-cli --version` and `whoami`<, plus the agent-specific check>.
+   (Preflight)
+2. **<Gather the inputs>.** <What is read from the repository.> (Gather inputs)
+3. **Get the user's yes** for the cost and the changes. (Cost and consent)
+4. **<Run the agent>** with `vidbyte-cli <command>`. (Run)
+5. **<Read the result>.** <What is taken from it.> (Read the result)
+6. **<Deliver>.** <What the user gets and what to offer next.> (Deliver)
+
+## CLI commands
+
+<!-- Every vidbyte-cli command the skill runs or asks the user to run, in the order they come up.
+     Describe each one from its help text in the CLI source, never from memory. -->
+Every `vidbyte-cli` command this skill runs or asks the user to run, in the order they come up.
+
+| Command | Used in | What it does |
+|---|---|---|
+| `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs <min-cli-version> or newer. Free and offline. |
+| `vidbyte-cli --json whoami` | Preflight | Shows the Vidbyte account behind the stored key. Exit 4 means no key is stored. Free. |
+| `vidbyte-cli --json --no-input <command>` | Run | <What it does, what it costs, and whether it writes files.> |
 
 ## Cost and consent
 

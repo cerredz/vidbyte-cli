@@ -13,7 +13,9 @@ draft pull request for each issue they approve. This is the backlog's planned `b
 idea, named the way the user asked for it.
 
 The same PR copies the `write-agent-skill` writing contract from the Vidbyte repository into
-`docs/agent-skills/write-agent-skill/`, so the contract lives next to the skills it governs.
+`docs/agent-skills/write-agent-skill/`, so the contract lives next to the skills it governs. The
+copy is the contract as updated in cerredz/Vidbyte#678, after review on PR #1 changed the public
+skill format, and review on PR #5 asked for the same format here.
 
 ## Flow chart
 
@@ -71,6 +73,12 @@ vidbyte-cli --json --no-input runtime task-board run \
 
 ## How it works
 
+- **Section order.** `SKILL.md` has no "When to use" or "When not to use" section; the frontmatter
+  `description` already holds the triggers. It opens with "The problem" and "How vidbyte-cli
+  solves it", and has "Steps" and "CLI commands" after "Gather inputs". The limits the removed
+  sections held now sit where the agent acts on them: a lone issue, issues that need another
+  issue's code, and possible security vulnerabilities in Gather inputs step 1 (security also in
+  Guardrails), and a non-GitHub or fork clone in Preflight.
 - **One board, one agent per issue.** The Task Board runs its tasks one at a time and throws each
   Codex agent away when its task ends. `--context-mode isolated` sends no earlier summary to any
   agent, so every issue starts with a fresh context window. Each task is a whole Markdown file
@@ -113,13 +121,13 @@ vidbyte-cli --json --no-input runtime task-board run \
 
 | File | Change |
 |---|---|
-| `skills/github-issue-tasks/SKILL.md` | New. The skill, in the `write-agent-skill` section order. |
+| `skills/github-issue-tasks/SKILL.md` | New. The skill, in the section order of the updated `write-agent-skill` contract. |
 | `skills/github-issue-tasks/scripts/prepare.sh` | New. Free: validates issues, creates the worktree, writes task files and state. |
 | `skills/github-issue-tasks/scripts/run.sh` | New. The one paid step, plus the retry and resume modes. |
 | `skills/github-issue-tasks/scripts/on_step.sh` | New. The `--on-checkpoint` hook that gives each issue its own branch. |
 | `skills/github-issue-tasks/references/setup.md` | New. Byte-for-byte copy of the canonical file. |
 | `skills/github-issue-tasks/references/troubleshooting.md` | New. Byte-for-byte copy of the canonical file. |
-| `docs/agent-skills/write-agent-skill/` | New. Byte-for-byte copy of Vidbyte `skills/agent-skills/write-agent-skill/` (`SKILL.md` and `references/`). |
+| `docs/agent-skills/write-agent-skill/` | New. Byte-for-byte copy of Vidbyte `skills/agent-skills/write-agent-skill/` (`SKILL.md` and `references/`) at cerredz/Vidbyte#678's head, `ee4c3ab95`. |
 | `.gitattributes` | New. `*.sh text eol=lf`, so a Windows clone with `core.autocrlf=true` (Git for Windows' default) still checks the scripts out with LF endings that bash can run. |
 | `docs/design/github-issue-tasks.md` | New. This document. |
 
@@ -170,4 +178,7 @@ key when no `--idempotency-key` is given, and the skill always passes one. So `m
    and a missing number rejected, task files under 20,000 characters.
 4. `bash -n` on every script; `npx skills add <worktree> --list` lists `github-issue-tasks` and not
    `write-agent-skill`.
-5. `git hash-object` of every copied file equals its blob on Vidbyte `origin/main`.
+5. `git hash-object` of every copied file equals its Vidbyte blob: the contract's `SKILL.md` and
+   `references/skill-template.md` at cerredz/Vidbyte#678's head (`ee4c3ab95`), and
+   `references/setup.md` and `references/troubleshooting.md` on `origin/main`, which #678 leaves
+   unchanged.
