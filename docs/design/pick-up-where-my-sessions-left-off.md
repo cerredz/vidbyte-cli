@@ -126,7 +126,9 @@ vidbyte-cli --json --no-input agents suggest run \
   `Authorization:` values, credentials in URLs, `.env`-style assignments (`NAME=value` lines and any
   `*KEY*`/`*TOKEN*`/`*SECRET*`/`*PASSWORD*` assignment, including JSON-style), email addresses, and
   absolute home paths (`C:\Users\<name>`, `/Users/<name>`, `/home/<name>`, and this user's home in
-  every spelling) shown as `~`. The digest header lists the counts, never the values. `sessions.json`
+  every spelling, including Claude Code's encoded project folder names) shown as `~`, and this
+  user's login name as a whole word, shown as `[user]`. The digest header lists the counts, never
+  the values. `sessions.json`
   keeps real paths and session ids for the resume commands and is never sent.
 - **Typed inputs.** The coding agent writes `inputs.json` from the digest. Every value except
   `constraint` and `avoid` must start with session tags such as `[S2 S5]` or `[all]`. The tags tie
@@ -141,7 +143,9 @@ vidbyte-cli --json --no-input agents suggest run \
   holds no home path, and no repository `AGENTS.md` is in Codex's working folder. stdout is saved
   as UTF-8 (`dry-run.json` or `result.json`); stderr is shown and saved (`*.stderr.txt`) because
   the CLI writes its `kind: "error"` document there. The paid mode needs `--paid`, makes and saves
-  one idempotency key, and refuses to overwrite a successful `result.json`.
+  one idempotency key, and refuses to start in a folder that already holds a paid attempt
+  (`idempotency-key.txt` or `result.json`, even an empty or unreadable one), unless the caller is
+  recovering that attempt with `--idempotency-key` and no result was saved yet.
 - **Flag choices.**
   - `--category completion continuation immediate_next_steps verification`: close the open loops,
     take the next step of plans already agreed, act from the current state, and check claims
@@ -215,7 +219,8 @@ cents per block of up to ten requested ideas, comes from `SuggestionAdmissionLim
   background or with a long timeout, because a run killed after admission is still charged.
 - **Horizon filter.** The CLI applies `--horizon` silently after review. A warning, or telling the
   generator the horizon, would make the flag safe to use; reported as a CLI gap.
-- No paid end-to-end run was made, because it spends real money.
+- No paid end-to-end run was completed, because it spends real money. The paid path was tested
+  with a stand-in `vidbyte-cli` that only records its arguments.
 
 ## Verification
 
@@ -231,3 +236,9 @@ cents per block of up to ten requested ideas, comes from `SuggestionAdmissionLim
    no_suggestions`, `stop_reason: dry_run`, every manifest entry `included`, no charge. Invalid
    inputs (missing tags, unknown tag, too many values, a missing project) fail with exit 2.
 5. `cmp` of both `references/` files against the canonical copies.
+6. The paid-run guards tested with a stand-in `vidbyte-cli` first on `PATH`: a folder with an
+   earlier key file, an empty result, or an unreadable result refuses; a recovery key runs only
+   while no result is saved; a clean folder runs once and then refuses.
+7. `sessions.py feedback` (accept, reject with a redacted reason, unknown idea, bad project key) and
+   `agents suggest handoff` run against a synthetic, schema-valid `result.json` with an isolated
+   state folder; a dry run with `--project` then loads the recorded feedback.
