@@ -57,10 +57,10 @@ every link as a supporting file.
 Then, after the user's yes, one `vidbyte-cli agents suggest run` call ranks it. The agent runs in
 the user's own Codex, read-only. A generator proposes candidates and an independent critic reviews
 them before the agent keeps the strongest five. Only ideas for today survive (`--horizon now`),
-and the agent reasons as prioritization, immediate next steps, quick wins, and stop-or-defer. The user's
-coding agent could sort the list itself, but it would sort by its own habits. The Suggestion Agent
-makes every trade explicit, and it remembers, through a suggestion project, which suggestions the
-user accepted or rejected on earlier mornings.
+and the agent reasons as prioritization, immediate next steps, quick wins, and stop-or-defer.
+The user's coding agent could sort the list itself, but it would sort by its own habits. The
+Suggestion Agent makes every trade explicit, and it remembers, through a suggestion project, which
+suggestions the user accepted or rejected on earlier mornings.
 
 At the end the user has today's top five in order, each with a concrete first action and the link
 to the pull request, run, issue, or error it came from. They also get a short "safe to ignore
@@ -162,7 +162,7 @@ temp directory, never to the repository.
    user, show the counts, and stop, because a run would cost money for nothing. Exit 1 means `gh`
    is missing, not logged in, or every GitHub source failed; show the message.
 
-   `OUT_DIR` holds three files:
+   `OUT_DIR` holds these files, plus a redacted `digest-<n>.md` copy of each `--digest` file:
 
    | File | What it holds |
    |---|---|
