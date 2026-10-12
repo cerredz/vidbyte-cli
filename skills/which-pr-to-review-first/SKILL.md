@@ -4,7 +4,7 @@ description: Use when a maintainer or lead faces more open pull requests than th
 metadata:
   agent: suggestion-agent
   commands: "agents suggest project list, agents suggest project create, agents suggest run, agents suggest handoff, agents suggest feedback accept, agents suggest feedback reject"
-  cost: "2 cents per run (one block of up to 10 suggestions) + model usage on the user's own Codex login"
+  cost: "Model usage from the Vidbyte balance: gpt-6-sol at $2 / $10 per million input / output tokens + 2%, capped at 400,000 tokens per run"
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
@@ -54,14 +54,14 @@ dependencies, code, tests, docs), and whether the author is a member, a first-ti
 or a bot. It adds simple signals such as `quick`, `blocks #N`, and `waiting 9d, no review`,
 removes secrets, and writes one compact table, `prs.md`.
 
-Then, after the user's yes, one `vidbyte-cli agents suggest run` call decides the order. The agent
-runs in the user's own Codex, read-only. A generator proposes candidates and an independent
-critic reviews them, weighing what each pull request unblocks, how urgent or risky it is, how
-fast it can be reviewed, and how long its author has waited, within the review time the user has
-today. The user's coding agent could sort the table itself, but it would sort by one rule at a
-time. The Suggestion Agent makes the trade explicit, names what can wait, and remembers, through
-a suggestion project for this repository, which suggestions the maintainer accepted or rejected
-before.
+Then, after the user's yes, one `vidbyte-cli agents suggest run` call decides the order. Its model
+calls run on OpenAI's gpt-6-sol through Vidbyte's model gateway and are billed to the user's
+Vidbyte balance. A generator proposes candidates and an independent critic reviews them, weighing
+what each pull request unblocks, how urgent or risky it is, how fast it can be reviewed, and how
+long its author has waited, within the review time the user has today. The user's coding agent
+could sort the table itself, but it would sort by one rule at a time. The Suggestion Agent makes
+the trade explicit, names what can wait, and remembers, through a suggestion project for this
+repository, which suggestions the maintainer accepted or rejected before.
 
 At the end the user has an ordered review list: each pull request with its link, its facts in one
 line, and the reason it is where it is, grouped into "review now", "next", and "later", plus
@@ -76,27 +76,28 @@ note of what can wait, with money spent only after the user has seen what will b
 yes.
 
 Done when: the user has seen the review order with a link and a one-line reason for every pull
-request in it, the groups, the list of queued pull requests no suggestion named, and the charge
-from `data.charged_cents`, and every suggestion they explicitly accepted or rejected is recorded
-with `vidbyte-cli agents suggest feedback`.
+request in it, the groups, the list of queued pull requests no suggestion named, and the run's
+model usage and estimated cost, and every suggestion they explicitly accepted or rejected is
+recorded with `vidbyte-cli agents suggest feedback`.
 
 ## Preflight
 
 Run these in order. If a `vidbyte-cli` check fails, read `references/setup.md`, fix only what
-failed, and run the preflight again. Step 3 of that file covers what the Suggestion Agent needs.
+failed, and run the preflight again. Step 3 of that file lists what the Suggestion Agent needs:
+no Codex and no OpenAI key, only a Vidbyte key with the `models:invoke` permission.
 
 ```bash
 vidbyte-cli --version                  # must be 0.3.0 or newer
 vidbyte-cli --json whoami              # exit 4 means no Vidbyte key is stored
-vidbyte-cli --json runtime doctor      # data.hosts must list "codex" with "available": true
-codex login status                     # must report a login; exit 1 means not logged in
 gh auth status                         # the GitHub CLI must be logged in to github.com
 python3 --version                      # 3.8 or newer, for the helper script
 ```
 
-- Codex must be logged in. `vidbyte-cli` checks that Codex is on `PATH` before it charges, but it
-  does not check the login, so a run with a logged-out Codex is charged and then fails. If
-  `codex login status` reports no login, ask the user to run `codex login` in their own terminal.
+- The Vidbyte key must carry the `models:invoke` permission; an admin or full-access key has it
+  too. `whoami` does not show permissions, so a key without it fails at the run's first model call
+  with exit 4 and `The stored Vidbyte API key is missing the models:invoke permission.`, before
+  anything is billed. The user then creates a key with that permission at
+  <https://vidbyte.pro/settings/api> and runs `vidbyte-cli login` with it.
 - If `gh` is missing or not logged in, ask the user to install the GitHub CLI from
   <https://cli.github.com/> and run `gh auth login` in their own terminal. Never ask for a GitHub
   token in the chat.
@@ -175,7 +176,7 @@ a new folder in the system temp directory, never to the repository.
      tokens, JWTs, private keys, and `password=`-style values) and email addresses are replaced
      with `[redacted]` everywhere.
 
-   The script prints the counts, every distilled value, the cost at the chosen `--count`, the
+   The script prints the counts, every distilled value, how the paid run is billed, the
    suggestion project for this repository with the exact command to create it, and `OUT_DIR=<folder>`
    as its last line. Keep that path. Exit 0 means done. Exit 3 means fewer than two pull requests
    are in the queue: tell the user, offer `prs.md` as a free summary, and stop, because there is
@@ -223,15 +224,16 @@ a new folder in the system temp directory, never to the repository.
    The message `Suggestion project already exists: pr-review-octo-org-web.` (exit 2) means it is
    there; use it.
 
-5. **Dry-run the exact command.** This is free: a dry run never calls a model, never buys an
-   admission, and needs no credentials. It checks every flag, the file, and the project.
+5. **Dry-run the exact command.** This is free: a dry run never calls a model, is not billed, and
+   needs no credentials. The script runs the exact command from Run with `--dry-run` added, and
+   the CLI checks every flag, the file, and the project.
 
    ```bash
    python3 "<skill>/scripts/review_order.py" run --out-dir "<OUT_DIR>" --dry-run
    ```
 
    Expect exit 0, the line `kind: suggestions.result  status: no_suggestions  stop_reason: dry_run`,
-   every `context_manifest` line `included`, `charged_cents: None`, and the line
+   every `context_manifest` line `included`, `models: gpt-6-sol`, and the line
    `Dry run passed.` The script saves a fingerprint of the request; the paid run refuses to start
    unless it matches. On exit 2, fix what the message names (for a missing project, step 4) and
    dry-run again.
@@ -247,8 +249,7 @@ a new folder in the system temp directory, never to the repository.
 The whole skill, in order. Each step names the section that holds its details.
 
 1. **Check the setup.** Run `vidbyte-cli --version`, `vidbyte-cli --json whoami`,
-   `vidbyte-cli --json runtime doctor`, `codex login status`, `gh auth status`, and
-   `python3 --version`. (Preflight)
+   `gh auth status`, and `python3 --version`. (Preflight)
 2. **Find the repository and ask about review time.** One question, only if the user has not said
    it. (Gather inputs, steps 1 and 2)
 3. **Gather, free.** Run `review_order.py gather`. It runs `gh api user`, `gh repo view`, and
@@ -259,9 +260,10 @@ The whole skill, in order. Each step names the section that holds its details.
 5. **Dry-run, free.** Run `review_order.py run --dry-run`, which calls
    `vidbyte-cli --json --no-input agents suggest run ... --dry-run`. (Gather inputs, step 5)
 6. **Show the inputs and the cost, and get the user's yes.** (Cost and consent)
-7. **Run the agent.** Run `review_order.py run --idempotency-key <key>`, which calls
-   `vidbyte-cli --json --no-input agents suggest run` once and saves `result.json`. (Run)
-8. **Read the result**: `data.status`, `data.ideas`, and `data.charged_cents`. (Read the result)
+7. **Run the agent.** Run `review_order.py run --paid`, which calls
+   `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` once and saves
+   `result.json`. (Run)
+8. **Read the result**: `data.status`, `data.ideas`, and `data.usage`. (Read the result)
 9. **Report, free.** Run `review_order.py report` for the review order with links and groups, and
    present it. (Deliver, step 1)
 10. **Offer to start the first review** with `vidbyte-cli --json agents suggest handoff`, and a
@@ -279,11 +281,10 @@ Root options such as `--json` and `--no-input` always come before the command pa
 |---|---|---|
 | `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.3.0 or newer. Free and offline. |
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
-| `vidbyte-cli --json runtime doctor` | Preflight | Reports the working directory and which supported agent hosts are on `PATH`, without reading credentials or using the network. Its `codex` row must be available. Free and offline. |
 | `vidbyte-cli --json agents suggest project list` | Gather inputs | Lists every local suggestion project, sorted by key, with its title and description. An absent catalog returns an empty list, not an error. No credentials, no model call. Free and local. |
 | `vidbyte-cli --json agents suggest project create` | Gather inputs | Registers one new local suggestion project under a stable key, with a title and a description that frame every later run. Refuses a key that already exists. No credentials, no model call, sends nothing to Vidbyte. Free; writes only to vidbyte-cli's own data folder. |
-| `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `review_order.py run --dry-run` | Validates and resolves the complete request without calling a model: settings, the context manifest, omissions, and warnings. Needs no credentials, buys no admission, and returns `stop_reason` `dry_run` with no ideas. Free. |
-| `vidbyte-cli --json --no-input agents suggest run` | Run, through `review_order.py run` | Buys one Vidbyte admission, then develops concrete next actions for one goal: a generator proposes candidates in the user's local Codex, read-only, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready handoff survive. Costs 2 cents per block of up to ten requested suggestions (2 cents at `--count` 5, 8, or 10), plus model usage on the user's own Codex login. Edits no files in the workspace; records the run in vidbyte-cli's local runs ledger. |
+| `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `review_order.py run --dry-run` | Validates and resolves the complete request without calling a model: settings, the context manifest, omissions, and warnings. Needs no credentials, is not billed, and returns `stop_reason` `dry_run` with no ideas. Free. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `review_order.py run --paid` | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready handoff survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. It starts no new call after 400,000 tokens. Edits no files in the workspace; records the run in vidbyte-cli's local runs ledger. |
 | `vidbyte-cli --json agents suggest handoff` | Deliver | Extracts one reviewed idea from a saved result by its exact id and prints its action packet, including a copyable execution prompt. No provider, no credentials. Free and local. |
 | `vidbyte-cli --json agents suggest feedback accept` | Deliver, through `review_order.py feedback` | Appends one suggestion the user explicitly accepted, with their reason, to the project's memory, so later runs look for the same qualities. No credentials, no model call. Free and local. |
 | `vidbyte-cli --json agents suggest feedback reject` | Deliver, through `review_order.py feedback` | Appends one suggestion the user explicitly rejected, with their reason, to the project's memory. Later runs steer away from it, and any idea that repeats it word for word is removed. Free and local. |
@@ -293,13 +294,21 @@ credits" in `references/troubleshooting.md`, which tops up only after the user's
 
 ## Cost and consent
 
-This skill runs `vidbyte-cli agents suggest run` once. It costs 2 cents from the user's Vidbyte
-balance at the default `--count` (5, 8, or 10, all one block of up to ten suggestions). A
-`--count` from 11 to 20 costs 4 cents, and each further block of ten costs 2 cents more; `gather`
-prints the cost for the chosen count. Model usage is billed to the user's own Codex login, not by
-Vidbyte. The run edits no files in the workspace and changes nothing on GitHub. The script writes
-only to `OUT_DIR` in the system temp folder, and vidbyte-cli records the run in its own local runs
-ledger.
+This skill runs `vidbyte-cli agents suggest run` once, and the run is billed by usage from the
+user's Vidbyte balance. It makes about five model calls on gpt-6-sol at high reasoning effort: one
+draft, then a critique and a revision in each of two rounds. Each call is billed at gpt-6-sol's
+rate, $2 per million input tokens ($0.20 when the input is cached) and $10 per million output
+tokens, plus 2%, and the model's reasoning counts as output. The `--count` (5, 8, or 10) does not
+change the number of calls; a larger count asks for longer replies. The skill passes
+`--max-total-tokens 400000`, so the run starts no new call once it has used 400,000 tokens; a call
+already running still finishes and is billed. That keeps one run under about $4, and the script
+reports the run's real token usage and an estimate of its cost when it finishes. The run edits no
+files in the workspace and changes nothing on GitHub. The script writes only to `OUT_DIR` in the
+system temp folder, and vidbyte-cli records the run in its own local runs ledger.
+
+What leaves the machine: `prs.md` and the values in `inputs.json` go to Vidbyte, which sends them
+to OpenAI with every model call of the run. `prs.json` and the code of the pull requests are never
+sent.
 
 Before running it, show the user what will be sent and ask, in your own words:
 
@@ -310,39 +319,34 @@ Before running it, show the user what will be sent and ask, in your own words:
 > - Stacks that block other pull requests: `<each --blockers value, shortened>`
 > - Pull requests touching sensitive areas: `<each --risks value, shortened>`
 >
-> The agent runs in your local Codex on your own login, so OpenAI sees the pull request titles,
-> file paths, and the first 240 characters of each description. Vidbyte's admission request
-> carries only the agent host and the number of suggestion blocks. It costs `<cents>` cents from
-> your Vidbyte balance plus Codex usage, and it changes no files and nothing on GitHub. Run it?
+> This goes through Vidbyte to OpenAI's gpt-6-sol, so Vidbyte and OpenAI see the pull request
+> titles, file paths, and the first 240 characters of each description. It is billed by usage
+> from your Vidbyte balance, at most about $4 because the run starts no model call after 400,000
+> tokens, and it changes no files and nothing on GitHub. Run it?
 
 If the repository is private, say that plainly: its pull request titles, paths, and description
-excerpts go to OpenAI under the user's Codex login. Wait for a yes. If the user says no, offer
+excerpts go to Vidbyte, which sends them to OpenAI. Wait for a yes. If the user says no, offer
 `prs.md` as a free summary instead.
 
-Make one idempotency key for this run, `which-pr-to-review-first:<YYYYMMDD>:<6 random hex
-characters>`, for example with:
-
-```bash
-python3 -c "import datetime, secrets; print('which-pr-to-review-first:' + datetime.date.today().strftime('%Y%m%d') + ':' + secrets.token_hex(3))"
-```
-
-The script saves the key in `<OUT_DIR>/idempotency-key.txt` before it starts. Reuse that key only to
-recover this same admission (Troubleshooting). A new run gets a new key and a new `OUT_DIR`.
+The command takes no idempotency key: there is no purchase to recover, and each model call is
+billed once, when it finishes. The script writes `<OUT_DIR>/paid-run.txt` before the run and
+refuses a second paid run in the same `OUT_DIR`. Any new run is a new charge, in a new `OUT_DIR`.
 
 ## Run
 
 After the user's yes, run:
 
 ```bash
-python3 "<skill>/scripts/review_order.py" run --out-dir "<OUT_DIR>" --idempotency-key "<key>"
+python3 "<skill>/scripts/review_order.py" run --out-dir "<OUT_DIR>" --paid
 ```
 
 The script refuses to start unless a dry run passed for exactly these inputs, and it refuses a
-second, different key in the same folder. It prints the full path of the `vidbyte-cli` it calls
-(`Using vidbyte-cli at: ...`); `run` and `feedback` take `--cli <path>` when the right
-`vidbyte-cli` is not the first one on `PATH`. It reads `inputs.json` and runs exactly this command
-from inside `OUT_DIR`, passing every value as its own argument with no shell in between, so titles
-with quotes, `$`, `&`, or backticks arrive unchanged in bash, PowerShell, and `cmd.exe`:
+second paid run in a folder that already holds `paid-run.txt` or `result.json`. It prints the
+full path of the `vidbyte-cli` it calls (`Using vidbyte-cli at: ...`); `run` and `feedback` take
+`--cli <path>` when the right `vidbyte-cli` is not the first one on `PATH`. It reads
+`inputs.json` and runs exactly this command from inside `OUT_DIR`, passing every value as its own
+argument with no shell in between, so titles with quotes, `$`, `&`, or backticks arrive unchanged
+in bash, PowerShell, and `cmd.exe`:
 
 ```bash
 vidbyte-cli --json --no-input agents suggest run \
@@ -361,7 +365,7 @@ vidbyte-cli --json --no-input agents suggest run \
   --risks "[#305] touches database migrations (db/migrate/20261001_add_index.rb), judged by file name; ..." \
   --context "Open pull requests in OWNER/NAME on 2026-10-12 08:00 UTC: 64 open, 55 in this review queue ..." \
   --files prs.md \
-  --idempotency-key "<key>" > "<OUT_DIR>/result.json"
+  --max-total-tokens 400000 > "<OUT_DIR>/result.json"
 ```
 
 Each context flag repeats once per value in `inputs.json` (`--success`, `--avoid`, `--capability`,
@@ -374,7 +378,7 @@ and `--decision` too, when present); a flag with no values is left out. Why thes
   repository, and only this repository.
 - `--horizon any`: every idea survives whatever horizon label it gets. Any other value is a filter
   the CLI applies after review: ideas labelled otherwise are dropped, the slate can come back
-  short, and the run is still charged. The report groups ideas by their own label instead.
+  short, and the run is still billed. The report groups ideas by their own label instead.
 - `--category prioritization`: rank against the scarce review time and name what falls below the
   line.
 - `--category bottleneck`: find the pull requests that hold others back, such as the base of a
@@ -384,7 +388,7 @@ and `--decision` too, when present); a flag with no values is left out. Why thes
 - `--category risk_prevention`: pull requests whose delay or careless review is costly, such as
   security-sensitive changes and migrations.
 - `--count`: 5 for a queue of up to 10 pull requests, 8 up to 40, 10 above. One idea can name
-  several pull requests, and all three counts are one 2-cent block.
+  several pull requests. A larger count asks for longer replies, which are more output tokens.
 - `--forbidden`: a long, fixed sentence. The handoff carries it as a forbidden action. It is long on
   purpose, because the CLI removes any idea that repeats a `--forbidden` value word for word.
 - `--blockers`, `--risks`, `--context`: one fact per value, each starting with its pull request
@@ -393,16 +397,20 @@ and `--decision` too, when present); a flag with no values is left out. Why thes
   string reaches the model and an absolute path would name the user's home folder. `--files` and
   not `--attach`, because a `--files` file becomes citable evidence; the CLI withholds ideas that
   cite evidence it never received.
-- Kept at their defaults: `--rounds 2`, no `--extra-compute`, and no `--model`, so Codex uses the
-  model the user configured.
+- `--max-total-tokens 400000`: the run starts no new model call after 400,000 tokens, which
+  bounds its cost (Cost and consent). A run that reaches it stops with `stop_reason: token_limit`
+  and returns the ideas it has so far.
+- Kept at their defaults: `--rounds 2` and no `--extra-compute`, which would add one model call
+  per selected category; no `--model`, `--critic-model`, or `--reasoning-effort`, so the generator
+  and the critic both run on gpt-6-sol at high reasoning effort, the rate Cost and consent quotes.
 
 How to run it safely:
 
 - The run can take several minutes, longer than many hosts let one command run. Start it in the
   background and wait for it to exit, or give it a timeout of at least 20 minutes if the host
-  allows one that long. Never stop it after stderr shows
-  `Vidbyte has verified the admission for this run.`: from that line on, the run is paid for, and
-  suggestion runs cannot resume.
+  allows one that long. A host timeout that kills the command loses the result of model calls that
+  were already billed. Do not stop it early for the same reason: the calls that finished are billed
+  either way, and suggestion runs cannot resume.
 - The script writes stdout to `<OUT_DIR>/result.json`, shows vidbyte-cli's progress on stderr, and
   saves that stderr to `<OUT_DIR>/result-stderr.log`.
 
@@ -410,16 +418,18 @@ How to run it safely:
 
 On exit 0, `result.json` holds one JSON document:
 `{"schema_version": 1, "kind": "suggestions.result", "data": {...}}`. The script also prints the
-status, the number of ideas, and the charge.
+status, the number of ideas, `models`, `usage` (`model_calls`, `input_tokens`,
+`cached_input_tokens`, `output_tokens`), and `estimated_cost_usd`.
 
 | Field | Use it for |
 |---|---|
 | `data.status` | `complete`; `partial` (fewer ideas than asked, which is normal; the ideas are valid); `no_suggestions` (nothing survived review; show `data.warnings`); or `needs_input` (the agent stopped to ask a question). |
-| `data.parent_message` | The agent's question when the status is `needs_input`. Relay it. Answering it means a new run, which is a new charge, so ask first. |
+| `data.stop_reason` | Why the run stopped: `completed`, `count_shortfall`, `round_limit`, `token_limit` (the 400,000-token cap), `time_limit`, `gateway_limit` (the balance or the key's daily spend limit ran out after some ideas were reviewed), `provider_failed`, or `parent_message`. |
+| `data.parent_message` | The agent's question when the status is `needs_input`. Relay it. Answering it means a new run, which is a new usage-billed run, so ask first. |
 | `data.ideas[]` | The ranked slate: `rank`, `id` (`idea-001`), `title`, `summary`, `primary_category`, `horizon` (`now`, `next`, or `later`), `readiness`, `effort_estimate`, `why_now`, `first_action`. |
 | `data.ideas[].handoff.evidence[]` | The values each idea cites. A typed value starts with its tag, such as `[#311]`, which `report` maps to the pull request's link. |
 | `data.warnings` | Shortfalls, such as fewer ideas surviving review, or ideas withheld for citing evidence the run never received. Mention them briefly. |
-| `data.charged_cents`, `data.admission.admission_id` | What the run cost, and the id to give Vidbyte support if needed. |
+| `data.usage` | What the run used: `model_calls`, `input_tokens`, `cached_input_tokens`, and `output_tokens`. The script's `estimated_cost_usd` prices them at gpt-6-sol's rates plus 2%; the exact charge is on <https://vidbyte.pro/usage>. |
 
 ## Deliver
 
@@ -450,7 +460,10 @@ status, the number of ideas, and the charge.
    Blocking other pull requests: #311
    Review with care: #305
 
-   Not named by any suggestion: 41 queued pull requests (in prs.md). This run cost 2 cents.
+   Not named by any suggestion: 41 queued pull requests (in prs.md).
+   This run made <model_calls> model calls with <input_tokens> input and <output_tokens> output
+   tokens, about $<estimated_cost_usd> from your Vidbyte balance; the exact amount is on
+   vidbyte.pro/usage.
    ```
 
    If an idea names no pull request, `report` says so; say the same instead of guessing a link.
@@ -500,7 +513,7 @@ status, the number of ideas, and the charge.
 | Exit | Do this |
 |---|---|
 | 2 | Fix the flag or value the message names. Do not retry unchanged. The dry run catches most of these for free. From `review_order.py`, exit 2 is a bad option, a bad `inputs.json`, a dry run that did not pass, or a refused paid run; it prints which. |
-| 4 | Stop. Follow `references/setup.md` step 2. |
+| 4 | Stop. No Vidbyte key is stored, or the key lacks `models:invoke` (the message says which). Nothing was billed. Follow `references/setup.md` step 2. |
 | 5 | Stop. Follow "Out of credits" in `references/troubleshooting.md`. Never top up without the user's yes. |
 | 1 from `gather` | `gh` is missing, not logged in, or the repository could not be read. Show the message; ask the user to run `gh auth login` themselves, or check `--repo`. |
 | 3 from `gather` | Fewer than two pull requests are in the queue. Show the counts and stop; do not run the paid step. |
@@ -510,17 +523,17 @@ status, the number of ideas, and the charge.
 `Suggestion project was not found: <key>.` (exit 2) means the project does not exist yet: create
 it (Gather inputs, step 4) and dry-run again.
 
-When the paid run fails, check whether `<OUT_DIR>/result-stderr.log` contains the line that starts
-with `Vidbyte has verified the admission for this run.`:
+If a paid run fails or is cut off, first read the `code`, `message`, and `hint` the script
+printed, and `<OUT_DIR>/result-stderr.log`. The model calls that finished before the failure were billed,
+and nothing recovers or refunds them: there is no admission and no idempotency key. The script
+refuses another paid run in that `OUT_DIR`, so any new run starts with `gather` into a new folder.
 
-- If that line never appeared (for example, the connection dropped during admission), tell the
-  user and rerun the same command once with the same `--idempotency-key`, the one in
-  `idempotency-key.txt`. This recovers a charge that may already have happened without paying
-  twice. Keep `inputs.json` unchanged.
-- If the line appeared and the run then failed (exit 1, for example a provider failure), the
-  admission was used. Check `codex login status`. A new run is a new charge with a new key, so ask
-  the user first, then run `gather` again into a new folder. The script refuses a new key in the
-  old folder.
+- **`stop_reason: gateway_limit`.** The balance or the key's daily spend limit ran out after some
+  ideas were reviewed. Deliver those ideas, then follow "Out of credits" in
+  `references/troubleshooting.md` before any new run.
+- **Exit 1 with `The model gateway did not complete the suggestion run.`** A provider outage or a
+  reply that did not validate. Another run is a new usage-billed run, so ask the user first, then
+  run `gather` again into a new folder.
 
 ## Guardrails
 
@@ -530,7 +543,7 @@ with `Vidbyte has verified the admission for this run.`:
 - Run at most one file-writing Vidbyte agent in a workspace at a time. This skill's run writes no
   workspace files, so it can run beside one.
 - Show the distilled inputs, state the cost, and wait for a yes before `agents suggest run` without
-  `--dry-run`. Give the run one idempotency key, and reuse it only to recover that same admission.
+  `--dry-run`.
 - Stay read-only on GitHub. Never approve, request changes, comment, label, assign, merge, close,
   push, rerun a workflow, or approve a workflow run as part of this skill. Do any of these later
   only after the user asks for that exact action on that exact pull request.

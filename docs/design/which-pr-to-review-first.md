@@ -279,3 +279,28 @@ paid admission, and contract rule 5 requires one idempotency key per priced run.
    result) checked too.
 5. `cmp` of both `references/` files against the canonical copies; `git diff` checked for leaked
    names, paths, or tokens before every commit.
+
+## Update: usage-billed Suggestion Agent (2026-10-11)
+
+vidbyte-cli 0.3.0's `agents suggest run` no longer buys an admission or runs on the user's Codex.
+This commit moves the skill to that model; cerredz/vidbyte-cli#22 is the reference, and where the
+sections above disagree, this section wins.
+
+- No admission, no 2-cent blocks, no idempotency key: every generator, critic, and revision step
+  is one model call through Vidbyte's model gateway, billed to the Vidbyte balance at the model's
+  per-token rate plus 2%. `run --idempotency-key KEY` is now `run --paid`; the script writes
+  `paid-run.txt` just before the paid run and refuses a second paid run in a folder that holds it
+  or `result.json`. `--count` no longer changes the price.
+- Both roles run on gpt-6-sol at high reasoning effort ($2 / $0.20 cached / $10 per million input /
+  output tokens, plus 2%). The dry and the paid run both pass `--max-total-tokens 400000`. With
+  `--rounds 2` and no `--extra-compute` a run makes about five calls; the worst case (seven calls
+  with two repair retries, 32,000 output tokens each, the cap plus one in-flight call) is about
+  $2.93, stated to the user as "under about $4".
+- `run` prints `models`, `usage` (`model_calls`, `input_tokens`, `cached_input_tokens`,
+  `output_tokens`), and `estimated_cost_usd` instead of `charged_cents`; `report` ends with the
+  usage and the estimate; `gather` prints the usage pricing instead of a cent cost per count.
+- Preflight drops `runtime doctor` and `codex login status` and names the `models:invoke`
+  permission the Vidbyte key needs instead (a key without it fails with exit 4 before anything is
+  billed).
+  Troubleshooting replaces admission recovery with `gateway_limit` and provider-failure guidance,
+  and both `references/` files are the new canonical copies.

@@ -9,9 +9,9 @@ Four subcommands, run in this order:
             for report), and inputs.json to a new folder outside the repository. Its last line is
             OUT_DIR=<folder>.
   run       Runs the one vidbyte-cli agents suggest run command built from inputs.json, from
-            inside OUT_DIR. With --dry-run it is free: no model, no admission, no charge. With
-            --idempotency-key it is the paid run (2 cents per block of up to 10 suggestions, plus
-            Codex usage), and it refuses to start until a dry run passed for the same inputs.
+            inside OUT_DIR. With --dry-run it is free: no model call, no charge. With --paid it is
+            the usage-billed run (each model call billed to the Vidbyte balance, no new call after
+            400,000 tokens), and it refuses to start until a dry run passed for the same inputs.
   report    Free and offline. Maps each returned idea to the pull requests it names and prints
             the review order with links.
   feedback  Free and local. Records the user's explicit accept or reject of one idea under the
@@ -27,7 +27,6 @@ import argparse
 import datetime as dt
 import hashlib
 import json
-import math
 import os
 import re
 import shutil
@@ -36,8 +35,6 @@ import sys
 import tempfile
 import time
 
-SLUG = "which-pr-to-review-first"
-
 # Fixed run settings. SKILL.md explains each one in its Run section.
 HORIZON = "any"
 CATEGORIES = ("prioritization", "bottleneck", "quick_wins", "risk_prevention")
@@ -45,6 +42,16 @@ FORBIDDEN = (
     "Approving, requesting changes on, commenting on, labelling, assigning, merging, or closing "
     "any pull request as part of this ranking; the maintainer reviews and decides on GitHub by hand."
 )
+# The run starts no new model call once it has used this many tokens, which bounds its cost.
+MAX_TOTAL_TOKENS = 400000
+
+# vidbyte-cli's default model for both roles, and its regular rates in US dollars per million
+# tokens (https://developers.openai.com/api/docs/models/gpt-6-sol), which Vidbyte's model gateway
+# bills plus a 2% markup. They only estimate a finished run's cost; vidbyte.pro/usage is exact.
+MODEL = "gpt-6-sol"
+RATES_PER_MILLION = {"input": 2.0, "cached_input": 0.2, "output": 10.0}
+MARKUP = 1.02
+USAGE_KEYS = ("model_calls", "input_tokens", "cached_input_tokens", "output_tokens")
 
 # Reading GitHub. gh pr list asks for 100 pull requests per page; with the check, file, and merge
 # fields GitHub can answer that with HTTP 502, so this script pages itself and halves on failure.
@@ -89,7 +96,6 @@ INPUT_KEYS = {"schema_version", "repo", "generated_at", "goal", "project", "coun
 FILE_SUFFIXES = (".md", ".txt", ".json")
 MAX_FILES = 3
 
-KEY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 PROJECT_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 REPO_PATTERN = re.compile(r"^(?:https?://github\.com/)?([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$")
 TAG_PATTERN = re.compile(r"^\s*\[(#\d+(?:[\s,]+#\d+)*)\]")
@@ -748,8 +754,24 @@ def default_count(queued):
     return 5 if queued <= 10 else 8 if queued <= 40 else 10
 
 
-def cost_cents(count):
-    return 2 * int(math.ceil(count / 10.0))
+def estimate_usd(usage, models):
+    """Estimates a finished run's cost in dollars, or None when it made no call or left gpt-6-sol."""
+    if not usage.get("model_calls") or any(model != MODEL for model in models):
+        return None
+    cached = int(usage.get("cached_input_tokens") or 0)
+    fresh = max(int(usage.get("input_tokens") or 0) - cached, 0)
+    output = int(usage.get("output_tokens") or 0)
+    rates = RATES_PER_MILLION
+    dollars = (fresh * rates["input"] + cached * rates["cached_input"] + output * rates["output"]) / 1000000
+    return round(dollars * MARKUP, 2)
+
+
+def usage_summary(data):
+    """Returns (models, usage counts, estimated dollars) from a suggestions.result document's data."""
+    settings = data.get("settings") or {}
+    models = list(dict.fromkeys(m for m in (settings.get("model"), settings.get("critic_model")) if m))
+    usage = data.get("usage") or {}
+    return models, {key: int(usage.get(key) or 0) for key in USAGE_KEYS}, estimate_usd(usage, models)
 
 
 # ---------------------------------------------------------------- gather: write
@@ -969,11 +991,13 @@ def cmd_gather(args):
         for val in vals:
             print("    " + val)
     print("  --files: prs.md ({:,} characters)".format(digest_chars))
-    print("  Fixed by run: --project {} --horizon {} --count {} --category {}".format(
-        key, HORIZON, count, " --category ".join(CATEGORIES)))
-    print("\nCost of the paid run at --count {}: {} cents from the Vidbyte balance ({} of up to 10 "
-          "suggestions), plus model usage on the user's own Codex login.".format(
-              count, cost_cents(count), plural(int(math.ceil(count / 10.0)), "block")))
+    print("  Fixed by run: --project {} --horizon {} --count {} --category {} --max-total-tokens {}".format(
+        key, HORIZON, count, " --category ".join(CATEGORIES), MAX_TOTAL_TOKENS))
+    print("\nCost of the paid run: model usage from the Vidbyte balance. About five model calls on {} at high "
+          "reasoning effort, each billed at ${:g} per million input tokens (${:.2f} cached) and ${:g} per million "
+          "output tokens, plus 2%; reasoning counts as output. No new call starts after {:,} tokens, so one run "
+          "stays under about $4.".format(MODEL, RATES_PER_MILLION["input"], RATES_PER_MILLION["cached_input"],
+                                         RATES_PER_MILLION["output"], MAX_TOTAL_TOKENS))
     print("Suggestion project for this repository: {}. If 'vidbyte-cli --json agents suggest project list' "
           "does not show it, create it once (free, local):".format(key))
     print('  vidbyte-cli --json agents suggest project create --key {} --title "Review order for {}" '
@@ -1068,6 +1092,7 @@ def build_argv(inputs):
             argv += [flag, value]
     for name in inputs["files"]:
         argv += ["--files", name]  # relative: vidbyte-cli runs inside OUT_DIR
+    argv += ["--max-total-tokens", str(MAX_TOTAL_TOKENS)]
     return argv
 
 
@@ -1131,22 +1156,9 @@ def last_error_document(text):
     return None
 
 
-def finished_result(path):
-    try:
-        with open(path, encoding="utf-8") as handle:
-            doc = json.load(handle)
-    except (OSError, ValueError):
-        return False
-    data = doc.get("data") if isinstance(doc, dict) else None
-    return doc.get("kind") == "suggestions.result" and isinstance(data, dict) and data.get("stop_reason") != "dry_run"
-
-
 def cmd_run(args):
     out_dir = os.path.abspath(args.out_dir)
-    paid = not args.dry_run
-    if paid and not KEY_PATTERN.match(args.idempotency_key or ""):
-        raise UsageProblem("--idempotency-key must be 8 to 128 letters, digits, dots, underscores, colons, or "
-                           "hyphens, such as {}:20261012:7f3a9c.".format(SLUG))
+    paid = args.paid
     inputs, problems = validate_inputs(load_json(os.path.join(out_dir, "inputs.json"), "inputs.json"), out_dir)
     if problems:
         for problem in problems:
@@ -1162,9 +1174,16 @@ def cmd_run(args):
             length, MAX_ARGV_CHARS))
     fingerprint = request_hash(argv, out_dir, inputs["files"])
     ok_path = os.path.join(out_dir, "dry-run.ok")
-    key_path = os.path.join(out_dir, "idempotency-key.txt")
+    marker_path = os.path.join(out_dir, "paid-run.txt")
     result_path = os.path.join(out_dir, "result.json")
     if paid:
+        if os.path.exists(marker_path) or os.path.exists(result_path):
+            # The model calls an earlier paid run here finished were billed, and nothing recovers
+            # them. Another run is a new charge, so it needs the user's yes and a new folder.
+            raise UsageProblem("A paid run was already started in this folder (see paid-run.txt and result.json), and "
+                               "the model calls it finished were billed. Read result.json with 'report' if it is "
+                               "there. Any other run is a new usage-billed run: ask the user first, then run gather "
+                               "again into a new folder.")
         try:
             with open(ok_path, encoding="utf-8") as handle:
                 passed = json.load(handle).get("request") == fingerprint
@@ -1173,31 +1192,16 @@ def cmd_run(args):
         if not passed:
             raise UsageProblem("No passed dry run matches the current inputs.json and prs.md. Run "
                                "'run --dry-run' first, show the user what will be sent, and get their yes.")
-        saved = ""
-        if os.path.isfile(key_path):
-            with open(key_path, encoding="utf-8") as handle:
-                saved = handle.read().strip()
-        if saved and saved != args.idempotency_key:
-            raise UsageProblem("A paid attempt with the key {} was already started in this folder, so it may already "
-                               "be charged. Reuse that exact key only to recover it. Any other new run is a new "
-                               "charge: ask the user first, then run gather again into a new folder.".format(saved))
-        if finished_result(result_path):
-            raise UsageProblem("result.json already holds a finished paid run, so there is nothing to recover. "
-                               "Read it with 'report'. A new run is a new charge: ask the user first, then run "
-                               "gather again into a new folder.")
-        with open(key_path, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(args.idempotency_key + "\n")
-        argv += ["--idempotency-key", args.idempotency_key]
     else:
         argv += ["--dry-run"]
     stem = "dry-run" if args.dry_run else "result"
     out_path = os.path.join(out_dir, stem + ".json")
-    if paid and os.path.exists(result_path):
-        kept = os.path.join(out_dir, "result-{}.json".format(dt.datetime.now().strftime("%Y%m%d-%H%M%S")))
-        os.replace(result_path, kept)
-        print("Kept the earlier attempt's output as " + os.path.basename(kept))
-    print("Running in OUT_DIR" + (" (free dry run)" if args.dry_run else " (paid run, {} cents plus Codex usage)".format(
-        cost_cents(inputs["count"]))) + ":")
+    if paid:
+        with open(marker_path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write("Paid run started {} with --max-total-tokens {}.\n".format(
+                dt.datetime.now().isoformat(timespec="seconds"), MAX_TOTAL_TOKENS))
+    print("Running in OUT_DIR" + (" (free dry run)" if args.dry_run else " (usage-billed run on the Vidbyte balance, "
+                                  "no new model call after {:,} tokens)".format(MAX_TOTAL_TOKENS)) + ":")
     print(display(argv))
     print("stdout -> " + stem + ".json", flush=True)
     log_path = os.path.join(out_dir, stem + "-stderr.log")
@@ -1231,7 +1235,10 @@ def cmd_run(args):
     for entry in manifest:
         print("context_manifest: {} {} {} ({} chars)".format(entry.get("ref"), entry.get("source"),
                                                           entry.get("status"), entry.get("chars")))
-    print("charged_cents: {}".format(data.get("charged_cents")))
+    models, usage, estimate = usage_summary(data)
+    print("models: {}".format(", ".join(models) or "not reported"))
+    print("usage: " + ", ".join("{} {}".format(key, usage[key]) for key in USAGE_KEYS))
+    print("estimated_cost_usd: {}".format(estimate))
     for warning in data.get("warnings") or []:
         print("warning: " + warning)
     if args.dry_run:
@@ -1337,10 +1344,13 @@ def cmd_report(args):
         ", ".join("#{}".format(f["number"]) for f in rest[:40]) + (", and more" if len(rest) > 40 else "")))
     if rest:
         lines.append("They are listed with their facts in prs.md.")
-    if data.get("charged_cents") is not None:
-        admission = (data.get("admission") or {}).get("admission_id", "")
-        lines.append("This run cost {} cents from the Vidbyte balance{}.".format(
-            data["charged_cents"], " (admission {})".format(admission) if admission else ""))
+    models, usage, estimate = usage_summary(data)
+    if usage["model_calls"]:
+        lines.append("This run made {} with {:,} input and {:,} output tokens, {}; the exact amount is on "
+                     "vidbyte.pro/usage.".format(
+                         plural(usage["model_calls"], "model call"), usage["input_tokens"], usage["output_tokens"],
+                         "about ${:.2f} from the Vidbyte balance".format(estimate) if estimate is not None
+                         else "billed to the Vidbyte balance at the rates of " + ", ".join(models)))
     for warning in data.get("warnings") or []:
         lines.append("Warning: " + warning)
     text = "\n".join(lines) + "\n"
@@ -1390,7 +1400,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="review_order.py",
         description="Read every open pull request of one repository, ask the Vidbyte Suggestion Agent which to "
-                    "review first, and report the order with links. Only 'run' without --dry-run costs money.")
+                    "review first, and report the order with links. Only 'run --paid' costs money.")
     sub = parser.add_subparsers(dest="command")
 
     gather = sub.add_parser(
@@ -1416,20 +1426,22 @@ def main(argv=None):
     gather.add_argument("--avoid", action="append", default=[], metavar="TEXT",
                         help="A full sentence naming a direction the user does not want. Repeat for more.")
     gather.add_argument("--count", type=int, metavar="N",
-                        help="Suggestions to request (2-100). Default: 5, 8, or 10 by queue size; 2 cents per block of 10.")
+                        help="Suggestions to request (2-100). Default: 5, 8, or 10 by queue size. A larger count asks "
+                             "for longer replies, which are more output tokens.")
     gather.add_argument("--out-dir", metavar="DIR", help="Write here instead of a new folder in the system temp directory.")
     gather.set_defaults(func=cmd_gather)
 
     run = sub.add_parser(
         "run", help="Run vidbyte-cli agents suggest run from inputs.json (dry run or paid).",
         description="Build the vidbyte-cli agents suggest run command from <out-dir>/inputs.json and run it inside "
-                    "<out-dir>. --dry-run is free and writes dry-run.json. --idempotency-key is the paid run, needs a "
-                    "passed dry run for the same inputs, and writes result.json. Exits with vidbyte-cli's exit code.")
+                    "<out-dir>. --dry-run is free and writes dry-run.json. --paid is the usage-billed run, needs a "
+                    "passed dry run for the same inputs, runs at most once per folder, and writes result.json. Exits "
+                    "with vidbyte-cli's exit code.")
     run.add_argument("--out-dir", required=True, metavar="DIR", help="The OUT_DIR that gather printed.")
     mode = run.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--dry-run", action="store_true", help="Validate for free: no model, no charge.")
-    mode.add_argument("--idempotency-key", metavar="KEY",
-                      help="Paid run, only after the user's yes. One key per run, such as {}:20261012:7f3a9c.".format(SLUG))
+    mode.add_argument("--dry-run", action="store_true", help="Validate for free: no model call, no charge.")
+    mode.add_argument("--paid", action="store_true",
+                      help="The usage-billed run. Use only after the user agreed to the cost.")
     run.add_argument("--cli", default="vidbyte-cli", metavar="PATH",
                      help="The vidbyte-cli to call: a command name looked up on PATH or a full path to the "
                           "executable. Default: vidbyte-cli on PATH.")
