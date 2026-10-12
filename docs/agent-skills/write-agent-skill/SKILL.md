@@ -107,7 +107,7 @@ metadata:
 | `description` | Starts with "Use when", quotes two or three phrasings a user would actually type, says what the skill gets done, and names the Vidbyte agent and `vidbyte-cli`. It is the only place the skill says when to use it (section 4). At most 1024 characters. The website catalog entry's `description` is a verbatim copy of this field, so edit both together. No price figures: on the website every price must trace to the backend's price table, and lint rule N038 checks only agent catalog entries and the sentences bound in `lint/allowlists/price_sources.txt`, so a price here would ship unchecked. Prices go in `metadata.cost` and the Cost and consent section. |
 | `metadata.agent` | The agent id, from the website vocabulary: `suggestion-agent`, `persistent-researcher`, `persistent-agent`, `ensemble-agent`, `task-board`, `stages-agent`, or `bug-finder`. |
 | `metadata.commands` | The command paths the skill runs, without the `vidbyte-cli` prefix, separated by commas. |
-| `metadata.cost` | The exact Vidbyte charge plus any provider usage, in the same words the Cost and consent section uses. |
+| `metadata.cost` | The exact Vidbyte charge plus any provider usage, in the same words the Cost and consent section uses. For a usage-billed agent, which has no exact charge, the model, its per-token rates, and the token cap the skill passes. |
 | `metadata.writes-files` | `"true"` when any step edits the user's workspace. |
 | `metadata.min-cli-version` | The first released version on PyPI that has every command and flag the skill uses. See section 6. |
 | `metadata.status` | `stable`, or `preview` while the agent itself is labelled preview. A skill that is not ready is not published; it appears on the website as a coming-soon entry with no public file. |
@@ -130,7 +130,7 @@ ready to fill in.
 | Gather inputs | What to read from the repository before asking the user anything, and the one or two questions only the user can answer. |
 | Steps | A numbered, high-level list of the whole procedure, from preflight to hand-back. Each step is one or two lines, names the `vidbyte-cli` command it runs if it runs one, and ends with the section that holds its details, such as "(Run)". |
 | CLI commands | A table of every `vidbyte-cli` command the skill runs or asks the user to run, in the order they come up: the full command with root options first, the section that uses it, and what the command does, what it costs, and whether it writes files. Describe each command from its help text in the CLI source (`src/vidbyte_cli/commands/**/prompts/*.md` on the internal repository), never from memory. |
-| Cost and consent | The exact charge, whether files change, the consent question, and how to make the idempotency key. |
+| Cost and consent | The exact charge (or, for a usage-billed agent, what makes the usage grow), whether files change, the consent question, and how to make the idempotency key when the command takes one. |
 | Run | The exact command, always `vidbyte-cli --json --no-input ...`, with a one-line reason for each non-default flag. |
 | Read the result | The result `kind` and the `data` fields the next step uses. |
 | Deliver | How to present the result and which skill to chain to next. |
@@ -162,6 +162,7 @@ These rules are not optional and every skill restates them in its Guardrails sec
    are stored with `login --with-token` from stdin or by the user running `vidbyte-cli login`.
 4. Run at most one file-writing Vidbyte agent in a workspace at a time.
 5. Give every priced run one idempotency key and reuse it only to recover that same admission.
+   `agents suggest run` buys no admission and takes no key; its model calls are billed one by one.
 
 ## 6. Commands are exact
 
@@ -174,8 +175,8 @@ These rules are not optional and every skill restates them in its Guardrails sec
   source, never from memory, from `--help` text you remember, or from another skill.
 - As of 2026-10-11, PyPI's newest release is `vidbyte-cli` 0.2.0 (tagged 2026-10-03). It does not
   have `runs`, `mcp serve`, `setup-prompt`, `github link`, `browserbase login`, or
-  `agents bug-finder`, and its suggestion command predates the paid admission and
-  `--idempotency-key` and caps `--count` at 15 where `main` allows 100. A skill that needs any of these sets `min-cli-version` to the release that
+  `agents bug-finder`, and its suggestion command predates the model calls billed through
+  Vidbyte and caps `--count` at 15 where `main` allows 100. A skill that needs any of these sets `min-cli-version` to the release that
   ships them and is not published until that release is on PyPI.
 - Never write a skill around `runtime adversarial-team`. It exists in the command tree but raises
   `NOT_IMPLEMENTED` before doing anything.
