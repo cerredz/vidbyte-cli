@@ -40,7 +40,7 @@ flowchart TD
     C -->|exit 3: nothing repeated enough| W["Show window and counts;<br/>offer a longer window or other config folders"]
     C --> D["digest.md (sent) + patterns.json (local only)<br/>+ state.json updated (local, per user)"]
     D --> E["Agent reads digest.md, writes inputs.json:<br/>goal + tagged mistakes / success / outcomes / context"]
-    E --> P["agents suggest project list;<br/>project create once (free, local)"]
+    E --> P["agents suggest project list;<br/>project create once (free, local;<br/>the dry run needs the project)"]
     P --> F["repeats.py suggest --dry-run (free: no model, no admission)"]
     F -->|exit 2| E
     F --> G{"Cost and consent: pattern table + inputs shown,<br/>2 cents + Codex usage. Yes?"}
@@ -48,7 +48,7 @@ flowchart TD
     G -->|yes| H["repeats.py suggest --paid:<br/>vidbyte-cli --json --no-input agents suggest run ..."]
     H -->|exit 4, 5, other| T["Troubleshooting table"]
     H --> I["Read result.json: ideas, pattern tags, charged_cents"]
-    I --> J["Deliver: ranked fixes with repetition, count,<br/>fix kind, exact change; grouped by horizon"]
+    I --> J["Deliver: since the last run, then ranked fixes<br/>with repetition, count, fix kind, exact change"]
     J --> K{"User approves one exact change?"}
     K -->|yes| L["agents suggest handoff → agent shows the diff,<br/>applies it, validates JSON"] --> M["repeats.py feedback --accept --applied<br/>(CLI feedback + state: fixed at now)"]
     K -->|no| N["repeats.py feedback --reject --reason<br/>(CLI feedback + state: rejected)"]
@@ -123,7 +123,9 @@ sessions since Oct 11); P3 continues despite its CLAUDE.md rule (4 times since)"
     `pastedContents` holds either `content` or a `contentHash` whose text is in
     `paste-cache/<hash>.txt`, so the same paste is found by hash.
   - Codex rollouts, `$CODEX_HOME` (else `~/.codex`) `sessions/YYYY/MM/DD/rollout-*.jsonl`, with
-    the same skips (SDK, subagent, automation threads) as `pick-up-where-my-sessions-left-off`.
+    the same skips (SDK, subagent, automation threads) as `pick-up-where-my-sessions-left-off`,
+    plus `codex exec` runs (`originator: codex_exec`, `source: exec`), whose prompts a script
+    wrote, not a person.
   - Codex `history.jsonl`: `{session_id, ts, text}`, for prompts of sessions with no rollout.
 - **Formats confirmed on real files** (Claude Code 2.1.29x, codex-cli 0.16x):
   - Human prompts: Claude Code `type: user` records with `origin.kind: human`, or older records
@@ -146,15 +148,15 @@ sessions since Oct 11); P3 continues despite its CLAUDE.md rule (4 times since)"
 
   | Kind | What counts |
   |---|---|
-  | `correction` | A short, directive sentence after the first prompt: "no, use pnpm", "don't add comments", "run the tests first", "instead of ...". |
-  | `start_preference` | A directive sentence in the first prompt of a session: "always work in a worktree", "be brief". |
-  | `repeated_request` | The same task asked again across sessions (whole-prompt similarity 0.6 or more). Skill or slash-command candidate. Slash commands are counted separately as skills already in use. |
+  | `correction` | A directive sentence ("no, use pnpm", "don't add comments", "run the tests first", "instead of ...") said in at least two sessions and in at least two different requests, so one prompt sent to two agents at once does not count. |
+  | `start_preference` | The same, when most of its occurrences open a session: "always work in a worktree", "be brief". Corrections and preferences are clustered together and the kind follows the majority, so one instruction is never split in two. Instructions that always appear in the same prompts (or, with three or more sessions, the same sessions) merge into one pattern: a pasted block is one repetition. |
+  | `repeated_request` | The same task asked again across sessions (whole-prompt similarity 0.6 or more). Skill or slash-command candidate. Prompts that start with a slash command or a Codex `$skill` already use the durable fix; they are counted as skills in use instead. |
   | `repeated_context` | The same file path, link, pasted block, or long explanatory sentence in prompts of different sessions and different requests. |
-  | `approval` | The same command approved by hand: Claude Code `user_temporary` accepts, Codex escalations that ran. Each has a safety class (`read_only`, `runs_code`, `writes`, `unknown`) from the command's first words. |
+  | `approval` | The same command approved by hand, one pattern per command prefix across Claude Code (`Bash`, `PowerShell`) and Codex escalations. Each has a safety class (`read_only`, `runs_code`, `writes`, `unknown`) from the command's words. Answering `AskUserQuestion` or approving a plan is not a permission prompt and is not counted. |
   | `rejected_action` | The same tool call refused by the user in several sessions. |
   | `follow_up` | A short prompt right after a finished turn that asks for commit, push, a pull request, tests, lint, a type check, a build, docs, or worktree cleanup. Keyed by the set of asks, such as `commit+push`. |
   | `go_ahead` | "yes", "continue", "go ahead" after the agent stopped to ask. |
-  | `repeated_error` | The same non-check command failing the same way in three or more sessions, such as `python3` not found on Windows. |
+  | `repeated_error` | The same setup or usage mistake in three or more sessions: a missing tool, module, or shell feature (`python3: command not found`, `&&` in Windows PowerShell 5.1), or a wrong flag or subcommand. A failing test or lint run, a bug in the agent's own script, and a read-only command (a search that found nothing) do not count; a check command counts only for a missing tool. These are the agent's mistakes, not the user's words, so they rank below the other kinds and fill at most four places. |
 
 - **Existing configuration.** The script inventories, per config folder and for `--project-dir`
   folders: `CLAUDE.md` and `AGENTS.md` (size, line count, headings), `settings.json` and
@@ -162,10 +164,15 @@ sessions since Oct 11); P3 continues despite its CLAUDE.md rule (4 times since)"
   names, `.mcp.json` server names, Claude Code memory files, Codex `config.toml`
   (`approval_policy`, `sandbox_mode`, MCP server names), Codex `rules/default.rules` prefix-rule
   count, Codex skills, prompts, and `AGENTS.md`. For each pattern it searches instruction and
-  memory files for lines that contain the pattern's key words. A match goes into the digest as
-  "Already configured: <file> line N"; a pattern that still repeats there is marked "repeats
-  despite this rule", which tells the Suggestion Agent to propose a hook, check, script, or skill
-  instead of another rule.
+  memory files for lines that contain the pattern's key words. Each line knows which agent reads
+  its file (Claude Code reads `CLAUDE.md`, and `AGENTS.md` only through an `@AGENTS.md` import;
+  Codex reads `AGENTS.md`) and where it applies (everywhere for a global file, inside its folder for
+  a project file). A match goes into the digest as "Already configured: <file> line N" with how
+  many of the pattern's sessions the rule reaches. A rule that reached the sessions and was still
+  repeated is not enough, which tells the Suggestion Agent to propose a hook, check, script, or
+  skill instead of another rule. A rule that never reached them (for example a Codex `AGENTS.md`
+  rule for a repetition that happens only in Claude Code) points to the cheapest fix: the same rule
+  where that agent reads it.
 - **Fix kinds.** The digest names the fix kinds that fit each pattern: a rule for corrections and
   preferences, a skill or slash command for repeated requests, a rule or a reference file for
   repeated context, an allowlist entry only for `read_only` approvals (the exact Claude Code
@@ -184,7 +191,9 @@ sessions since Oct 11); P3 continues despite its CLAUDE.md rule (4 times since)"
   pattern: a fingerprint id, kind, a short redacted label, key words, first and last seen, a count
   history per run, and the fix (`accepted`, `applied`, or `rejected`, with the time, the idea
   title, and a one-line summary). It holds no transcript text beyond the redacted label and key
-  words, and no session ids.
+  words, and no session ids. It is written atomically and keeps the last 52 runs; a file that
+  cannot be read is kept as `state.json.unreadable-<time>` instead of being overwritten, and
+  `status` never moves or writes it.
 - **Since the last run.** On each `gather`, every current pattern is matched to the state by
   fingerprint (exact key, or key-word similarity 0.5 or more within the same kind). A pattern with
   an applied fix is re-counted only after the fix time, over every candidate (not only those above
@@ -206,6 +215,8 @@ sessions since Oct 11); P3 continues despite its CLAUDE.md rule (4 times since)"
   `--files digest.md` as a relative path (the path string reaches the model), stdout to
   `result.json`, stderr shown and saved. `--paid` makes and saves one idempotency key and refuses a
   folder that already holds a paid attempt unless recovering it with `--idempotency-key`.
+  `suggest` and `feedback` take `--cli <path>` (default: `vidbyte-cli` on `PATH`) and print the
+  resolved path, so tests can pass a recording stand-in explicitly and prove it ran.
 - **Flag choices.**
   - `--category leverage quick_wins simplification risk_prevention`: a rule, skill, or hook is one
     asset that pays off in every later session; small config edits are quick wins; a bloated
@@ -214,7 +225,7 @@ sessions since Oct 11); P3 continues despite its CLAUDE.md rule (4 times since)"
   - `--count 10`: one admission covers up to ten ideas (2 cents), and ten fixes fit one weekly
     review.
   - `--horizon any`, passed explicitly: any other value is a silent filter after review that can
-    return fewer ideas than asked and still charge. Deliver groups by each idea's own label.
+    return fewer ideas than asked and still charge. Deliver shows each idea's own label.
   - `--forbidden` twice: never allowlist commands that write, delete, push, or spend money, and
     never "fix" approvals by turning prompts or the sandbox off altogether.
   - `--project stop-repeating-yourself`: created once with `project create` (free, local), so
@@ -222,13 +233,16 @@ sessions since Oct 11); P3 continues despite its CLAUDE.md rule (4 times since)"
     word is dropped.
   - `--files digest.md`, not `--attach`, so ideas can cite the digest (`ctx-NNN`) and pass the
     evidence gate.
-- **Deliver and apply.** Ideas are shown in rank order, grouped by horizon, each with its pattern
-  tags resolved through `patterns.json` (label, count, sessions, status), the fix kind, and the
-  exact change. For the idea the user picks, the agent runs `agents suggest handoff`, drafts the
-  exact edit (file, before and after), and applies it only after a yes for that exact edit. It
-  copies a settings file into the output folder before editing it, and checks JSON with
-  `python3 -m json.tool` after. Then `repeats.py feedback --accept --applied` records the CLI
-  feedback and marks the idea's patterns as fixed at that time; `--reject` records a rejection.
+- **Deliver and apply.** Deliver first reports what changed since the last run. Ideas are then
+  shown in rank order, each with its own horizon, its pattern tags resolved through
+  `patterns.json` (label, count, sessions, status), the fix kind, and the exact change. For the
+  idea the user picks, the agent runs `agents suggest handoff`, drafts the exact edit (file,
+  before and after), and applies it only after a yes for that exact edit. It copies the file into
+  the output folder before editing it, and checks JSON with `python3 -m json.tool` after. Then
+  `repeats.py feedback --accept --applied` records the CLI feedback and marks the idea's patterns
+  as fixed at that time; `--reject` records a rejection; `--accept` alone records a fix that is
+  not applied yet, and `--accept --applied --state-only` marks it applied later without a second
+  CLI record. The state file changes only after the CLI feedback succeeded.
 - **Weekly reminder (opt-in).** `repeats.py status --remind` reads only the state file and prints
   one line when the last run is seven or more days old, and nothing otherwise. Deliver offers a
   Claude Code `SessionStart` hook that runs it, so the agent offers the next run on its own. It is
@@ -239,8 +253,8 @@ sessions since Oct 11); P3 continues despite its CLAUDE.md rule (4 times since)"
 
 Same reasons as the sibling skill: JSONL parsing, regular-expression redaction, and free-text
 arguments break in shell pipelines on Windows. The script uses only the standard library and runs
-on Python 3.8+; `tomllib` is used for `config.toml` when present (3.11+), with a line scan as the
-fallback.
+on Python 3.8+ (tested on 3.8.20 and 3.11); `tomllib` is used for `config.toml` when present
+(3.11+), with a line scan as the fallback.
 
 ## Files
 
@@ -277,8 +291,9 @@ and no `--idempotency-key`, so `min-cli-version` is `0.3.0` and the skill is not
 - **Undocumented formats.** Transcript and history formats change between releases. Fields are
   read defensively and unparsed lines are counted, so a change degrades the digest instead of
   crashing it.
-- **Redaction is pattern-based.** Same redactor as the sibling skill. Pasted blocks are never
-  copied into the digest whole: only a redacted first line and a count.
+- **Redaction is pattern-based.** Same redactor as the sibling skill, plus Slack and Discord
+  webhook links. Pasted blocks are never copied into the digest whole: only a redacted first line
+  and a count.
 - **Overlap.** The parallel `agent-mistakes-to-guardrails` skill works from pull-request review
   history on GitHub; this one works from the local transcripts. They can point to each other once
   both ship.
@@ -299,10 +314,23 @@ and no `--idempotency-key`, so `min-cli-version` is `0.3.0` and the skill is not
 3. `repeats.py gather` against the real folders on this Windows machine, output kept outside the
    repository and scanned for home paths, the login name, emails, and token patterns. Only counts
    are reported; nothing real is committed.
-4. `repeats.py suggest --dry-run` with a written `inputs.json` against a CLI built from the
-   internal `main`, with a guard that refuses any non-dry run: exit 0, `stop_reason: dry_run`,
-   every manifest entry `included`, no charge.
-5. The paid-run guards and `feedback` tested with a stand-in `vidbyte-cli` first on `PATH`,
-   confirmed with `command -v vidbyte-cli` before each test.
-6. `cmp` of both `references/` files against the canonical copies; `python -m py_compile` under
-   the oldest available Python; a diff grep for real names, paths, and ids before each commit.
+4. `repeats.py suggest --dry-run --cli <guard>` with a written `inputs.json` against a CLI
+   installed from the internal `main`. The guard forwards only `agents suggest run ... --dry-run`
+   and refuses everything else (paid runs, `project create`, `feedback`) before the real CLI
+   starts; it also switches the keyring off and points the CLI's state folders into a scratch
+   folder. Without a project: exit 0, `stop_reason: dry_run`, every manifest entry `included`,
+   `digest.md` as one `file` entry, no charge. With `--project stop-repeating-yourself` not yet
+   created: exit 2, `Suggestion project was not found`, which is why Gather inputs creates the
+   project before the dry run.
+5. The paid-run guards and `feedback` tested only with a stand-in `vidbyte-cli` that records its
+   arguments, passed explicitly with `--cli` and also first on `PATH`; the test runner aborts
+   unless `command -v vidbyte-cli` in the same shell is the stand-in, and each report's `cli`
+   field names the stand-in. Covered: dry run, one paid run, a refused second paid run, a refused
+   recovery on a finished folder, recovery with the saved key on an interrupted folder, accept with
+   `--applied`, accept with `--pattern`, reject with `--reason`, a failing CLI that leaves the
+   state file unchanged, `--state-only`, and `status` with and without `--remind`. Then a second
+   fixture phase (sessions after the fixes) gives `continues_despite_fix`, `stopped_after_fix`,
+   `rejected`, `too_early`, and `fix_pending` where expected.
+6. `cmp` and `git hash-object` of both `references/` files against the canonical copies;
+   `py_compile` and the full fixture run under Python 3.8.20 and 3.11; a diff grep for real names,
+   paths, and ids before each commit.
