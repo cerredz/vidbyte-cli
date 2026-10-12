@@ -99,16 +99,19 @@ vidbyte-cli --json --no-input agents suggest run \
   exist. The file is undocumented. On this machine it is
   `{"vaults": {"<16-hex id>": {"path": "<absolute path>", "ts": <epoch ms>, "open": true}}}`, and
   Obsidian drops vaults whose folder is gone. So the script uses it as a hint: it keeps only paths
-  that still hold `.obsidian/`, adds a bounded scan of common folders (the home folder to depth 4,
-  the iCloud Obsidian folder), and the agent always asks the user to confirm one vault.
+  that still hold `.obsidian/`, adds a bounded scan (the home folder to depth 4 for at most 15
+  seconds, plus the iCloud Obsidian folder; it keeps going inside a vault, because a vault can hold
+  another vault), and the agent always asks the user to confirm one vault.
 - **Gathering.** `gather` walks the vault once without following symlinks. It skips dot-folders
   (`.obsidian`, `.trash`, `.git`), the templates folder named in `.obsidian/templates.json` or the
   Templater plugin's settings, the attachment folder named in `.obsidian/app.json`, the user's own
   "Excluded files" (`userIgnoreFilters` in the same file), and `*.excalidraw.md` drawings. A note
-  is in the window when its modified time, or its creation time (birth time on Windows and macOS,
-  or a `created`/`date` frontmatter value), is on or after the window start. `--exclude` (a
-  folder, a file, or a glob) and `--exclude-tag` remove notes before anything is written; excluded
-  notes appear only as counts.
+  is in the window when its modified time is on or after the window start. A note created in the
+  window was also modified in it, so this covers new notes too. Birth time is not used for the
+  window, because copying or restoring a vault resets it and would make every note look new; it
+  fills `created` only when no `created` frontmatter value exists and it is not later than the
+  modified time. `--exclude` (a folder, a file, or a glob) and `--exclude-tag` remove notes before
+  anything is written; excluded notes appear only as counts.
 - **Parsing.** For each note: a small YAML frontmatter reader (`tags`, `created`, `date`,
   `source`), inline `#tags` outside code, unchecked tasks (`- [ ]`, and `- [/]` in progress),
   wikilinks and Markdown links whose target is no file in the vault ("notes not written yet"), and
@@ -116,8 +119,8 @@ vidbyte-cli --json --no-input agents suggest run \
   and empty template headings removed; headings turned into bold lines so they cannot be mistaken
   for a new note in the digest. A note with no text and no open task left is skipped as empty, so a
   daily note created from a template and never filled in costs nothing.
-- **Daily notes.** A note in the daily-notes folder (`.obsidian/daily-notes.json`, or the Periodic
-  Notes plugin's settings) or named like a date (`2026-10-09`) is a daily note. It stays a `note`
+- **Daily notes.** A note named like a date is a daily note: `YYYY-MM-DD`, or the date format set
+  in `.obsidian/daily-notes.json` or the Periodic Notes plugin's settings. It stays a `note`
   with its date as title; its excerpt starts with "Daily note." and keeps the start and the end of
   the text, because daily notes grow at the bottom. The agent asks whether a journal folder should
   be left out.
@@ -221,7 +224,7 @@ and the PR waits for that release, like PRs #7 and #8.
   many notes at once. When more than 100 notes, or more than half the vault, fall in the window,
   `gather` warns, and the agent offers a shorter window or exclusions before anything is sent.
 - **Creation time.** Linux has no birth time in `os.stat`, so there `created` comes only from
-  frontmatter and is often `null`. The window still uses the modified time.
+  frontmatter and is often `null`. The window uses the modified time on every system.
 - **Tracing ideas to notes.** The CLI's handoff evidence for a file is the file's first 4,096
   characters, not the passage an idea relies on. The goal asks the model to name its notes, and
   `report` matches paths and titles in the idea text; an idea that names none is shown as drawing
