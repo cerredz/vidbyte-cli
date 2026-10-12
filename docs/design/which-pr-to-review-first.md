@@ -105,10 +105,13 @@ vidbyte-cli --json --no-input agents suggest run \
 - **One Python script, four subcommands.** `scripts/review_order.py` uses only the standard
   library (Python 3.8+) and calls `gh` and `vidbyte-cli` with argument lists, never a shell, so
   PR titles with quotes, `$`, `&`, or backticks reach the CLI unchanged on macOS, Linux, and
-  Windows. It is copied and adapted from `morning-triage`'s `morning_triage.py` (structure,
-  `gather` / `run` / `report` naming, the dry-run-or-key choice), with the `feedback` subcommand
-  and the one-paid-attempt-per-folder rule from `pick-up-where-my-sessions-left-off`. Public
-  skills install one folder at a time, so nothing is imported from a sibling.
+  Windows. `run` and `feedback` take `--cli <path>` (default: `vidbyte-cli` on `PATH`) and print
+  the full path of the binary before every call, so a caller, or a test, can see and choose
+  exactly which `vidbyte-cli` runs. It is copied and adapted from `morning-triage`'s
+  `morning_triage.py` (structure, `gather` / `run` / `report` naming, the dry-run-or-key
+  choice), with the `feedback` subcommand and the one-paid-attempt-per-folder rule from
+  `pick-up-where-my-sessions-left-off`. Public skills install one folder at a time, so nothing
+  is imported from a sibling.
 - **Gather (free, read-only).** `gh api user` checks the login (the login is used to recognize
   the user's own PRs and review requests, and is shown as "you", never printed). `gh repo view`
   finds the repository when `--repo` is not given. Then one GraphQL query, sent with
@@ -134,12 +137,15 @@ vidbyte-cli --json --no-input agents suggest run \
   - Merge: conflicts, behind the base branch, blocked by branch protection, clean, or unknown
     (GitHub computes mergeability lazily).
   - Review: the decision, the latest review per reviewer, and pending requests; the user's own
-    reviews and requests appear as "you".
+    reviews and requests appear as "you". Reviews by bots, such as an automated code reviewer, are
+    listed apart as "automated review" and never count as a human review.
   - Stacks: a PR whose base branch is another open, same-repository PR's head branch is stacked
     on it, so the lower PR blocks the upper one.
-  - Areas, from file paths: security-sensitive names, database migrations, API definitions, CI
-    configuration, build and deploy files, dependency manifests, code, tests, docs; "docs only"
-    and "tests only" when every file is one kind. Only the first 100 files of a PR are read.
+  - Areas, from file paths: security-sensitive names, database migrations, API schema files
+    (such as `.proto`, `.graphql`, and OpenAPI files), CI configuration, build and deploy files,
+    dependency manifests, code, tests, docs; "docs only" and "tests only" when every file is one
+    kind. Test files are checked first, so a test under an `auth/` folder counts as a test, not
+    as security-sensitive. Only the first 100 files of a PR are read.
   - Author: member, owner, collaborator, contributor, first-time contributor, or bot.
   - Linked issues: the issues the PR closes, with labels that look like priority or severity.
   - Signals: `quick` (50 lines or fewer, CI passing or absent, no conflicts, no changes
@@ -170,8 +176,9 @@ vidbyte-cli --json --no-input agents suggest run \
   - `--forbidden`: one fixed sentence that rules out approving, commenting, labelling, merging, or
     closing. It is long on purpose: the CLI removes any idea that repeats a `--forbidden` or
     `--avoid` value word for word, so a short value such as "merge" would remove good ideas.
-  - `--blockers`: stack bases, up to 8, each starting with its tag, such as `[#311]`.
-  - `--risks`: PRs touching security-sensitive paths, migrations, API definitions, or CI
+  - `--blockers`: stack bases, up to 8, each starting with its tag, such as `[#311]`, and
+    sorted by how many PRs wait above them in the stack, counted through the whole chain.
+  - `--risks`: PRs touching security-sensitive paths, migrations, API schema files, or CI
     configuration, up to 8.
   - `--context`: one snapshot of the counts, plus the PRs where the user's review is requested
     directly.
@@ -265,8 +272,10 @@ paid admission, and contract rule 5 requires one idempotency key per priced run.
    `main`, with its state folders redirected to a scratch folder: exit 0, `stop_reason`
    `dry_run`, every manifest entry `included`, `admission` null.
 4. The paid path of `run`, `report`, and `feedback` exercised only with a fake `vidbyte-cli` that
-   records its arguments, placed first on `PATH` and confirmed with `command -v` before each test;
-   `report` checked against a synthetic `result.json`. The guard's refusals (no dry run, changed
-   inputs, a second key) checked too.
+   records its arguments, passed with `--cli` while no `vidbyte-cli` at all is on `PATH` (so an
+   ignored `--cli` fails with exit 127 instead of reaching a real CLI), and every recorded call
+   matched against the calls the tests expected; `report` checked against a synthetic
+   `result.json`. The guard's refusals (no dry run, changed inputs, a second key, a finished
+   result) checked too.
 5. `cmp` of both `references/` files against the canonical copies; `git diff` checked for leaked
    names, paths, or tokens before every commit.
