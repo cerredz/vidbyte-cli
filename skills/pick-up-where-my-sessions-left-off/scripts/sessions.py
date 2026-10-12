@@ -66,6 +66,12 @@ KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 PROJECT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 
+def write_text_lf(path, text):
+    """Write UTF-8 text with LF line endings (Path.write_text has no newline= before Python 3.10)."""
+    with open(str(path), "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
 # --------------------------------------------------------------------------------------------
 # Redaction
 
@@ -816,15 +822,15 @@ def cmd_gather(args) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     projects = group_by_project(kept, redact)
     digest = render_digest(projects, kept, since, now, args.max_chars)
-    (out_dir / "digest.md").write_text(digest, encoding="utf-8", newline="\n")
+    write_text_lf(out_dir / "digest.md", digest)
     index = build_index(projects, since, now, home)
-    (out_dir / "sessions.json").write_text(json.dumps(index, indent=2), encoding="utf-8", newline="\n")
+    write_text_lf(out_dir / "sessions.json", json.dumps(index, indent=2))
     inputs_path = out_dir / "inputs.json"
     warnings = []
     if inputs_path.exists():
         warnings.append("inputs.json already existed and was left as it is; check its session tags against the new digest.")
     else:
-        inputs_path.write_text(json.dumps(inputs_template(since, now, args), indent=2), encoding="utf-8", newline="\n")
+        write_text_lf(inputs_path, json.dumps(inputs_template(since, now, args), indent=2))
 
     summary.update(
         {
