@@ -120,17 +120,18 @@ and, where it applies, `Backed by more than one tool: Notion, Slack.`
 
   | Provider | Available when | Otherwise |
   |---|---|---|
-  | Obsidian | `--vault <folder>` names a folder that holds `.obsidian`. | Vaults listed in Obsidian's own `obsidian.json` (and, with `--scan`, a 15-second scan of the home folder) are shown as "found, confirm with --vault". The skill always asks the user to confirm a vault. |
+  | Obsidian | `--vault <folder>` names a folder that holds `.obsidian`. | Vaults listed in Obsidian's own `obsidian.json` (and, with `--scan`, a 15-second scan of the home folder) are shown as "found, confirm first". The skill always asks the user to confirm a vault. |
   | Notion | `NOTION_TOKEN` is set. | Fix: `references/notion-setup.md`. |
   | Slack | `SLACK_USER_TOKEN` is set and starts with `xoxp-`. | A bot (`xoxb-`) or browser session (`xoxc-`, `xoxd-`) token gets its own fix. Fix: `references/slack-app.md`. |
   | Google Docs | `--google-token-file` names a readable file, or `GOOGLE_OAUTH_ACCESS_TOKEN` is set, or `--google-auth gcloud` is passed, or gcloud is on `PATH` and a quota project is set (`--google-quota-project` or `GOOGLE_CLOUD_QUOTA_PROJECT`). | gcloud on `PATH` without a quota project is reported as "possible": gcloud is used only when the user chose it, because its token needs Drive access and a project of the user's own. Fix: `references/google-drive-access.md`. |
   | Any | `--from-items <provider>=<items.json>` names a file the host agent wrote with its own connector. | - |
 
-  `providers --check` adds one free, read-only call per available provider (Notion `GET /v1/users/me`,
-  Slack `auth.test`, Drive `files.list` with `pageSize=1`) and marks a provider unavailable when the
-  call fails, with the error kind. The JSON output has a `providers[]` list (provider, label,
-  available, source, detail, fix, reference) and a ready `table_markdown`. Exit 0 when at least one
-  provider is available, 3 when none is.
+  `providers --check` adds one free, read-only check per available provider (Notion
+  `GET /v1/users/me` and a one-page `POST /v1/search`, Slack `auth.test`, Drive `files.list` with
+  `pageSize=1`, and a local folder check for Obsidian) and marks a provider unavailable when the
+  check fails, with the error kind. `--providers` marks the others "not selected". The JSON output
+  has a `providers[]` list (provider, label, available, possible, source, detail, fix, reference)
+  and a ready `table_markdown`. Exit 0 when at least one provider is available, 3 when none is.
 - **Gather** (`gather`). `--providers obsidian,notion,...` picks a subset; the default is every
   available provider. Each provider runs in its own `try` block, one after another:
   - Obsidian walks the vault read-only (templates, attachments, `.trash`, the vault's own excluded
@@ -170,8 +171,8 @@ and, where it applies, `Backed by more than one tool: Notion, Slack.`
   | `items.json` | The kept items in `notes-digest/1`, `"provider": "all"`, newest first across providers. | No |
   | `sources.json` | Local index: the window, each provider's status, counts, skips, warnings, API call counts, error, and budget share, and the vault's real path. | No, never |
 
-  Exit 0 when the files were written, 3 when no provider returned an item, 1 when every provider
-  that was tried failed, 2 for a usage error (including a `--from-items` file that does not follow
+  Exit 0 when the files were written, 3 when no provider is available or none returned an item, 1
+  when every provider that was tried failed, 2 for a usage error (including a `--from-items` file that does not follow
   the format; every problem is listed).
 - **Run, report, and feedback** follow the provider skills. `run --dry-run` builds the request,
   saves it in `request.json`, and runs it with `--dry-run`; a passing dry run stores a fingerprint
@@ -253,15 +254,16 @@ Example, with a pool of 96,000 characters:
 
 | Provider | Items | Need | Floor (12,000, capped at need) | Proportional share | Final |
 |---|---|---|---|---|---|
-| Slack | 40 | 70,000 | 12,000 | +35,789, then +1,902 | 49,691 |
-| Notion | 12 | 25,000 | 12,000 | +10,736, then +570 | 23,306 |
+| Slack | 40 | 70,000 | 12,000 | +35,789, then +1,903 | 49,692 |
+| Notion | 12 | 25,000 | 12,000 | +10,736, then +571 | 23,307 |
 | Obsidian | 8 | 9,000 | 9,000 | needs nothing more | 9,000 |
 | Google Docs | 5 | 14,000 | 12,000 | +4,473, capped at +2,000 | 14,000 |
 
 The floors use 45,000 characters. The other 51,000 are split 40 : 12 : 5 among Slack, Notion, and
-Google Docs. Google Docs needs only 2,000 more, so its unused 2,473 are split 40 : 12 between Slack
-and Notion. Obsidian and Google Docs keep everything; Slack and Notion drop or shorten their
-lowest-priority items to fit their shares.
+Google Docs (each share rounded down). Google Docs needs only 2,000 more, so its unused 2,473, plus
+the 2 characters lost to rounding, are split 40 : 12 between Slack and Notion. The 1 character left
+after that rounding stays unused. Obsidian and Google Docs keep everything; Slack and Notion drop or
+shorten their lowest-priority items to fit their shares.
 
 ## Shared family format
 
@@ -316,7 +318,8 @@ page · Projects · last edited 2026-10-10 16:40 · https://www.notion.so/...
 The cross-tool section uses bold labels instead of `##`, so every `##` heading in the file is one
 item. Topics are the words and two-word phrases from item titles (at least four letters, common
 words left out) that appear in the title or text of items from at least two tools, ranked by the
-number of tools, then items; a two-word phrase hides its single words. Headings inside an excerpt
+number of tools, then items; a two-word phrase hides a single word in it that appears in the same
+tools. Headings inside an excerpt
 become bold lines.
 
 ## Keeping the copied adapters in sync
@@ -390,7 +393,7 @@ PyPI. The price, 2 cents per block of up to ten requested ideas, comes from the
 2. `py_compile` of every script, a Python 3.8 grammar check (`ast.parse(..., feature_version=(3, 8))`),
    an AST scan for `write_text`/`read_text` with `newline=`, and the test suite run under a real
    Python 3.8 interpreter.
-3. `gather` against one local mock server that answers the Notion, Slack, and Drive paths with
+3. `gather` against local mock servers that answer the Notion, Slack, and Drive paths with
    realistic JSON (planted secrets, emails, phone numbers, checklists, threads, a database row,
    pagination, a 429 that succeeds on retry), plus a synthetic Obsidian vault: `items.json` has
    exactly the shared keys in order, `"provider": "all"`, newest first; `digest.md` has the shared
