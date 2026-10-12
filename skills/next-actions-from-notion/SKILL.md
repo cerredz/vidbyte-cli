@@ -4,7 +4,7 @@ description: Use when the user wants to know what to do next based on what they 
 metadata:
   agent: "suggestion-agent"
   commands: "agents suggest project list, agents suggest project create, agents suggest run, agents suggest handoff, agents suggest feedback accept, agents suggest feedback reject"
-  cost: "2 cents per run (one block of up to 10 suggestions) + model usage on the user's own Codex account"
+  cost: "Model usage from the Vidbyte balance: gpt-6-sol at $2 / $10 per million input / output tokens + 2%, capped at 400,000 tokens per run"
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
@@ -53,10 +53,11 @@ numbers, home-folder paths, and the login name, and writes one short Markdown di
 
 After the user has seen the digest and said yes, one `vidbyte-cli agents suggest run` call sends
 the digest to the Suggestion Agent with the user's own question: "What are the most important
-next actions given what I've been writing and discussing in Notion over the last 7 days?". The
-agent runs on the user's own Codex. A generator proposes candidates, an independent critic
-reviews them, and only ideas backed by evidence from the digest survive. A suggestion project
-remembers which ideas the user accepted or rejected, across every note tool in this skill family.
+next actions given what I've been writing and discussing in Notion over the last 7 days?". Its
+model calls run on OpenAI's gpt-6-sol through Vidbyte's model gateway and are billed to the
+user's Vidbyte balance. A generator proposes candidates, an independent critic reviews them, and
+only ideas backed by evidence from the digest survive. A suggestion project remembers which ideas
+the user accepted or rejected, across every note tool in this skill family.
 
 At the end the user has a short, ranked list of next actions, grouped into now, next, and later.
 Each action names the Notion pages it came from, with links, and has a first step. The free
@@ -67,33 +68,33 @@ session.
 
 The goal is one ranked list of the most important next actions from the user's recent Notion
 pages, built from a redacted digest the user approved, with every action traced back to its
-source pages, for one Vidbyte charge.
+source pages, in one usage-billed run.
 
 Done when: the user has seen the next actions grouped by `now`, `next`, and `later`, each with its
-source Notion pages and links; the result's `charged_cents` has been reported; and the user has
-been offered a handoff for the action they choose and feedback on the actions they accepted or
-rejected.
+source Notion pages and links; the run's model usage and estimated cost have been reported; and
+the user has been offered a handoff for the action they choose and feedback on the actions they
+accepted or rejected.
 
 ## Preflight
 
 Run these in order. If a `vidbyte-cli` check fails, read `references/setup.md`, fix only what
-failed, and run the preflight again. Step 3 of that file covers Codex for the Suggestion Agent.
+failed, and run the preflight again. Step 3 of that file lists what the Suggestion Agent needs:
+no Codex and no OpenAI key, only a Vidbyte key with the `models:invoke` permission.
 
 ```bash
 vidbyte-cli --version                  # must be 0.3.0 or newer
 vidbyte-cli --json whoami              # exit 4 means no Vidbyte key is stored
-vidbyte-cli --json runtime doctor      # data.hosts must list "codex" with "available": true
-codex login status                     # must report a login; exit 1 means not logged in
 python3 --version                      # must be 3.8 or newer
 python3 "<skill>/scripts/notion_next_actions.py" check    # Notion access; see below
 ```
 
 - `<skill>` means the folder that holds this `SKILL.md`. Run the commands from any folder; the
   script never writes into the current folder or the user's repositories.
-- Codex must be logged in. `vidbyte-cli` checks that Codex is on `PATH` before it charges, but it
-  does not check the login, so a run with a logged-out Codex is charged and then fails. If
-  `codex login status` says the user is not logged in, ask them to run `codex login` in their own
-  terminal.
+- The Vidbyte key must carry the `models:invoke` permission; an admin or full-access key has it
+  too. `whoami` does not show permissions, so a key without it fails at the run's first model call
+  with exit 4 and `The stored Vidbyte API key is missing the models:invoke permission.`, before
+  anything is billed. The user then creates a key with that permission at
+  <https://vidbyte.pro/settings/api> and runs `vidbyte-cli login` with it.
 - On Windows, `python3` may be missing or may open the Microsoft Store. Use `py -3 --version` or
   `python --version`, and use that same command wherever this file says `python3`. The script
   uses only the Python standard library, so it runs unchanged on macOS, Linux, and Windows, from
@@ -281,12 +282,12 @@ Everything in this section is free. It reads Notion and never changes it.
    ```
 
    The script checks `inputs.json` (allowed keys, counts, lengths), redacts the values once more,
-   and runs the exact command from Run with `--dry-run` in place of `--idempotency-key`. A dry run
-   calls no model, buys no admission, and needs no credentials. Expect exit 0,
-   `"status": "no_suggestions"`, `"stop_reason": "dry_run"`, `"charged_cents": null`, and every
-   `context_manifest` entry `included`, with `digest.md` as one `file` entry. On exit 2, fix what
-   the message names and run the dry run again. The paid run refuses to start unless the last dry
-   run passed on the same `digest.md` and `inputs.json`.
+   and runs the exact command from Run with `--dry-run` added. A dry run calls no model, is not
+   billed, and needs no credentials. Expect exit 0, `"status": "no_suggestions"`,
+   `"stop_reason": "dry_run"`, `"models": ["gpt-6-sol"]`, and every `context_manifest` entry
+   `included`, with `digest.md` as one `file` entry. On exit 2, fix what the message names and run
+   the dry run again. The paid run refuses to start unless the last dry run passed on the same
+   `digest.md` and `inputs.json`.
 
 ## Steps
 
@@ -294,9 +295,8 @@ The whole skill, in order. Each step names the commands it runs and the section 
 details.
 
 1. **Check the setup.** Run `vidbyte-cli --version`, `vidbyte-cli --json whoami`,
-   `vidbyte-cli --json runtime doctor`, `codex login status`, `python3 --version`, and
-   `python3 "<skill>/scripts/notion_next_actions.py" check`. If `check` exits 3 or 4, walk the
-   user through "Notion access". (Preflight)
+   `python3 --version`, and `python3 "<skill>/scripts/notion_next_actions.py" check`. If `check`
+   exits 3 or 4, walk the user through "Notion access". (Preflight)
 2. **Read the window and the exclusions** from the request, and ask the one question about
    private pages if the request did not cover it. (Gather inputs, step 1)
 3. **Gather the pages, free.** Run `python3 "<skill>/scripts/notion_next_actions.py" gather` with
@@ -313,7 +313,7 @@ details.
 7. **Show the user the digest and the cost, and wait for a yes.** (Cost and consent)
 8. **Run the Suggestion Agent once.** Run
    `python3 "<skill>/scripts/notion_next_actions.py" suggest --out "<out_dir>" --paid`, which runs
-   `vidbyte-cli --json --no-input agents suggest run` with `--idempotency-key`. (Run)
+   `vidbyte-cli --json --no-input agents suggest run` with `--max-total-tokens 400000`. (Run)
 9. **Read `result.json`.** (Read the result)
 10. **Deliver the next actions.** Run
     `python3 "<skill>/scripts/notion_next_actions.py" report --out "<out_dir>"` and show the
@@ -335,11 +335,10 @@ Root options such as `--json` and `--no-input` always come before the command pa
 |---|---|---|
 | `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.3.0 or newer. Free and offline. |
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
-| `vidbyte-cli --json runtime doctor` | Preflight | Reports the working directory and which supported agent hosts are installed, from `PATH` alone, without reading credentials or using the network. Its `codex` row must be available. Free and offline. |
 | `vidbyte-cli --json agents suggest project list` | Gather inputs | Lists every local suggestion project, sorted by key, with its title and description. An absent catalog returns an empty list, not an error. No credentials, no model call. Free and offline. |
 | `vidbyte-cli --json agents suggest project create --key ... --title ... --description ...` | Gather inputs | Registers one local suggestion project under a stable key, with an empty feedback memory. Refuses a key that already exists. No credentials, no model call, sends nothing to Vidbyte. Free; writes only to vidbyte-cli's own data folder. |
-| `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `notion_next_actions.py suggest --dry-run` | Validates and resolves the complete request without calling a model, and returns the settings, the context manifest, omissions, and warnings. Needs no credentials and buys nothing. Free. |
-| `vidbyte-cli --json --no-input agents suggest run ... --idempotency-key <key>` | Run, through `notion_next_actions.py suggest --paid` | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Buys one Vidbyte admission before any model is called: 2 cents for each block of up to ten requested ideas, so 2 cents at `--count 6`, plus model usage on the user's own Codex account. Writes no files in the workspace; the script saves its output in the `out_dir`. |
+| `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `notion_next_actions.py suggest --dry-run` | Validates and resolves the complete request without calling a model, and returns the settings, the context manifest, omissions, and warnings. Needs no credentials and is not billed. Free. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `notion_next_actions.py suggest --paid` | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. It starts no new call after 400,000 tokens. Writes no files in the workspace; the script saves its output in the `out_dir`. |
 | `vidbyte-cli --json agents suggest handoff --input <result.json> --idea <id>` | Deliver | Extracts one reviewed idea from a saved result, by its exact id, as an action packet with a copyable `execution_prompt`. A local read: no provider, no credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest feedback accept --project ... --suggestion ...` | Deliver, through `notion_next_actions.py feedback` | Appends one suggestion the user explicitly accepted, with their optional `--reason`, to the project's memory, so later runs with `--project` look for the same qualities. Local; no credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest feedback reject --project ... --suggestion ...` | Deliver, through `notion_next_actions.py feedback` | Appends one suggestion the user explicitly rejected. On later runs with `--project`, the generator steers away from it and selection drops any idea that repeats it word for word. Local; no credentials, no model call. Free. |
@@ -349,19 +348,23 @@ credits" in `references/troubleshooting.md`, which tops up only after the user's
 
 ## Cost and consent
 
-This skill runs `vidbyte-cli agents suggest run` once. The run costs 2 cents from the user's
-Vidbyte balance, because one admission covers up to ten requested ideas and this skill asks for
-six, plus model usage on the user's own Codex account (their ChatGPT plan or OpenAI API key,
-whichever Codex is logged in with). It changes nothing in Notion and edits no files in the user's
-repositories; the script writes only into its own `out_dir`.
+This skill runs `vidbyte-cli agents suggest run` once, and the run is billed by usage from the
+user's Vidbyte balance. It makes about five model calls on gpt-6-sol at high reasoning effort: one
+draft, then a critique and a revision in each of two rounds. Each call is billed at gpt-6-sol's
+rate, $2 per million input tokens ($0.20 when the input is cached) and $10 per million output
+tokens, plus 2%, and the model's reasoning counts as output. The skill passes
+`--max-total-tokens 400000`, so the run starts no new call once it has used 400,000 tokens; a call
+already running still finishes and is billed. That keeps one run under about $4, and the script
+reports the run's real token usage and an estimate of its cost when it finishes. It changes
+nothing in Notion and edits no files in the user's repositories; the script writes only into its
+own `out_dir`.
 
 What leaves the machine:
 
 - The gather step reads from Notion with the user's own token (or your MCP server). Nothing is
   written back.
-- `digest.md` and the values in `inputs.json` go to the model through the user's own Codex login.
-- Vidbyte's backend receives only the admission request, which holds the host and the unit count,
-  never the digest.
+- `digest.md` and the values in `inputs.json` go to Vidbyte, which sends them to OpenAI with every
+  model call of the run.
 - `items.json`, `gather.json`, and the raw Notion pages are never sent.
 
 Before running, show the user:
@@ -375,21 +378,18 @@ Before running, show the user:
 Then ask, in your own words:
 
 > This runs the Vidbyte Suggestion Agent once over <N> Notion pages from <the window>. It sends
-> the redacted digest above to the model through your own Codex login. It costs 2 cents from your
-> Vidbyte balance, plus model usage on your Codex account, and it changes nothing in Notion or in
-> your files. Run it?
+> the redacted digest above through Vidbyte to OpenAI's gpt-6-sol. It is billed by usage from your
+> Vidbyte balance, at most about $4 because the run starts no model call after 400,000 tokens, and
+> it changes nothing in Notion or in your files. Run it?
 
 Wait for a yes. If the user wants a page left out, run `gather` again with another `--exclude`,
 then the dry run again, and ask again. If the user spots a secret in the digest, run `gather`
 again with that page excluded, tell them to rotate the secret, and ask again. If the user says no,
 offer `digest.md` as a free summary of their week in Notion.
 
-The script makes one idempotency key per paid run, in the form
-`next-actions-from-notion:<YYYYMMDD>:<6 hex characters>`, such as
-`next-actions-from-notion:20261011:3f9a1c`. It saves the key in `<out_dir>/idempotency-key.txt`
-and prints it before the run. Reuse
-that key only to recover this same admission (Troubleshooting). Any new run is a new charge with a
-new key, in a new `out_dir`.
+The command takes no idempotency key: there is no purchase to recover, and each model call is
+billed once, when it finishes. The script writes `<out_dir>/paid-run.txt` before the run and
+refuses a second paid run in the same `out_dir`. Any new run is a new charge, in a new `out_dir`.
 
 ## Run
 
@@ -401,13 +401,13 @@ python3 "<skill>/scripts/notion_next_actions.py" suggest --out "<out_dir>" --pai
 
 The run often takes several minutes, longer than many hosts let one command run. Start it in the
 background and wait for it to exit, or give it a timeout of at least 20 minutes if the host allows
-one that long. A host timeout that kills the command loses the result of a run that was already
-paid for. Never stop it after stderr shows `Vidbyte has verified the admission for this run.`:
-from that line on, the run is paid for.
+one that long. A host timeout that kills the command loses the result of model calls that were
+already billed. Do not stop it early for the same reason: the calls that finished are billed
+either way.
 
-The script refuses to start unless the last dry run passed on the same files, unless
-`codex login status` succeeds, or if this `out_dir` already has a paid attempt. It then runs, from
-inside the `out_dir` and without a shell, so quoting is the same on every operating system:
+The script refuses to start unless the last dry run passed on the same files, or if this
+`out_dir` already has a paid attempt. It then runs, from inside the `out_dir` and without a shell,
+so quoting is the same on every operating system:
 
 ```bash
 vidbyte-cli --json --no-input agents suggest run \
@@ -419,7 +419,7 @@ vidbyte-cli --json --no-input agents suggest run \
   --trajectory "Getting the beta out before the October 20 launch" \
   --constraint "About 3 focused hours this week" \
   --files digest.md \
-  --idempotency-key "next-actions-from-notion:20261011:3f9a1c"
+  --max-total-tokens 400000
 ```
 
 `--trajectory`, `--constraint`, and `--avoid` appear once per value in `inputs.json`, and not at
@@ -434,24 +434,29 @@ saved to `<out_dir>/result.stderr.txt`.
   matters and name what falls below the line, find a move the user can make now, close open loops
   such as unchecked to-dos, and take the next step of plans already written down.
 - `--horizon any`: any other value filters the slate after review, so ideas with another horizon
-  label would be dropped after the charge. Deliver groups the ideas by their own horizon instead.
-- `--count 6`: one 2-cent block, and six actions can be read and compared in one sitting. The
-  count is a maximum, not a quota.
+  label would be dropped after they were billed. Deliver groups the ideas by their own horizon
+  instead.
+- `--count 6`: six actions can be read and compared in one sitting. The count is a maximum, not a
+  quota. A larger count asks for longer replies, which are more output tokens.
 - `--trajectory`, `--constraint`, `--avoid`: only what the user stated.
 - `--files digest.md`: the digest gets a context reference that ideas can cite as evidence. It is
   a relative path from inside the `out_dir`, because the path reaches the model and an absolute
   path would name the user's home folder. `--attach` is not used, because attached text cannot be
   cited.
-- `--idempotency-key`: the one key for this admission (Cost and consent).
-- Kept at their defaults: `--rounds` and `--max-messages`; no `--model` or `--reasoning-effort`,
-  so Codex uses the model the user configured.
+- `--max-total-tokens 400000`: the run starts no new model call after 400,000 tokens, which
+  bounds its cost (Cost and consent). A run that reaches it stops with `stop_reason: token_limit`
+  and returns the ideas it has so far.
+- Kept at their defaults: `--rounds` (two) and `--max-messages`; no `--model` or
+  `--reasoning-effort`, so the generator and the critic both run on gpt-6-sol at high reasoning
+  effort, the rate Cost and consent quotes.
 
 ## Read the result
 
 The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exit 0 the report has
-`result_file`, `kind`, `status`, `stop_reason`, `ideas` (a count), `charged_cents`, `warnings`,
-and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message`, `hint`, and
-`retryable` (Troubleshooting).
+`result_file`, `kind`, `status`, `stop_reason`, `ideas` (a count), `models`, `usage`
+(`model_calls`, `input_tokens`, `cached_input_tokens`, `output_tokens`), `estimated_cost_usd`, and
+`warnings`; otherwise it has `error`, with the CLI's `code`, `message`, `hint`, and `retryable`
+(Troubleshooting).
 
 `<out_dir>/result.json` is one JSON document,
 `{"schema_version": 1, "kind": "suggestions.result", "data": {...}}`.
@@ -459,14 +464,14 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
 | Field | Use it for |
 |---|---|
 | `data.status` | `complete`, `partial` (fewer ideas than asked, which is normal), `no_suggestions`, or `needs_input`. |
-| `data.stop_reason` | Why the run stopped, such as `completed`, `count_shortfall`, or `provider_failed`. |
+| `data.stop_reason` | Why the run stopped, such as `completed`, `count_shortfall`, `token_limit`, `gateway_limit` (the balance or the key's daily spend limit ran out after some ideas were reviewed), or `provider_failed`. |
 | `data.parent_message` | Set with `needs_input`: the agent's question for the user. |
 | `data.ideas[]` | The ranked ideas, best first. |
 | `.id`, `.rank`, `.title`, `.summary` | What to show; `id` (such as `idea-002`) selects an idea for handoff and feedback. |
 | `.horizon`, `.readiness` | `now`, `next`, or `later`; `ready`, `needs_evidence`, `needs_decision`, or `blocked`. |
 | `.first_action`, `.why_now`, `.effort_estimate`, `.completion_criteria` | The concrete first step, why it matters now, its size, and how to know it is done. |
 | `data.warnings`, `data.missing_context` | Gaps the run noticed. Mention them if they change how the user reads the ideas. |
-| `data.charged_cents`, `data.admission.admission_id` | What the run cost, and the id to give Vidbyte support if needed. |
+| `data.usage` | What the run used: `model_calls`, `input_tokens`, `cached_input_tokens`, and `output_tokens`. The report's `estimated_cost_usd` prices them at gpt-6-sol's rates plus 2%; the exact charge is on <https://vidbyte.pro/usage>. |
 
 ## Deliver
 
@@ -482,9 +487,11 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
    the titles and links of the Notion pages it names. Present it in that shape. "From: the digest
    as a whole" means the idea names no single page; say so instead of guessing a link. Mention the
    readiness when it is not `ready`. If `status` is `needs_input`, show `parent_message` and ask
-   the user; a run with their answer added is a new charge. If there are no ideas, say so, with
-   `stop_reason` and `warnings`. End with the charge: "This run cost <charged_cents> cents from
-   your Vidbyte balance."
+   the user; a run with their answer added is a new usage-billed run. If there are no ideas, say
+   so, with `stop_reason` and `warnings`. End with the usage, which the report's last line also
+   gives: "This run made <model_calls> model calls with <input_tokens> input and <output_tokens>
+   output tokens, about $<estimated_cost_usd> from your Vidbyte balance; the exact amount is on
+   vidbyte.pro/usage."
 
 2. **Offer a handoff** for the action the user wants to start. It is free and local:
 
@@ -527,29 +534,22 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
 | 3 | `gather` | Nothing matched the window. Show `window` and `skipped`, and offer a wider `--days`. |
 | 1 | `check`, `gather` | Notion could not be reached or failed. Show the message; try again later. |
 | 2 | `notion_next_actions.py` | The script names the problem, such as a bad option, a bad `items.json`, a bad `inputs.json`, no passing dry run, or a paid attempt already started in this `out_dir`. Fix it; do not retry unchanged. |
-| 6 | `suggest --paid` | Codex is missing or not logged in. Ask the user to run `codex login` in their own terminal. Nothing was charged. |
 | 127 | `suggest`, `feedback` | `vidbyte-cli` is not on `PATH`. Follow `references/setup.md` step 1. If it is installed somewhere that is not on `PATH`, pass its full path with `--cli "<path to vidbyte-cli>"`. |
 | 2 | `vidbyte-cli` | Fix the flag the message names. `Suggestion project was not found: notes-next-actions.` means the project is missing: create it (Gather inputs, step 5). |
-| 4 | `vidbyte-cli` | Stop. Follow `references/setup.md` step 2. |
+| 4 | `vidbyte-cli` | Stop. No Vidbyte key is stored, or the key lacks `models:invoke` (the message says which). Nothing was billed. Follow `references/setup.md` step 2. |
 | 5 | `vidbyte-cli` | Stop. Follow "Out of credits" in `references/troubleshooting.md`. Never top up without the user's yes. |
 | Other | `vidbyte-cli` | Read `references/troubleshooting.md`. |
 
-If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` first:
+If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` and the report's `error`
+first. The model calls that finished before the failure were billed, and nothing recovers or
+refunds them: there is no admission and no idempotency key.
 
-- **It does not contain `Vidbyte has verified the admission for this run.`** The admission may
-  have been charged while its reply was lost. Recover it without paying twice by rerunning with the
-  saved key, after telling the user:
-
-  ```bash
-  python3 "<skill>/scripts/notion_next_actions.py" suggest --out "<out_dir>" --paid --idempotency-key "<key from idempotency-key.txt>"
-  ```
-
-  The key recovers the purchase only: the backend returns the admission already bought, and the
-  ideas are generated again. Keep `digest.md` and `inputs.json` unchanged between attempts.
-- **It contains that line.** The run was paid for. A failure after it, such as
-  `stop_reason: provider_failed`, is usually Codex: check `codex login status`. Another run is a
-  new 2-cent charge plus model usage, so ask the user first, then run `gather` again into a new
-  folder.
+- **`stop_reason: gateway_limit`.** The balance or the key's daily spend limit ran out after some
+  ideas were reviewed. Deliver those ideas, then follow "Out of credits" in
+  `references/troubleshooting.md` before any new run.
+- **Exit 1 with `The model gateway did not complete the suggestion run.`** A provider outage or a
+  reply that did not validate. Another run is a new usage-billed run, so ask the user first, then
+  run `gather` again into a new folder.
 
 ## Guardrails
 
@@ -561,8 +561,6 @@ If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` first:
   in the workspace; its one Vidbyte run edits nothing.
 - Never run `notion_next_actions.py suggest --paid`, or `vidbyte-cli agents suggest run` without
   `--dry-run`, before the user's yes. One yes covers one paid run.
-- Give every paid run one idempotency key, the one the script saves in `idempotency-key.txt`, and
-  reuse it only to recover that same admission.
 - Stay read-only in Notion. Never create, edit, move, or delete a page, check off a to-do, or
   comment, as part of this skill. Do any of these later only after the user asks for that exact
   action.

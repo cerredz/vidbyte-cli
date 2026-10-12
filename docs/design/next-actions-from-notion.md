@@ -284,3 +284,25 @@ must not merge until 0.3.0 is on PyPI.
 5. One real `--dry-run` with a synthetic digest against a CLI built from the internal `main`, with
    an isolated state folder, behind a wrapper that refuses any `suggest run` without `--dry-run`.
 6. `cmp` of both `references/` files against the canonical copies.
+
+## Update: usage-billed Suggestion Agent (2026-10-11)
+
+`vidbyte-cli agents suggest run` no longer buys an admission or runs on the user's Codex, so this
+commit moves the skill to usage billing, following cerredz/vidbyte-cli#22 (the same change to
+`pick-up-where-my-sessions-left-off`):
+
+- No 2-cent admission and no `--idempotency-key`: every generator, critic, and revision step is one
+  model call through Vidbyte's model gateway, billed to the Vidbyte balance. The script no longer
+  makes or saves a key; it writes `paid-run.txt` just before the paid run and refuses a second paid
+  run in a folder that has that marker or a `result.json`.
+- Both roles run on gpt-6-sol at high reasoning effort (the CLI defaults): $2 / $0.20 cached / $10
+  per million input / output tokens, plus 2%, with reasoning counted as output.
+- Both the dry and the paid run pass `--max-total-tokens 400000`. With the default two rounds and
+  no extra compute the run makes about five calls; with two repair retries and one in-flight call
+  past the cap the worst case is about $2.93, stated as "under about $4".
+- The `suggest` report has `models`, `usage` (`model_calls`, `input_tokens`,
+  `cached_input_tokens`, `output_tokens`), and `estimated_cost_usd` instead of `charged_cents` and
+  `idempotency_key`; `report` ends with the same usage and estimate instead of the cents line.
+- Codex is no longer needed: `runtime doctor`, `codex login status`, the script's Codex login
+  check, and its exit 6 are gone. Preflight instead notes that the Vidbyte key needs the
+  `models:invoke` permission. Both `references/` files are the new canonical copies from #22.
