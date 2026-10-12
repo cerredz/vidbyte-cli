@@ -268,7 +268,7 @@ Everything in this section is free. It reads Notion and never changes it.
    If no entry in `data.projects` has `key` equal to `notes-next-actions`, create it:
 
    ```bash
-   vidbyte-cli --json agents suggest project create --key notes-next-actions --title "Next actions from my notes" --description "Next actions built from a redacted digest of what the user recently wrote and discussed in their note tools. Accepted and rejected ideas record which kinds of next actions the user wants."
+   vidbyte-cli --json agents suggest project create --key notes-next-actions --title "Next actions from my notes" --description "Next actions built from a redacted digest of the notes the user created or edited recently in Obsidian, Notion, Slack, or Google Docs. Accepted and rejected ideas record which kinds of follow-up the user wants from their notes."
    ```
 
    The message `Suggestion project already exists: notes-next-actions.` (exit 2) means it is
