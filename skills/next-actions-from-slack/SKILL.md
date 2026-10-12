@@ -4,7 +4,7 @@ description: Use when the user wants their next actions pulled out of Slack - "w
 metadata:
   agent: "suggestion-agent"
   commands: "agents suggest project list, agents suggest project create, agents suggest run, agents suggest handoff, agents suggest feedback accept, agents suggest feedback reject"
-  cost: "2 cents per run (one block of up to 10 suggestions) + model usage on the user's own Codex account"
+  cost: "Model usage from the Vidbyte balance: gpt-6-sol at $2 / $10 per million input / output tokens + 2%, capped at 400,000 tokens per run"
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
@@ -55,10 +55,11 @@ token, it writes the items itself and the script checks and redacts them the sam
 
 After the user has read the digest and said yes, one `vidbyte-cli agents suggest run` call asks the
 Suggestion Agent the user's own question: "What are the most important next actions given what
-I've been writing and discussing in Slack over the last 7 days?" The agent runs on the user's own
-Codex: a generator proposes candidates, an independent critic reviews them, and only actions backed
-by evidence from the digest survive. A suggestion project, `notes-next-actions`, remembers which
-actions the user accepted or rejected, so later runs learn what they want.
+I've been writing and discussing in Slack over the last 7 days?" Its model calls run on OpenAI's
+gpt-6-sol through Vidbyte's model gateway and are billed to the user's Vidbyte balance: a generator
+proposes candidates, an independent critic reviews them, and only actions backed by evidence from
+the digest survive. A suggestion project, `notes-next-actions`, remembers which actions the user
+accepted or rejected, so later runs learn what they want.
 
 At the end the user has up to six next actions grouped by when they matter (`now`, `next`,
 `later`), each with a first step and the Slack threads, messages, or files it came from, with their
@@ -69,31 +70,31 @@ new agent session.
 
 The goal is one short, ranked list of next actions from the user's recent Slack activity, built
 from a redacted digest the user has seen and approved, with every action traced back to the Slack
-items it came from, for one Vidbyte charge.
+items it came from, in one usage-billed run.
 
 Done when: the user has seen the next actions grouped by `now`, `next`, and `later`, each with its
-source items and their Slack links; the result's `charged_cents` has been reported; and the user has
-been offered a handoff for the action they choose and feedback on the actions they accepted or
-rejected.
+source items and their Slack links; the run's model usage and estimated cost have been reported;
+and the user has been offered a handoff for the action they choose and feedback on the actions
+they accepted or rejected.
 
 ## Preflight
 
 Run these in order. If a `vidbyte-cli` check fails, read `references/setup.md`, fix only what
-failed, and run the preflight again. Step 3 of that file covers Codex for the Suggestion Agent.
+failed, and run the preflight again. Step 3 of that file lists what the Suggestion Agent needs:
+no Codex and no OpenAI key, only a Vidbyte key with the `models:invoke` permission.
 
 ```bash
 vidbyte-cli --version                  # must be 0.3.0 or newer
 vidbyte-cli --json whoami              # exit 4 means no Vidbyte key is stored
-vidbyte-cli --json runtime doctor      # data.hosts must list "codex" with "available": true
-codex login status                     # must print "Logged in ..."; exit 1 means not logged in
 python3 --version                      # must be 3.8 or newer
 python3 -c "import os; print('SLACK_USER_TOKEN is ' + ('set' if os.environ.get('SLACK_USER_TOKEN') else 'not set'))"
 ```
 
-- Codex must be logged in. The CLI checks that Codex is on `PATH` before it charges, but not that
-  it is logged in, so a run with a logged-out Codex is charged and then fails. If
-  `codex login status` prints `Not logged in`, ask the user to run `codex login` in their own
-  terminal.
+- The Vidbyte key must carry the `models:invoke` permission; an admin or full-access key has it
+  too. `whoami` does not show permissions, so a key without it fails at the run's first model call
+  with exit 4 and `The stored Vidbyte API key is missing the models:invoke permission.`, before
+  anything is billed. The user then creates a key with that permission at
+  <https://vidbyte.pro/settings/api> and runs `vidbyte-cli login` with it.
 - The last line only says whether the token is set. Never print the token itself. If it is not
   set, check whether you, the coding agent, have a Slack tool (an MCP server or connector). If you
   do, use the host connector path (Gather inputs, step 3). If you have neither, read
@@ -248,21 +249,21 @@ Everything in this section is free and read-only in Slack.
    python3 "<skill>/scripts/next_actions.py" run --out "<out_dir>" --dry-run
    ```
 
-   The script checks `inputs.json`, then runs the exact command from Run with `--dry-run` in place
-   of `--idempotency-key`. A dry run calls no model, buys no admission, and needs no credentials.
-   Expect exit 0, `"status": "no_suggestions"`, `"stop_reason": "dry_run"`, `"charged_cents":
-   null`, and every `context_manifest` entry `included`, with `digest.md` as one `file` entry. The
-   script records that this exact `digest.md` and `inputs.json` passed; the paid run refuses to
-   start without that record, so after any edit to either file, run the dry run again.
+   The script checks `inputs.json`, then runs the exact command from Run with `--dry-run` added. A
+   dry run calls no model, is not billed, and needs no credentials. Expect exit 0,
+   `"status": "no_suggestions"`, `"stop_reason": "dry_run"`, `"models": ["gpt-6-sol"]`, and every
+   `context_manifest` entry `included`, with `digest.md` as one `file` entry. The script records
+   that this exact `digest.md` and `inputs.json` passed; the paid run refuses to start without
+   that record, so after any edit to either file, run the dry run again.
 
 ## Steps
 
 The whole skill, in order. Each step names the commands it runs and the section that holds its
 details.
 
-1. **Check the setup.** Run `vidbyte-cli --version`, `vidbyte-cli --json whoami`,
-   `vidbyte-cli --json runtime doctor`, `codex login status`, and `python3 --version`, and check
-   that `SLACK_USER_TOKEN` is set or that you have a Slack tool. (Preflight)
+1. **Check the setup.** Run `vidbyte-cli --version`, `vidbyte-cli --json whoami`, and
+   `python3 --version`, and check that `SLACK_USER_TOKEN` is set or that you have a Slack tool.
+   (Preflight)
 2. **Read the window and scope** from the request, and ask the one question about excluded
    channels and focus if the request does not answer it. (Gather inputs, step 1)
 3. **Gather Slack, free.** Run `python3 "<skill>/scripts/next_actions.py" gather` with the token,
@@ -278,7 +279,7 @@ details.
 7. **Show the user what will be sent and what it costs, and wait for a yes.** (Cost and consent)
 8. **Run the Suggestion Agent once** with `python3 "<skill>/scripts/next_actions.py" run --out
    "<out_dir>" --paid`, which runs `vidbyte-cli --json --no-input agents suggest run ...
-   --idempotency-key <key>`. (Run)
+   --max-total-tokens 400000`. (Run)
 9. **Read `result.json`.** (Read the result)
 10. **Deliver the next actions** with `python3 "<skill>/scripts/next_actions.py" report --out
     "<out_dir>"`: grouped by horizon, each with its Slack sources and links. (Deliver, step 1)
@@ -297,11 +298,10 @@ Root options such as `--json` and `--no-input` always come before the command pa
 |---|---|---|
 | `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.3.0 or newer. Free and offline. |
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
-| `vidbyte-cli --json runtime doctor` | Preflight | Reports the working directory and which supported agent hosts are installed, from `PATH` alone, without reading credentials or using the network. Its `codex` row must be available. Free and offline. |
 | `vidbyte-cli --json agents suggest project list` | Gather inputs | Lists every local suggestion project, sorted by key, with its title and description. An absent catalog returns an empty list, not an error. No credentials, no model call. Free and offline. |
 | `vidbyte-cli --json agents suggest project create --key ... --title ... --description ...` | Gather inputs | Registers one new local suggestion project with an empty feedback memory. Refuses a key that already exists, so an existing project's history is never overwritten. No credentials, no model call, sends nothing to Vidbyte. Free; writes only to vidbyte-cli's own data folder. |
-| `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `next_actions.py run --dry-run` | Validates and resolves the complete request without calling a model, and returns the settings, the context manifest, omissions, and warnings. Needs no credentials and buys nothing. Free. |
-| `vidbyte-cli --json --no-input agents suggest run ... --idempotency-key <key>` | Run, through `next_actions.py run --paid` | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Buys one Vidbyte admission before any model is called: 2 cents for each block of up to ten requested suggestions, so 2 cents at `--count 6`, plus model usage on the user's own Codex account. Edits no files in the workspace; the script saves its output in the `out_dir`. |
+| `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `next_actions.py run --dry-run` | Validates and resolves the complete request without calling a model, and returns the settings, the context manifest, omissions, and warnings. Needs no credentials and is not billed. Free. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `next_actions.py run --paid` | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. It starts no new call after 400,000 tokens. Edits no files in the workspace; the script saves its output in the `out_dir`. |
 | `vidbyte-cli --json agents suggest handoff --input <result.json> --idea <id>` | Deliver | Extracts one reviewed idea from a saved result, by its exact id, as an action packet with a copyable `execution_prompt`. A local read: no provider, no credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest feedback accept --project ... --suggestion ... --reason ...` | Deliver, through `next_actions.py feedback` | Appends one suggestion the user explicitly accepted, with their optional reason, to the project's memory, so later runs with `--project` look for the same qualities. Local; no credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest feedback reject --project ... --suggestion ... --reason ...` | Deliver, through `next_actions.py feedback` | Appends one suggestion the user explicitly rejected. On later runs with `--project`, the generator steers away from it and selection drops any idea that repeats it word for word. Local; no credentials, no model call. Free. |
@@ -311,18 +311,22 @@ credits" in `references/troubleshooting.md`, which tops up only after the user's
 
 ## Cost and consent
 
-This skill runs `vidbyte-cli agents suggest run` once. The run costs 2 cents from the user's
-Vidbyte balance, because one admission covers up to ten requested suggestions and this skill asks
-for six, plus model usage on the user's own Codex account (their ChatGPT plan or OpenAI API key,
-whichever Codex is logged in with). It changes nothing in Slack and edits no files in the user's
-repositories; the script writes only into its own `out_dir`.
+This skill runs `vidbyte-cli agents suggest run` once, and the run is billed by usage from the
+user's Vidbyte balance. It makes about five model calls on gpt-6-sol at high reasoning effort: one
+draft, then a critique and a revision in each of two rounds. Each call is billed at gpt-6-sol's
+rate, $2 per million input tokens ($0.20 when the input is cached) and $10 per million output
+tokens, plus 2%, and the model's reasoning counts as output. The skill passes
+`--max-total-tokens 400000`, so the run starts no new call once it has used 400,000 tokens; a call
+already running still finishes and is billed. That keeps one run under about $4, and the script
+reports the run's real token usage and an estimate of its cost when it finishes. It changes
+nothing in Slack and edits no files in the user's repositories; the script writes only into its
+own `out_dir`.
 
-What leaves the machine: `digest.md` and the values in `inputs.json` go to the model through the
-user's own Codex login. The digest holds channel names, pseudonymized message text, file titles,
-and Slack links, and the links name the workspace (such as `example.slack.com`); a file link also
-holds the uploader's Slack member id. Vidbyte's backend receives only the admission request, which
-holds the agent host and the unit count, never the digest. `items.json`, the Slack token, and
-everything the script did not keep are never sent.
+What leaves the machine: `digest.md` and the values in `inputs.json` go to Vidbyte, which sends
+them to OpenAI with every model call of the run. The digest holds channel names, pseudonymized
+message text, file titles, and Slack links, and the links name the workspace (such as
+`example.slack.com`); a file link also holds the uploader's Slack member id. `items.json`, the
+Slack token, and everything the script did not keep are never sent.
 
 Before running, show the user:
 
@@ -334,18 +338,18 @@ Before running, show the user:
 Then ask, in your own words:
 
 > This runs the Vidbyte Suggestion Agent once over <N> Slack items from <window>. It sends the
-> redacted digest above, which includes channel names and Slack links to your workspace, to the
-> model through your own Codex login. It costs 2 cents from your Vidbyte balance plus Codex usage,
-> and it changes nothing in Slack or in your files. Run it?
+> redacted digest above, which includes channel names and Slack links to your workspace, through
+> Vidbyte to OpenAI's gpt-6-sol. It is billed by usage from your Vidbyte balance, at most about $4
+> because the run starts no model call after 400,000 tokens, and it changes nothing in Slack or in
+> your files. Run it?
 
 Wait for a yes. If the user wants something removed, delete its `## ` section from `digest.md` (or
 gather again with `--exclude`), run the dry run again, and ask again. If the user spots a secret in
 the digest, delete it, tell them to rotate that secret, run the dry run again, and ask again.
 
-The script makes one idempotency key per paid run,
-`next-actions-from-slack:<YYYYMMDD>:<6 hex characters>`, saves it in
-`<out_dir>/idempotency-key.txt`, and prints it before the run. Reuse that key only to recover this
-same admission (Troubleshooting). Any new run is a new charge with a new key, in a new `out_dir`.
+The command takes no idempotency key: there is no purchase to recover, and each model call is
+billed once, when it finishes. The script writes `<out_dir>/paid-run.txt` before the run and
+refuses a second paid run in the same `out_dir`. Any new run is a new charge, in a new `out_dir`.
 
 ## Run
 
@@ -358,8 +362,8 @@ python3 "<skill>/scripts/next_actions.py" run --out "<out_dir>" --paid
 The run has no time limit of its own and often takes several minutes, longer than many hosts let
 one command run. Start it in the background and wait for it to exit, or give it a timeout of at
 least 20 minutes if the host allows one that long. A host timeout that kills the command loses the
-result of a run that was already paid for. Never stop it after stderr shows
-`Vidbyte has verified the admission for this run.`: from that line on, the run is paid for.
+result of model calls that were already billed. Do not stop it early for the same reason: the calls
+that finished are billed either way.
 
 The script refuses to start without a passing dry run for this exact `digest.md` and
 `inputs.json`, or when this `out_dir` already has a paid attempt. It then runs, from inside the
@@ -375,7 +379,7 @@ vidbyte-cli --json --no-input agents suggest run \
   --count 6 \
   --trajectory "Shipping the billing launch" \
   --files digest.md \
-  --idempotency-key "next-actions-from-slack:20261011:3f9a1c"
+  --max-total-tokens 400000
 ```
 
 stdout is saved to `<out_dir>/result.json`, and stderr is shown and saved to
@@ -393,9 +397,9 @@ stdout is saved to `<out_dir>/result.json`, and stderr is shown and saved to
   `continuation`: the next step of work already agreed in a thread.
 - `--horizon any`: every idea keeps its own `now`, `next`, or `later` label, and Deliver groups by
   it. Any other value is applied only after review, as a silent filter, so it could return fewer
-  than six ideas and still be charged.
-- `--count 6`: one 2-cent block, and six actions can be read and decided in one sitting. The count
-  is a maximum, not a quota.
+  than six ideas and still be billed.
+- `--count 6`: six actions can be read and decided in one sitting. The count is a maximum, not a
+  quota. A larger count asks for longer replies, which are more output tokens.
 - `--trajectory`: the user's current focus (`--focus`), so actions that serve it rank higher.
   `--constraint`: the time they have (`--time-available`). `--avoid`: directions they do not want.
   `--success` is not used: it means a method that worked for the user before, not a target.
@@ -403,16 +407,20 @@ stdout is saved to `<out_dir>/result.json`, and stderr is shown and saved to
   relative path, passed from inside the `out_dir`, because the path reaches the model and a full
   path would name the user's home folder. `--attach` is not used, because an idea that cited
   attached text could not reference it.
-- `--idempotency-key`: the one key for this admission (Cost and consent).
-- Kept at their defaults: `--rounds` and `--max-messages`; no `--model` or `--reasoning-effort`,
-  so Codex uses the model the user configured.
+- `--max-total-tokens 400000`: the run starts no new model call after 400,000 tokens, which
+  bounds its cost (Cost and consent). A run that reaches it stops with `stop_reason: token_limit`
+  and returns the ideas it has so far.
+- Kept at their defaults: `--rounds` (two) and `--max-messages`; no `--model` or
+  `--reasoning-effort`, so the generator and the critic both run on gpt-6-sol at high reasoning
+  effort, the rate Cost and consent quotes.
 
 ## Read the result
 
 The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exit 0 the report has
-`result_file`, `kind`, `status`, `stop_reason`, `ideas` (a count), `charged_cents`, `warnings`,
-and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message`, `hint`, and
-`retryable` (Troubleshooting).
+`result_file`, `kind`, `status`, `stop_reason`, `ideas` (a count), `models`, `usage`
+(`model_calls`, `input_tokens`, `cached_input_tokens`, `output_tokens`), `estimated_cost_usd`,
+`context_manifest`, and `warnings`; otherwise it has `error`, with the CLI's `code`, `message`,
+`hint`, and `retryable` (Troubleshooting).
 
 `<out_dir>/result.json` is one JSON document,
 `{"schema_version": 1, "kind": "suggestions.result", "data": {...}}`.
@@ -420,12 +428,12 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
 | Field | Use it for |
 |---|---|
 | `data.status` | `complete`, `partial` (fewer ideas than asked, which is normal), `no_suggestions`, or `needs_input`. |
-| `data.stop_reason` | Why the run stopped, such as `completed`, `count_shortfall`, `provider_failed`, or `parent_message`. |
-| `data.parent_message` | Set with `needs_input`: the agent's question for the user. Answering it means a new run, which is a new charge, so ask first. |
+| `data.stop_reason` | Why the run stopped, such as `completed`, `count_shortfall`, `token_limit`, `gateway_limit` (the balance or the key's daily spend limit ran out after some ideas were reviewed), `provider_failed`, or `parent_message`. |
+| `data.parent_message` | Set with `needs_input`: the agent's question for the user. Answering it means a new usage-billed run, so ask first. |
 | `data.ideas[]` | The ranked ideas, best first: `id` (such as `idea-002`), `rank`, `title`, `summary`, `horizon` (`now`, `next`, `later`), `readiness`, `first_action`, `why_now`, `effort_estimate`, `completion_criteria`. |
 | `data.ideas[].handoff.evidence[]` | The digest text each idea relies on; the report uses it, with the idea's own text, to find the source items. |
 | `data.warnings`, `data.missing_context` | Gaps the run noticed. Mention them if they change how the user reads the actions. |
-| `data.charged_cents`, `data.admission.admission_id` | What the run cost, and the id to give Vidbyte support if needed. |
+| `data.usage` | What the run used: `model_calls`, `input_tokens`, `cached_input_tokens`, and `output_tokens`. The report's `estimated_cost_usd` prices them at gpt-6-sol's rates plus 2%; the exact charge is on <https://vidbyte.pro/usage>. |
 
 ## Deliver
 
@@ -441,9 +449,11 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
    sources: `From: <item title> (<kind>) <Slack link>`. It matches an idea to items by link, by
    exact title, then by the words of the title in the idea and its evidence. When it prints
    `From: the digest as a whole`, say so instead of guessing a link. Present it in that shape,
-   keep the agent's order, and end with: "This run cost <charged_cents> cents from your Vidbyte
-   balance." If the status is `needs_input`, show `parent_message` and ask the user. If there are
-   no ideas, say so, with `stop_reason`.
+   keep the agent's order, and end with the usage: "This run made <model_calls> model calls with
+   <input_tokens> input and <output_tokens> output tokens, about $<estimated_cost_usd> from your
+   Vidbyte balance; the exact amount is on vidbyte.pro/usage." The report ends with that line too.
+   If the status is `needs_input`, show `parent_message` and ask the user. If there are no ideas,
+   say so, with `stop_reason`.
 
 2. **Offer a handoff** for the action the user wants to start. It is free and local:
 
@@ -486,7 +496,7 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
 | 1, from `gather` | Slack could not be reached, or `auth.test` failed for a reason other than the token. Show `detail`, check the network, and try again later. |
 | 2, from `next_actions.py` | The script names the problem: a bad option, an invalid `items.json` (it lists each field), a missing dry run, or a paid attempt already started in this `out_dir`. Fix it; do not retry unchanged. |
 | 2, from `vidbyte-cli` | Fix the flag the message names. `Suggestion project was not found: notes-next-actions.` means the project does not exist: create it (Gather inputs, step 5). |
-| 4 | Stop. Follow `references/setup.md` step 2. |
+| 4 | Stop. No Vidbyte key is stored, or the key lacks `models:invoke` (the message says which). Nothing was billed. Follow `references/setup.md` step 2. |
 | 5 | Stop. Follow "Out of credits" in `references/troubleshooting.md`. Never top up without the user's yes. |
 | 127, from `next_actions.py` | `vidbyte-cli` is not on `PATH`. Follow `references/setup.md` step 1, or, if it is installed outside `PATH`, add `--cli "<full path to vidbyte-cli>"` to `run` and `feedback`. |
 | Other | Read `references/troubleshooting.md`. |
@@ -496,23 +506,16 @@ digest is partial: say so, and offer `--channels` to narrow the next gather, or 
 `--max-wait`. If `warnings` says a method returned `missing_scope`, the digest is missing that
 part: follow step 4 of `references/slack-app.md` to add the scope, then gather again.
 
-If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` first:
+If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` and the report's `error`
+first. The model calls that finished before the failure were billed, and nothing recovers or
+refunds them: there is no admission and no idempotency key.
 
-- **It does not contain `Vidbyte has verified the admission for this run.`** The admission may
-  have been charged while its reply was lost. Recover it without paying twice by rerunning with the
-  saved key, after telling the user:
-
-  ```bash
-  python3 "<skill>/scripts/next_actions.py" run --out "<out_dir>" --paid --idempotency-key "<key from idempotency-key.txt>"
-  ```
-
-  The key recovers the purchase only: the backend returns the admission already bought, and the
-  ideas are generated again. Keep `digest.md` and `inputs.json` unchanged between attempts; the
-  script refuses any other key.
-- **It contains that line.** The run was paid for. A failure after it, such as
-  `stop_reason: provider_failed`, is usually Codex: check `codex login status`. Another run is a
-  new 2-cent charge plus model usage, so ask the user first, then run `gather` again into a new
-  folder.
+- **`stop_reason: gateway_limit`.** The balance or the key's daily spend limit ran out after some
+  ideas were reviewed. Deliver those ideas, then follow "Out of credits" in
+  `references/troubleshooting.md` before any new run.
+- **Exit 1 with `The model gateway did not complete the suggestion run.`** A provider outage or a
+  reply that did not validate. Another run is a new usage-billed run, so ask the user first, then
+  run `gather` again into a new folder.
 
 ## Guardrails
 

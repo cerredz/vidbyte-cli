@@ -305,3 +305,26 @@ lacks `agents suggest run --idempotency-key` and the paid admission, so `min-cli
 6. `cmp` of both shared `references/` files against the canonical copies; `py_compile` under the
    oldest available Python; the diff grepped for real names, paths, emails, and tokens before every
    commit.
+
+## Update: usage-billed Suggestion Agent (2026-10-11)
+
+This commit moves the skill to the usage-billed Suggestion Agent of vidbyte-cli 0.3.0, following
+the reference change in cerredz/vidbyte-cli#22. Where the sections above say otherwise (2 cents,
+an admission, an idempotency key, Codex), this section wins.
+
+- `agents suggest run` buys no admission and runs on no local Codex: every generator, critic, and
+  revision step is one model call through Vidbyte's model gateway, by default on gpt-6-sol at high
+  reasoning effort, billed to the Vidbyte balance at $2 / $0.20 / $10 per million input / cached
+  input / output tokens plus 2%.
+- `next_actions.py run` no longer makes, saves, or accepts an idempotency key. It passes
+  `--max-total-tokens 400000` on both the dry run and the paid run, writes `paid-run.txt` just
+  before the paid run, and refuses a second paid run in a folder that has that marker or a
+  `result.json`. The dry-run fingerprint guard is unchanged.
+- The default run makes about five calls (one draft, then a critique and a revision in each of two
+  rounds). With two possible repair retries, every reply at the 32,000-token cap, and one call in
+  flight past the cap, the worst case is about $2.93, so SKILL.md states "under about $4".
+- The run report has `models`, `usage` (`model_calls`, `input_tokens`, `cached_input_tokens`,
+  `output_tokens`), and `estimated_cost_usd` instead of `charged_cents` and `idempotency_key`;
+  `report` ends with the usage and the estimate instead of the cents charged.
+- Preflight drops `runtime doctor` and `codex login status` and adds the `models:invoke` key
+  permission; both shared `references/` files are replaced with the new canonical copies.
