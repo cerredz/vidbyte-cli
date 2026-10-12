@@ -130,7 +130,8 @@ the `Retry-After` seconds and retries, up to a total wait budget (`--max-wait`, 
 seconds). When the budget is spent, the phase stops, what was read so far is kept, and the summary
 says what was skipped. If `conversations.history` or `conversations.replies` answers with a wait
 of 30 seconds or more, the summary names the likely cause (the 2025 Tier 1 limit below) and points
-to `references/slack-app.md`.
+to `references/slack-app.md`. A `missing_scope` answer from search, history, replies, or files skips
+that part instead of stopping, and the summary's `warnings` names the scope the token needs.
 
 The token is sent only to `https://slack.com/api/` and, for file downloads, to
 `https://files.slack.com/`, with `add_unredirected_header` and a redirect handler that refuses
@@ -222,7 +223,10 @@ ideas and still charge; `--count 6`, one 2-cent block; categories `immediate_nex
 is not used, because it means a method that worked before, not a target. The paid-run guard is the
 one from pick-up-where-my-sessions-left-off: `--paid` must be given explicitly, a folder with an
 earlier key file or result refuses a second paid run, and `--idempotency-key` only recovers that
-same admission.
+same admission. In addition, `--paid` refuses to start unless a dry run passed for the exact
+`digest.md` and `inputs.json` (a SHA-256 fingerprint saved in `dry-run.ok`), so an edit after the
+dry run needs a new one. `run` and `feedback` take `--cli <path>` (default: `vidbyte-cli` on
+`PATH`), which the tests use to pass a recording fake explicitly instead of trusting `PATH`.
 
 ### Report and deliver
 
@@ -230,7 +234,7 @@ same admission.
 exact title, then title-word overlap in the idea text and its evidence), and prints the ideas
 grouped by `horizon` with title, first action, effort, readiness, and each source's title and link.
 `feedback` copies an idea's exact title into `agents suggest feedback accept|reject`, because
-rejection works by exact text.
+rejection works by exact text, and redacts the user's reason.
 
 ## Files
 
@@ -291,10 +295,13 @@ lacks `agents suggest run --idempotency-key` and the paid admission, so `min-cli
 4. `run --dry-run` with the synthetic digest, executed by a `vidbyte-cli` built from the internal
    `main` with its state folders pointed at a scratch directory: exit 0, `stop_reason: dry_run`,
    every manifest entry `included`, `charged_cents` null.
-5. `run --paid`, `report`, and `feedback` only against a fake `vidbyte-cli` placed first on
-   `PATH` (checked with `command -v vidbyte-cli` before each test) that records its arguments and
-   returns a schema-shaped result: the guard refuses a second paid run, accepts a recovery key only
-   while no result is saved, and passes `--files digest.md` as a relative path.
+5. `run --paid`, `report`, and `feedback` only against a fake `vidbyte-cli` that records its
+   arguments and returns a schema-valid result. The fake is passed explicitly with `--cli`, every
+   real `vidbyte-cli` is removed from the helper's `PATH` (so a helper that ignored `--cli` would
+   exit 127 instead of reaching the real CLI), and the test checks that every CLI call the helper
+   announced arrived in the fake's log. The guard refuses a paid run without a matching dry run, a
+   second paid run, and any key but the saved one; it accepts the saved key only while no result
+   is saved; and `--files digest.md` is passed as a relative path.
 6. `cmp` of both shared `references/` files against the canonical copies; `py_compile` under the
    oldest available Python; the diff grepped for real names, paths, emails, and tokens before every
    commit.
