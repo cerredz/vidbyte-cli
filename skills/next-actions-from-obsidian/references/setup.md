@@ -70,7 +70,7 @@ agent this skill drives.
 
 | Agent | Command | Needs, besides the Vidbyte key |
 |---|---|---|
-| Suggestion | `vidbyte-cli agents suggest run` | Codex installed and logged in; the model comes from the local Codex config. Prepaid Vidbyte balance for the admission. |
+| Suggestion | `vidbyte-cli agents suggest run` | Nothing local: no Codex and no OpenAI key. The Vidbyte key needs the `models:invoke` scope (an admin or full-access key also works), and each model call is billed by usage from the Vidbyte balance: by default gpt-6-sol at high reasoning effort, at its per-token rate plus 2%. |
 | Persistent Researcher | `vidbyte-cli research start` | Nothing local. Billed by usage from the Vidbyte balance. |
 | Persistent Agent | `vidbyte-cli runtime persistence` | Codex on `PATH` and an OpenAI key stored with `vidbyte-cli provider login openai`. |
 | Ensemble | `vidbyte-cli runtime same-host-ensemble` | Codex installed and logged in. |

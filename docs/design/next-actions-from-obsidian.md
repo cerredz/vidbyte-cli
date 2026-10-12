@@ -255,3 +255,27 @@ and the PR waits for that release, like PRs #7 and #8.
    refuses; a recovery key runs only while no result is saved. `report` and `feedback` checked
    against a synthetic `result.json`.
 6. `cmp` of both `references/` files against the canonical copies; `python -m py_compile`.
+
+## Update: usage-billed Suggestion Agent (2026-10-11)
+
+vidbyte-cli 0.3.0's `agents suggest run` no longer buys a Vidbyte admission or runs on the user's
+Codex, so this skill now follows the change cerredz/vidbyte-cli#22 made to
+`pick-up-where-my-sessions-left-off`. Where the sections above say otherwise, this section wins.
+
+- **No admission, no key, no Codex.** The 2-cent admission, `--idempotency-key`,
+  `idempotency-key.txt`, and the key-recovery path are gone. Every generator, critic, and revision
+  step is one model call through Vidbyte's model gateway, billed to the Vidbyte balance at the
+  model's per-token rate plus 2%. A paid run writes `paid-run.txt` first, and the script refuses a
+  second paid run (or a new dry run) in a folder that has that marker or a `result.json`.
+- **Model and cap.** No `--model` or `--reasoning-effort` is passed, so both roles run on gpt-6-sol
+  at high reasoning effort ($2 / $0.20 cached / $10 per million input / output tokens). Both the dry
+  and the paid run pass `--max-total-tokens 400000`, so the dry run checks the exact paid command.
+- **Bound.** The default two rounds make about five calls. With two repair retries (7 calls, at most
+  224,000 output tokens) and one call in flight past the cap (540,000 tokens in all), the worst case
+  is 1.02 x (10 x 224,000 + 2 x 316,000) / 1,000,000 = $2.93, stated to the user as "under about $4".
+- **Report fields.** `run` reports `models`, `usage` (`model_calls`, `input_tokens`,
+  `cached_input_tokens`, `output_tokens`), and `estimated_cost_usd` instead of `charged_cents` and
+  `idempotency_key`; `report` ends with a usage line instead of the cents line.
+- **Preflight.** `vidbyte-cli --json runtime doctor` and `codex login status` are dropped; the key
+  needs the `models:invoke` permission instead, and exit 4 now also covers a key without it.
+  `references/setup.md` and `references/troubleshooting.md` are the new canonical copies.
