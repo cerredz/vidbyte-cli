@@ -122,7 +122,9 @@ python3 "<skill>/scripts/meetings.py" whatif --out-dir "<OUT_DIR>" \
   its source) starts with a header row and has no attendee, organizer, RSVP, or recurrence columns,
   so attendee-based numbers are reported as unknown for this source. The series comes from the
   instance id (`<series>_<YYYYMMDDTHHMMSSZ>`), and the organizer is approximated by the creator
-  email when `--me` is given. Declined events are hidden by `--nodeclined`.
+  email when `--me` is given. Declined events are hidden by `--nodeclined`. gcalcli prints times
+  in this computer's own time zone, so the script reads them in that zone whatever `--tz` says;
+  `--tz` only sets the zone of the working hours and the report.
 
 ### The ICS parser
 
@@ -193,7 +195,7 @@ usage example. Why the settings:
 - `--horizon any`: any other value drops ideas with another horizon label after review, so a run
   could return fewer ideas and still be charged. The report groups ideas by their own label.
 - `--count 6`: one 2-cent block; six cuts can be reviewed in one sitting.
-- `--constraint`: the meetings the user keeps (default "customer calls" and "1:1s").
+- `--constraint`: the meetings the user keeps, from `--keep`, in their words (the skill asks once).
 - `--forbidden "declining or leaving meetings without telling the organizer"`. The CLI also drops
   any idea whose text repeats a forbidden value word for word, which is harmless here.
 - `--outcomes`, `--context`: one fact per value; each meeting value starts with its tag, so the
@@ -205,7 +207,9 @@ The paid-run guard is the one from `pick-up-where-my-sessions-left-off`: `run` n
 `--dry-run` or `--paid`; `--paid` makes one key, saves it in `idempotency-key.txt`, and refuses to
 start if the folder already holds a paid attempt, unless `--idempotency-key` recovers that same
 admission. Before a paid run, the script also runs `codex login status` and refuses on a non-zero
-exit, because the CLI checks only that `codex` is on `PATH` before it charges.
+exit, because the CLI checks only that `codex` is on `PATH` before it charges. `run` and `feedback`
+take `--cli PATH` (default: `vidbyte-cli` on `PATH`) and print which executable they use, so tests
+pass a recording fake explicitly instead of relying on `PATH` order.
 
 ### Deliver
 
@@ -225,9 +229,9 @@ Every command path and long option the skill uses is in `contracts/cli-commands.
 internal repository's `main` (`55e5b43`): `agents suggest run` with `--goal`, `--project`,
 `--category`, `--horizon`, `--count`, `--constraint`, `--forbidden`, `--outcomes`, `--context`,
 `--files`, `--dry-run`, and `--idempotency-key`; `agents suggest project list` and `create`
-(`--key`, `--title`, `--description`); `agents suggest handoff` (`--input`, `--idea`); and
-`agents suggest feedback accept` and `reject` (`--project`, `--suggestion`, `--reason`), plus
-`whoami` and `runtime doctor`. PyPI's newest release, 0.2.0, lacks `--idempotency-key` and the paid
+(`--key`, `--title`, `--description`); and `agents suggest feedback accept` and `reject` (`--project`, `--suggestion`, `--reason`),
+plus `whoami` and `runtime doctor`. `agents suggest handoff` is not used: the deliverable is a
+change per meeting and a message per organizer, not a task for another agent. PyPI's newest release, 0.2.0, lacks `--idempotency-key` and the paid
 admission on `agents suggest run`, so `min-cli-version` is `0.3.0`, and the PR must not merge until
 0.3.0 is on PyPI.
 
@@ -237,7 +241,7 @@ admission on `agents suggest run`, so `min-cli-version` is `0.3.0`, and the PR m
 |---|---|
 | `skills/too-many-meetings/SKILL.md` | New. The skill, in the contract's section order. |
 | `skills/too-many-meetings/scripts/meetings.py` | New. `gather`, `run`, `report`, `whatif`, `feedback`. Standard library only, Python 3.9 or newer; every external command is an argv list with no shell. |
-| `skills/too-many-meetings/tests/test_meetings.py` | New. `unittest` tests with inline synthetic `.ics` fixtures for every recurrence case, the sources, redaction, `whatif`, and the paid-run guard against a fake `vidbyte-cli` on a `PATH` that holds nothing else. |
+| `skills/too-many-meetings/tests/test_meetings.py` | New. `unittest` tests with inline synthetic `.ics` fixtures for every recurrence case, the sources, redaction, `whatif`, and the paid-run guard. Every `run` and `feedback` test passes a recording fake `vidbyte-cli` with `--cli`, and `PATH` holds only a fake `codex` and a decoy `vidbyte-cli` that fails the test if it is ever called. |
 | `skills/too-many-meetings/references/setup.md` | New. Byte-for-byte copy of the canonical file. |
 | `skills/too-many-meetings/references/troubleshooting.md` | New. Byte-for-byte copy of the canonical file. |
 | `docs/design/too-many-meetings.md` | New. This document. |
@@ -264,12 +268,12 @@ admission on `agents suggest run`, so `min-cli-version` is `0.3.0`, and the PR m
 2. A real `--dry-run` of the exact argv `meetings.py run --dry-run` builds, using a CLI installed
    from the internal `main` into a scratch virtual environment: exit 0, `stop_reason: dry_run`,
    every `context_manifest` entry `included`.
-3. `python -m unittest` on `tests/test_meetings.py` with Python 3.11 (with `tzdata`) and Python 3.13
-   without `tzdata` (forcing the `VTIMEZONE` fallback): weekly, every-other-week, weekday, daily,
+3. `python -m unittest` on `tests/test_meetings.py` with Python 3.11 (with `tzdata`), and Python 3.9
+   and 3.13 without `tzdata` (forcing the `VTIMEZONE` fallback): weekly, every-other-week, weekday, daily,
    monthly by ordinal day, by month day, and last weekday rules; `COUNT`, `UNTIL`, `EXDATE`,
    `RECURRENCE-ID` (moved and cancelled), all-day and time-off days, cancelled events, declined
    RSVPs, `TZID` across a daylight-saving change, unsupported rules reported, redaction, `events.json`,
-   a fake `gcalcli`, `whatif`, and the paid-run guard and recovery with a fake `vidbyte-cli` and a
-   fake `codex`.
+   a fake `gcalcli`, `whatif`, and the paid-run guard and recovery with a fake `vidbyte-cli` passed
+   through `--cli` and a fake `codex`.
 4. `cmp` of each `references/` file against `git show origin/main:` of the canonical copy.
 5. A grep of the diff for email addresses, home paths, and tokens before every commit.
