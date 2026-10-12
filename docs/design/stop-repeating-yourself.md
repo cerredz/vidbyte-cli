@@ -334,3 +334,28 @@ and no `--idempotency-key`, so `min-cli-version` is `0.3.0` and the skill is not
 6. `cmp` and `git hash-object` of both `references/` files against the canonical copies;
    `py_compile` and the full fixture run under Python 3.8.20 and 3.11; a diff grep for real names,
    paths, and ids before each commit.
+
+## Update: usage-billed Suggestion Agent (2026-10-11)
+
+`vidbyte-cli agents suggest run` in 0.3.0 no longer buys an admission or runs on the user's Codex,
+so this commit moves the skill to usage billing. cerredz/vidbyte-cli#22 is the reference: it made
+the same change to `pick-up-where-my-sessions-left-off`. The sections above keep the original
+admission design; where they differ, this section wins.
+
+- No admission, no 2 cents, and no idempotency key. `repeats.py` no longer makes or accepts a key
+  or writes `idempotency-key.txt`; it writes `paid-run.txt` just before the paid run and refuses a
+  second paid run in a folder that has that marker or a `result.json`.
+- Every generator, critic, and revision call goes through Vidbyte's model gateway on gpt-6-sol at
+  high reasoning effort, billed to the Vidbyte balance at $2 / $0.20 cached / $10 per million
+  input / output tokens plus 2%. `--count 10` adds no calls; a run makes about five.
+- Both the dry and the paid run pass `--max-total-tokens 400000`. The honest worst case (7 calls
+  with 2 repair retries, 224,000 output tokens, 540,000 tokens in all) is about $2.93, stated to
+  the user as "under about $4".
+- The report drops `charged_cents` and `idempotency_key` and adds `models`, `usage`
+  (`model_calls`, `input_tokens`, `cached_input_tokens`, `output_tokens`), and
+  `estimated_cost_usd`; Read the result adds `gateway_limit`, and Troubleshooting replaces the
+  admission recovery with the `gateway_limit` and provider-failure guidance.
+- Preflight drops `runtime doctor` and `codex login status` and checks for a Vidbyte key with the
+  `models:invoke` permission instead. Codex sessions stay an input the script reads from disk;
+  the Suggestion Agent itself no longer needs Codex. `references/setup.md` and
+  `references/troubleshooting.md` are the new canonical copies (blobs `8fb4e3c` / `cb9656b`).
