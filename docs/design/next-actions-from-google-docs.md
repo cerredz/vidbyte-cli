@@ -139,7 +139,9 @@ grouped `now`, `next`, `later`, each with the titles and links of its source doc
   home path reaches the model. `--dry-run` is free. `--paid` refuses to start unless a dry run passed
   on the exact same request (a fingerprint of the argv and `digest.md`), makes one idempotency key,
   saves it in `idempotency-key.txt`, and refuses a folder that already holds a paid attempt unless
-  the caller recovers it with that same saved key and no result was saved yet.
+  the caller recovers it with that same saved key and no result was saved yet. `run` and
+  `feedback` take `--cli <path>` (default: `vidbyte-cli` on `PATH`) and print the executable they
+  ran, so a test can pass a recording stand-in explicitly instead of trusting `PATH` order.
 - **Flag choices.**
   - `--goal`: the user's own question with the window filled in, plus one sentence asking the agent
     to tie each action to the documents' exact titles, so the report can link each action back.
@@ -261,9 +263,9 @@ merged until 0.3.0 is on PyPI. The price, 2 cents per block of up to ten request
   sentence is found only by the Suggestion Agent reading the excerpt.
 - **Shared drives.** Shared-drive documents are searched only with `--shared-drives`
   (`corpora=allDrives`), which Google may answer with `incompleteSearch`.
-- **Family consistency.** The four provider skills are built in parallel. The shared project's title
-  and description are set by whichever skill creates it first; this skill uses "Next actions from my
-  notes".
+- **Family consistency.** The four provider skills are built in parallel. All of them create the
+  shared project with the same `project create` line, character for character, so whichever runs
+  first sets the same title ("Next actions from my notes") and description.
 - **Redaction is pattern-based.** It removes the common secret formats and contact details, not
   every possible secret. The user sees the digest before anything is sent.
 - No paid end-to-end run was made, because it spends real money. The paid path was tested with a
@@ -286,9 +288,12 @@ merged until 0.3.0 is on PyPI. The price, 2 cents per block of up to ten request
 5. `run --dry-run` with a synthetic digest against a CLI built from the internal `main`, in an
    isolated state folder, behind a wrapper that refuses any `agents suggest run` without
    `--dry-run`: exit 0, `stop_reason: dry_run`, every manifest entry `included`, no charge.
-6. The paid-run guards tested with a stand-in `vidbyte-cli` first on `PATH` (confirmed with
-   `command -v vidbyte-cli` before each test): no dry run, a changed digest, an earlier key file, an
-   empty result, a recovery key that does not match, and one clean paid run that then refuses.
+6. The paid-run guards tested with a recording stand-in `vidbyte-cli`, passed with `--cli` on every
+   call, with a `PATH` that holds no other `vidbyte-cli` (checked before each call) and a bogus
+   `VIDBYTE_API_KEY`. Each test asserts how many calls the stand-in logged and that the report names
+   the stand-in: no dry run, a changed digest, changed inputs, an earlier key file, a failed
+   admission followed by recovery with the saved key, a recovery key that does not match, and one
+   clean paid run that then refuses a second one.
 7. `report` and `feedback` against a synthetic, schema-valid `result.json`; `agents suggest handoff`
    on it with the isolated CLI.
 8. `cmp` of both shared `references/` files against the canonical copies, and a leak scan of the
