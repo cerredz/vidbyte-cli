@@ -3,7 +3,7 @@
 Run from the skill folder:  python -m unittest discover -s tests -v
 
 Every calendar here is synthetic. Every command that calls vidbyte-cli (run and feedback) gets a
-recording fake through --cli, and PATH holds only a folder with a fake codex and a decoy vidbyte-cli,
+recording fake through --cli, and PATH holds only a folder with a decoy vidbyte-cli (and no codex),
 so no test can reach a real vidbyte-cli, spend money, or write to the real project catalog.
 """
 
@@ -543,21 +543,26 @@ FAKE_CLI = r'''
 import json, os, sys
 args = sys.argv[1:]
 with open(os.environ["FAKE_RECORD"], "a", encoding="utf-8") as handle:
-    handle.write(json.dumps({"argv": args, "cwd": os.getcwd()}) + "\n")
+    handle.write(json.dumps({"argv": args, "cwd": os.getcwd(), "marker": os.path.exists("paid-run.txt")}) + "\n")
 def flag_values(name):
     return [args[i + 1] for i, a in enumerate(args) if a == name and i + 1 < len(args)]
 if "feedback" in args:
     print(json.dumps({"schema_version": 1, "kind": "suggestions.feedback", "data": {"project_key": flag_values("--project")[0]}}))
     sys.exit(0)
+settings = {"model": "gpt-6-sol", "critic_model": "gpt-6-sol"}
 if "--dry-run" in args:
     manifest = [{"ref": "ctx-%03d" % (i + 1), "kind": "file" if a == "--files" else a[2:], "source": v, "status": "included"}
                 for i, (a, v) in enumerate((a, args[j + 1]) for j, a in enumerate(args)
                                            if a in ("--constraint", "--forbidden", "--outcomes", "--context", "--files"))]
     print(json.dumps({"schema_version": 1, "kind": "suggestions.result", "data": {"status": "no_suggestions",
-          "stop_reason": "dry_run", "ideas": [], "charged_cents": None, "context_manifest": manifest, "warnings": []}}))
+          "stop_reason": "dry_run", "settings": settings, "usage": {}, "ideas": [], "context_manifest": manifest,
+          "warnings": []}}))
     sys.exit(0)
-sys.stderr.write("Suggestion admission retry key: %s. If admission fails, reuse this key.\n" % flag_values("--idempotency-key")[0])
-sys.stderr.write("Vidbyte has verified the admission for this run.\n")
+if os.environ.get("FAKE_FAIL"):
+    sys.stderr.write(json.dumps({"kind": "error", "data": {"code": "provider_failed", "retryable": True,
+                     "message": "The model gateway did not complete the suggestion run."}}) + "\n")
+    sys.exit(1)
+sys.stderr.write("Generating and independently reviewing suggestions through Vidbyte's model gateway.\n")
 context = flag_values("--context")
 idea = {"rank": 1, "id": "idea-001", "title": "Replace the Weekly sync with a written update", "summary": "s",
         "primary_category": "simplification", "readiness": "ready", "effort_estimate": "30 minutes", "horizon": "now",
@@ -565,9 +570,11 @@ idea = {"rank": 1, "id": "idea-001", "title": "Replace the Weekly sync with a wr
         "handoff": {"evidence": []}}
 other = dict(idea, rank=2, id="idea-002", title="Stop the second meeting", horizon="later",
              handoff={"evidence": [{"source": "flag:context", "content": context[1] if len(context) > 1 else ""}]})
+# (150,000 - 50,000) x $2 + 50,000 x $0.20 + 40,000 x $10 per million = $0.61, x 1.02 = $0.62.
+usage = {"model_calls": 5, "input_tokens": 150000, "cached_input_tokens": 50000, "output_tokens": 40000, "tokens": 190000,
+         "draft_calls": 1, "critique_calls": 2, "revision_calls": 2}
 print(json.dumps({"schema_version": 1, "kind": "suggestions.result", "data": {"status": "complete", "stop_reason": "completed",
-      "ideas": [idea, other], "charged_cents": 2, "admission": {"admission_id": "adm_fake", "charged_cents": 2, "units": 1},
-      "context_manifest": [], "warnings": []}}))
+      "settings": settings, "usage": usage, "ideas": [idea, other], "context_manifest": [], "warnings": []}}))
 '''
 
 
@@ -601,8 +608,9 @@ class PaidRunGuardTest(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="tmm-run-")
         code, _, _, self.data, _, _, self.out = gather(self.tmp, main_calendar())
         self.assertEqual(code, 0)
-        # Every test passes the recording fake explicitly with --cli. PATH holds only a folder with a fake
-        # codex and a decoy vidbyte-cli, so even a lookup on PATH can never reach the real vidbyte-cli.
+        # Every test passes the recording fake explicitly with --cli. PATH holds only a folder with a
+        # decoy vidbyte-cli, so even a lookup on PATH can never reach the real vidbyte-cli. It holds no
+        # codex: the Suggestion Agent runs through Vidbyte's model gateway and needs none.
         self.fakes = os.path.join(self.tmp, "fakes")
         self.bin = os.path.join(self.tmp, "bin")
         os.makedirs(self.fakes)
@@ -611,20 +619,18 @@ class PaidRunGuardTest(unittest.TestCase):
         self.decoy_record = os.path.join(self.tmp, "decoy-calls.jsonl")
         self.fake = write_fake(self.fakes, "vidbyte-cli", FAKE_CLI)
         write_fake(self.bin, "vidbyte-cli", DECOY_CLI)
-        self.set_codex(logged_in=True)
         self.env = dict(os.environ, PATH=self.bin, FAKE_RECORD=self.record, DECOY_RECORD=self.decoy_record)
+        self.env.pop("FAKE_FAIL", None)
         found = shutil.which("vidbyte-cli", path=self.env["PATH"])
         self.assertEqual(os.path.normcase(os.path.dirname(found)), os.path.normcase(self.bin))
+        self.assertIsNone(shutil.which("codex", path=self.env["PATH"]))
+        self.marker = os.path.join(self.out, "paid-run.txt")
 
     def tearDown(self):
         decoy_called = os.path.exists(self.decoy_record)
         shutil.rmtree(self.tmp, ignore_errors=True)
         if decoy_called and not getattr(self, "decoy_expected", False):
             self.fail("a command looked vidbyte-cli up on PATH instead of using --cli")
-
-    def set_codex(self, logged_in):
-        code = "import sys\nprint('Logged in using ChatGPT' if %r else 'Not logged in')\nsys.exit(0 if %r else 1)\n" % (logged_in, logged_in)
-        write_fake(self.bin, "codex", code)
 
     def calls(self):
         if not os.path.exists(self.record):
@@ -635,13 +641,13 @@ class PaidRunGuardTest(unittest.TestCase):
     def run_cmd(self, *args):
         return run_script(["run", "--out-dir", self.out, "--cli", self.fake] + list(args), env=self.env)
 
-    def test_dry_run_passes_a_relative_file_and_never_a_key(self):
+    def test_dry_run_checks_the_paid_command_with_a_relative_file(self):
         code, stdout, stderr = self.run_cmd("--dry-run")
         self.assertEqual(code, 0, stdout + stderr)
         call = self.calls()[0]
         argv = call["argv"]
         self.assertEqual(argv[:5], ["--json", "--no-input", "agents", "suggest", "run"])
-        self.assertIn("--dry-run", argv)
+        self.assertEqual(argv[-3:], ["--max-total-tokens", "400000", "--dry-run"])
         self.assertNotIn("--idempotency-key", argv)
         self.assertEqual(argv[argv.index("--files") + 1], "meetings.md")
         self.assertEqual(os.path.normcase(os.path.realpath(call["cwd"])), os.path.normcase(os.path.realpath(self.out)))
@@ -654,45 +660,72 @@ class PaidRunGuardTest(unittest.TestCase):
         context = [argv[i + 1] for i, a in enumerate(argv) if a == "--context"]
         with open(os.path.join(self.out, "inputs.json"), encoding="utf-8") as handle:
             self.assertEqual(context, json.load(handle)["context"])  # values survive the command line unchanged
-        self.assertFalse(os.path.exists(os.path.join(self.out, "idempotency-key.txt")))
-        self.assertEqual(json.loads(stdout)["stop_reason"], "dry_run")
+        self.assertFalse(os.path.exists(self.marker))
+        self.assertFalse(call["marker"])
+        report = json.loads(stdout)
+        self.assertEqual(report["stop_reason"], "dry_run")
+        self.assertEqual(report["models"], ["gpt-6-sol"])
+        self.assertEqual(report["usage"], {"model_calls": 0, "input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0})
+        self.assertIsNone(report["estimated_cost_usd"])
+        self.assertNotIn("charged_cents", report)
 
-    def test_paid_needs_codex_login(self):
-        self.set_codex(logged_in=False)
-        code, stdout, stderr = self.run_cmd("--paid")
-        self.assertEqual(code, 2)
-        self.assertIn("codex login", stderr)
-        self.assertEqual(self.calls(), [])
-        self.assertFalse(os.path.exists(os.path.join(self.out, "idempotency-key.txt")))
-
-    def test_paid_once_then_refused_then_recovered(self):
+    def test_paid_once_then_refused(self):
         code, stdout, stderr = self.run_cmd("--paid")
         self.assertEqual(code, 0, stdout + stderr)
-        with open(os.path.join(self.out, "idempotency-key.txt"), encoding="utf-8") as handle:
-            key = handle.read().strip()
-        self.assertRegex(key, r"^too-many-meetings:\d{8}:[0-9a-f]{6}$")
-        argv = self.calls()[0]["argv"]
-        self.assertEqual(argv[argv.index("--idempotency-key") + 1], key)
+        call = self.calls()[0]
+        argv = call["argv"]
+        self.assertEqual(argv[-2:], ["--max-total-tokens", "400000"])
         self.assertNotIn("--dry-run", argv)
-        self.assertEqual(json.loads(stdout)["charged_cents"], 2)
-        # A second paid run in the same folder is refused before vidbyte-cli is called.
+        self.assertNotIn("--idempotency-key", argv)
+        self.assertTrue(call["marker"])  # paid-run.txt is written before vidbyte-cli starts
+        with open(self.marker, encoding="utf-8") as handle:
+            self.assertIn("--max-total-tokens 400000", handle.read())
+        self.assertFalse(os.path.exists(os.path.join(self.out, "idempotency-key.txt")))
+        report = json.loads(stdout)
+        self.assertEqual(report["models"], ["gpt-6-sol"])
+        self.assertEqual(report["usage"], {"model_calls": 5, "input_tokens": 150000, "cached_input_tokens": 50000,
+                                           "output_tokens": 40000})
+        self.assertEqual(report["estimated_cost_usd"], 0.62)
+        self.assertNotIn("charged_cents", report)
+        self.assertNotIn("idempotency_key", report)
+        # A second paid run in the same folder is refused before vidbyte-cli is called, whether the folder
+        # holds the marker, the result, or both.
         code, _, stderr = self.run_cmd("--paid")
         self.assertEqual(code, 2)
-        self.assertIn("already started", stderr)
+        self.assertIn("new usage-billed run", stderr)
+        os.remove(self.marker)
+        self.assertEqual(self.run_cmd("--paid")[0], 2)
         self.assertEqual(len(self.calls()), 1)
-        # Recovery is refused while a finished result exists, and allowed with the saved key once it is gone.
-        self.assertEqual(self.run_cmd("--paid", "--idempotency-key", key)[0], 2)
-        os.remove(os.path.join(self.out, "result.json"))
-        code, stdout, stderr = self.run_cmd("--paid", "--idempotency-key", key)
-        self.assertEqual(code, 0, stdout + stderr)
-        argv = self.calls()[1]["argv"]
-        self.assertEqual(argv[argv.index("--idempotency-key") + 1], key)
+
+    def test_failed_paid_run_still_blocks_a_second(self):
+        env = dict(self.env, FAKE_FAIL="1")
+        code, stdout, _ = run_script(["run", "--out-dir", self.out, "--cli", self.fake, "--paid"], env=env)
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(stdout)["error"]["message"], "The model gateway did not complete the suggestion run.")
+        self.assertTrue(os.path.exists(self.marker))
+        self.assertFalse(os.path.exists(os.path.join(self.out, "result.json")))
+        # The calls that finished were billed and nothing recovers them, so the folder takes no second paid run.
+        code, _, stderr = self.run_cmd("--paid")
+        self.assertEqual(code, 2)
+        self.assertIn("paid-run.txt", stderr)
+        self.assertEqual(len(self.calls()), 1)
 
     def test_neither_or_both_modes_refused(self):
         self.assertEqual(self.run_cmd()[0], 2)
         self.assertEqual(self.run_cmd("--dry-run", "--paid")[0], 2)
-        self.assertEqual(self.run_cmd("--dry-run", "--idempotency-key", "abcdefgh1")[0], 2)
+        # --idempotency-key is gone: agents suggest run buys no admission, so there is nothing to recover.
+        code, _, stderr = self.run_cmd("--paid", "--idempotency-key", "too-many-meetings:20261011:3f9a1c")
+        self.assertEqual(code, 2)
+        self.assertIn("unrecognized arguments", stderr)
         self.assertEqual(self.calls(), [])
+        self.assertFalse(os.path.exists(self.marker))
+
+    def test_estimate_usd(self):
+        usage = {"model_calls": 5, "input_tokens": 150000, "cached_input_tokens": 50000, "output_tokens": 40000}
+        self.assertEqual(meetings.estimate_usd(usage, ["gpt-6-sol"]), 0.62)
+        self.assertIsNone(meetings.estimate_usd(usage, ["gpt-6-sol", "gpt-5.5"]))  # a role left gpt-6-sol
+        self.assertIsNone(meetings.estimate_usd({"model_calls": 0}, ["gpt-6-sol"]))
+        self.assertIsNone(meetings.estimate_usd({}, ["gpt-6-sol"]))
 
     def test_report_and_feedback(self):
         self.assertEqual(self.run_cmd("--paid")[0], 0)
@@ -703,7 +736,9 @@ class PaidRunGuardTest(unittest.TestCase):
         self.assertIn("## Later", stdout)
         self.assertIn("[%s]" % weekly, stdout)  # matched by title
         self.assertIn("[M2]", stdout)  # matched by the tag in the cited context value
-        self.assertIn("This run cost 2 cents", stdout)
+        self.assertIn("This run made 5 model calls with 150000 input and 40000 output tokens, about $0.62 from the "
+                      "Vidbyte balance", stdout)
+        self.assertNotIn("cents", stdout)
         code, stdout, stderr = run_script(["feedback", "--out-dir", self.out, "--idea", "idea-002", "--reject",
                                            "--reason", "I need that meeting", "--cli", self.fake], env=self.env)
         self.assertEqual(code, 0, stdout + stderr)
@@ -716,7 +751,7 @@ class PaidRunGuardTest(unittest.TestCase):
         code, stdout, _ = run_script(["run", "--out-dir", self.out, "--cli", missing, "--paid"], env=self.env)
         self.assertEqual(code, 127)
         self.assertIn("--cli", stdout)
-        self.assertFalse(os.path.exists(os.path.join(self.out, "idempotency-key.txt")))
+        self.assertFalse(os.path.exists(self.marker))
         self.assertEqual(self.calls(), [])
 
     def test_default_lookup_uses_path(self):

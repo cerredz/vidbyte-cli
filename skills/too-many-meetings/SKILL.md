@@ -4,7 +4,7 @@ description: Use when the user's calendar has no room left for focused work and 
 metadata:
   agent: "suggestion-agent"
   commands: "agents suggest project list, agents suggest project create, agents suggest run, agents suggest feedback accept, agents suggest feedback reject"
-  cost: "2 cents per run + model usage on the user's own Codex account"
+  cost: "Model usage from the Vidbyte balance: gpt-6-sol at $2 / $10 per million input / output tokens + 2%, capped at 400,000 tokens per run"
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
@@ -51,9 +51,10 @@ back-to-back chains, meetings with more than eight people, and 1:1s. It writes a
 `meetings.md` with no email addresses, meeting links, or dial-in codes. After the user's yes, one
 `vidbyte-cli agents suggest run` call sends that digest to the Suggestion Agent with the user's goal
 ("get back 10 focus hours a week"), the meetings they keep as a constraint, and "declining or
-leaving meetings without telling the organizer" as a forbidden action. It runs on the user's own
-Codex: a generator proposes ideas, an independent critic reviews them, and only ideas backed by the
-digest survive.
+leaving meetings without telling the organizer" as a forbidden action. Its model calls run on
+OpenAI's gpt-6-sol through Vidbyte's model gateway and are billed to the user's Vidbyte balance: a
+generator proposes ideas, an independent critic reviews them, and only ideas backed by the digest
+survive.
 
 At the end the user has one recommendation per meeting (drop it, shorten it, replace it with a
 written update, delegate it, or batch it onto one day), the focus hours each change gives back,
@@ -64,32 +65,32 @@ record which kinds of change the user accepts, so later runs fit them better.
 ## Goal and done-when
 
 The goal is a plan that gives the user back the focus hours a week they asked for (10 by default),
-built from a redacted digest of their calendar that they approved, for one Vidbyte charge, with
+built from a redacted digest of their calendar that they approved, in one usage-billed run, with
 every change approved by the user before anything happens to their calendar.
 
 Done when: the user has seen one recommendation per named meeting with the focus hours it gives
-back and the total against their goal, a draft message for each organizer, and the run's
-`charged_cents`; every change the host applied was approved by the user one change at a time; and
-the user has been offered feedback on the ideas they accepted or rejected and the deletion of the
-calendar data this skill wrote.
+back and the total against their goal, a draft message for each organizer, and the run's model
+usage and estimated cost; every change the host applied was approved by the user one change at a
+time; and the user has been offered feedback on the ideas they accepted or rejected and the
+deletion of the calendar data this skill wrote.
 
 ## Preflight
 
 Run these in order. If a `vidbyte-cli` check fails, read `references/setup.md`, fix only what
-failed, and run the preflight again. Step 3 of that file covers Codex for the Suggestion Agent.
+failed, and run the preflight again. Step 3 of that file lists what the Suggestion Agent needs:
+no Codex and no OpenAI key, only a Vidbyte key with the `models:invoke` permission.
 
 ```bash
 vidbyte-cli --version                  # must be 0.3.0 or newer
 vidbyte-cli --json whoami              # exit 4 means no Vidbyte key is stored
-vidbyte-cli --json runtime doctor      # data.hosts must list "codex" with "available": true
-codex login status                     # must print "Logged in ..."; exit 1 means not logged in
 python3 --version                      # must be 3.9 or newer
 ```
 
-- Codex must be logged in. The CLI checks that Codex is on `PATH` before it charges, but it does
-  not check the login, so a run with a logged-out Codex is charged and then fails. If
-  `codex login status` prints `Not logged in`, ask the user to run `codex login` in their own
-  terminal. The script also runs `codex login status` before a paid run and refuses on failure.
+- The Vidbyte key must carry the `models:invoke` permission; an admin or full-access key has it
+  too. `whoami` does not show permissions, so a key without it fails at the run's first model call
+  with exit 4 and `The stored Vidbyte API key is missing the models:invoke permission.`, before
+  anything is billed. The user then creates a key with that permission at
+  <https://vidbyte.pro/settings/api> and runs `vidbyte-cli login` with it.
 - The script needs Python 3.9 or newer, because it reads time zones with the standard `zoneinfo`
   module. On Windows, `python3` may be missing or may open the Microsoft Store. Use `py -3
   --version`, or `python --version`, and use that same command wherever this file says `python3`.
@@ -258,9 +259,9 @@ Everything in this section is free, and the calendar data stays on this machine.
    ```
 
    The script checks `inputs.json` (allowed keys, counts, lengths), and then runs the exact command
-   from Run with `--dry-run` in place of `--idempotency-key`. A dry run calls no model and buys no
-   admission. Expect exit 0, `"status": "no_suggestions"`, `"stop_reason": "dry_run"`,
-   `"charged_cents": null`, and every `context_manifest` entry `included`, with `meetings.md` as
+   from Run with `--dry-run` added. A dry run calls no model, is not billed, and needs no
+   credentials. Expect exit 0, `"status": "no_suggestions"`, `"stop_reason": "dry_run"`,
+   `"models": ["gpt-6-sol"]`, and every `context_manifest` entry `included`, with `meetings.md` as
    one `file` entry. On exit 2 the script prints the problems; fix `inputs.json` and run the dry run
    again. `Suggestion project was not found: too-many-meetings.` means step 6 was skipped.
 
@@ -269,8 +270,8 @@ Everything in this section is free, and the calendar data stays on this machine.
 The whole skill, in order. Each step names the commands it runs and the section that holds its
 details.
 
-1. **Check the setup.** Run `vidbyte-cli --version`, `vidbyte-cli --json whoami`,
-   `vidbyte-cli --json runtime doctor`, `codex login status`, and `python3 --version`. (Preflight)
+1. **Check the setup.** Run `vidbyte-cli --version`, `vidbyte-cli --json whoami`, and
+   `python3 --version`. (Preflight)
 2. **Ask once** for the calendar source, the focus hours to get back, the meetings to keep, and,
    if unknown, the working hours and time zone. (Gather inputs, step 1)
 3. **Get the calendar data**: an exported `.ics` file, a file holding the private iCal address,
@@ -287,7 +288,7 @@ details.
 7. **Show the user what will be sent and what it costs, and wait for a yes.** (Cost and consent)
 8. **Run the Suggestion Agent once** with `python3 "<skill>/scripts/meetings.py" run --out-dir
    "<OUT_DIR>" --paid`, which runs `vidbyte-cli --json --no-input agents suggest run ...
-   --idempotency-key <key>`. (Run)
+   --max-total-tokens 400000`. (Run)
 9. **Read the ideas** with `python3 "<skill>/scripts/meetings.py" report --out-dir "<OUT_DIR>"`.
    (Read the result)
 10. **Pick one change per meeting** and compute what each gives back with
@@ -308,11 +309,10 @@ Root options such as `--json` and `--no-input` always come before the command pa
 |---|---|---|
 | `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.3.0 or newer. Free and offline. |
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
-| `vidbyte-cli --json runtime doctor` | Preflight | Reports the working directory and which supported agent hosts are installed, from `PATH` alone, without reading credentials or using the network. Its `codex` row must be available. Free and offline. |
 | `vidbyte-cli --json agents suggest project list` | Gather inputs | Prints every local suggestion project in the catalog, sorted by key, with its title and description. An absent catalog returns an empty list, not an error. No credentials, no model call. Free and offline. |
 | `vidbyte-cli --json agents suggest project create --key ... --title ... --description ...` | Gather inputs | Registers one new local suggestion project with an empty feedback memory file. Refuses a key that already exists instead of overwriting it. Local and deterministic: no credentials, no model call, sends nothing to Vidbyte. Free. |
-| `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `meetings.py run --dry-run` | Validates and resolves the complete request without invoking a model, and returns the settings, the context manifest, omissions, and warnings. Needs no provider credentials and buys nothing. Free. |
-| `vidbyte-cli --json --no-input agents suggest run ... --idempotency-key <key>` | Run, through `meetings.py run --paid` | Develops concrete next actions for one goal and returns only ideas that can be explained, evaluated, and handed off; independent critique rejects weak or redundant directions, and every surviving idea carries evidence and an action structure. Buys one Vidbyte admission before any model is called: 2 cents for each block of up to ten requested ideas, so 2 cents at `--count 6`, plus model usage on the user's own Codex account. Writes no files; the script saves its output in the `OUT_DIR`. |
+| `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `meetings.py run --dry-run` | Validates and resolves the complete request without invoking a model, and returns the settings, the context manifest, omissions, and warnings. Needs no provider credentials and is not billed. Free. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `meetings.py run --paid` | Develops concrete next actions for one goal and returns only ideas that can be explained, evaluated, and handed off; independent critique rejects weak or redundant directions, and every surviving idea carries evidence and an action structure. Every generator, critic, and revision step is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. It starts no new call after 400,000 tokens. Writes no files; the script saves its output in the `OUT_DIR`. |
 | `vidbyte-cli --json agents suggest feedback accept --project ... --suggestion ...` | Deliver, through `meetings.py feedback` | Appends one suggestion the user explicitly accepted, with their optional `--reason`, to the project's memory, so later runs with `--project` recognize what the user found useful. Local; no credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest feedback reject --project ... --suggestion ...` | Deliver, through `meetings.py feedback` | Appends one suggestion the user explicitly rejected. On later runs with `--project`, the generator steers away from it, and selection removes any idea whose title, summary, or actions repeat its text word for word. Local; no credentials, no model call. Free. |
 
@@ -321,17 +321,21 @@ credits" in `references/troubleshooting.md`, which tops up only after the user's
 
 ## Cost and consent
 
-This skill runs `vidbyte-cli agents suggest run` once. The run costs 2 cents from the user's
-Vidbyte balance, because one admission covers up to ten requested ideas and this skill asks for
-six, plus model usage on the user's own Codex account (their ChatGPT plan or OpenAI API key,
-whichever Codex is logged in with). It does not edit any files in the user's repositories and
-does not change the calendar; the script writes only into its own `OUT_DIR`.
+This skill runs `vidbyte-cli agents suggest run` once, and the run is billed by usage from the
+user's Vidbyte balance. It makes about five model calls on gpt-6-sol at high reasoning effort: one
+draft, then a critique and a revision in each of two rounds. Each call is billed at gpt-6-sol's
+rate, $2 per million input tokens ($0.20 when the input is cached) and $10 per million output
+tokens, plus 2%, and the model's reasoning counts as output. The skill passes
+`--max-total-tokens 400000`, so the run starts no new call once it has used 400,000 tokens; a call
+already running still finishes and is billed. That keeps one run under about $4, and the script
+reports the run's real token usage and an estimate of its cost when it finishes. It does not edit
+any files in the user's repositories and does not change the calendar; the script writes only
+into its own `OUT_DIR`.
 
-What leaves the machine: `meetings.md` and the values in `inputs.json` go to the model through the
-user's own Codex login. They hold meeting titles, times, lengths, and people counts, with email
-addresses, links, phone numbers, and dial-in codes removed, and without descriptions, locations,
-or attendee names. Vidbyte's backend receives only the admission request, which holds the host
-and the unit count, never the digest. `meetings.json`, the calendar file or address,
+What leaves the machine: `meetings.md` and the values in `inputs.json` go to Vidbyte, which sends
+them to OpenAI with every model call of the run. They hold meeting titles, times, lengths, and
+people counts, with email addresses, links, phone numbers, and dial-in codes removed, and without
+descriptions, locations, or attendee names. `meetings.json`, the calendar file or address,
 `events.json`, and the user's repositories are never sent.
 
 Before running, show the user:
@@ -344,17 +348,17 @@ Before running, show the user:
 Then ask, in your own words:
 
 > This runs the Vidbyte Suggestion Agent once to find <N> focus hours a week in your calendar. It
-> sends the redacted meeting digest above and these <k> inputs to the model through your own Codex
-> login. It costs 2 cents from your Vidbyte balance, plus model usage on your Codex account. It
-> changes no files and does not touch your calendar. Run it?
+> sends the redacted meeting digest above and these <k> inputs through Vidbyte to OpenAI's
+> gpt-6-sol. It is billed by usage from your Vidbyte balance, at most about $4 because the run
+> starts no model call after 400,000 tokens. It changes no files and does not touch your calendar.
+> Run it?
 
 Wait for a yes. If the user wants something changed, edit `inputs.json` or `meetings.md` and run
 the dry run again before asking again.
 
-The script makes one idempotency key per paid run, `too-many-meetings:<YYYYMMDD>:<6 hex
-characters>`, saves it in `<OUT_DIR>/idempotency-key.txt`, and prints it before the run. Reuse
-that key only to recover this same admission (Troubleshooting). Any new run is a new charge with a
-new key, in a new `OUT_DIR`.
+The command takes no idempotency key: there is no purchase to recover, and each model call is
+billed once, when it finishes. The script writes `<OUT_DIR>/paid-run.txt` before the run and
+refuses a second paid run in the same `OUT_DIR`. Any new run is a new charge, in a new `OUT_DIR`.
 
 ## Run
 
@@ -367,12 +371,12 @@ python3 "<skill>/scripts/meetings.py" run --out-dir "<OUT_DIR>" --paid
 The run has no time limit of its own and often takes several minutes, longer than many hosts let
 one command run. Start it in the background and wait for it to exit, or give it a timeout of at
 least 20 minutes if the host allows one that long. A host timeout that kills the command loses the
-result of a run that was already paid for. Never stop it after stderr shows
-`Vidbyte has verified the admission for this run.`: from that line on, the run is paid for.
+result of model calls that were already billed. Do not stop it early for the same reason: the calls
+that finished are billed either way.
 
-The script checks `inputs.json` again, runs `codex login status`, and refuses to start if this
-`OUT_DIR` already has a paid attempt. It then runs, from inside the `OUT_DIR` and without a shell,
-so quoting is the same on every operating system:
+The script checks `inputs.json` again and refuses to start if this `OUT_DIR` already has a paid
+attempt. It then runs, from inside the `OUT_DIR` and without a shell, so quoting is the same on
+every operating system:
 
 ```bash
 vidbyte-cli --json --no-input agents suggest run \
@@ -385,7 +389,7 @@ vidbyte-cli --json --no-input agents suggest run \
   --outcomes "Next 2 weeks, as booked today (...): 9.9 meeting hours a week ..." \
   --context "[M1] \"Weekly sync\": weekly on Mon, Wed, 10:00, 60 min, 2.0 h/week; ..." \
   --files meetings.md \
-  --idempotency-key "too-many-meetings:20261011:3f9a1c"
+  --max-total-tokens 400000
 ```
 
 Each `inputs.json` value becomes one flag, in the order shown, and an empty list adds nothing.
@@ -397,10 +401,10 @@ and stderr is shown and saved to `<OUT_DIR>/result.stderr.txt`.
   `prioritization` is left out because the user's priorities are theirs to set, and `coordination`
   because moving work between people is not the goal.
 - `--horizon any`: any other value is applied only after review, as a filter on each idea's own
-  label, so it could silently remove good ideas from a run that is still charged. The report
+  label, so it could silently remove good ideas from a run that is still billed. The report
   groups ideas by their own label instead.
-- `--count 6`: one 2-cent block covers up to ten ideas, the count is a maximum and not a quota,
-  and six changes can be discussed with colleagues in one week.
+- `--count 6`: the count is a maximum and not a quota, and six changes can be discussed with
+  colleagues in one week. A larger count asks for longer replies, which are more output tokens.
 - `--constraint`: the meetings the user keeps, so the generator and the critic check every idea
   against them.
 - `--forbidden "declining or leaving meetings without telling the organizer"`: every change goes
@@ -413,16 +417,20 @@ and stderr is shown and saved to `<OUT_DIR>/result.stderr.txt`.
   attached text has no reference, so an idea that cited it would be withheld.
 - `--project too-many-meetings`, only when set: loads the ideas the user accepted and rejected on
   earlier runs.
-- `--idempotency-key`: the one key for this admission (Cost and consent).
-- Kept at their defaults: `--rounds` and `--max-messages`; no `--model` or `--reasoning-effort`,
-  so Codex uses the model the user configured.
+- `--max-total-tokens 400000`: the run starts no new model call after 400,000 tokens, which
+  bounds its cost (Cost and consent). A run that reaches it stops with `stop_reason: token_limit`
+  and returns the ideas it has so far.
+- Kept at their defaults: `--rounds` (two) and `--max-messages`; no `--model` or
+  `--reasoning-effort`, so the generator and the critic both run on gpt-6-sol at high reasoning
+  effort, the rate Cost and consent quotes.
 
 ## Read the result
 
 The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exit 0 the report has
-`result_file`, `kind`, `status`, `stop_reason`, `ideas` (a count), `charged_cents`, `warnings`,
-and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message`, `hint`, and
-`retryable` (Troubleshooting).
+`result_file`, `kind`, `status`, `stop_reason`, `ideas` (a count), `models`, `usage`
+(`model_calls`, `input_tokens`, `cached_input_tokens`, `output_tokens`), `estimated_cost_usd`, and
+`warnings`; otherwise it has `error`, with the CLI's `code`, `message`, `hint`, and `retryable`
+(Troubleshooting).
 
 `<OUT_DIR>/result.json` is one JSON document,
 `{"schema_version": 1, "kind": "suggestions.result", "data": {...}}`.
@@ -430,7 +438,7 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
 | Field | Use it for |
 |---|---|
 | `data.status` | `complete`, `partial` (fewer ideas than asked, which is normal), `no_suggestions`, or `needs_input`. |
-| `data.stop_reason` | Why the run stopped: `completed`, `count_shortfall`, `round_limit`, `token_limit`, `time_limit`, `provider_failed`, or `parent_message`. |
+| `data.stop_reason` | Why the run stopped: `completed`, `count_shortfall`, `round_limit`, `token_limit`, `time_limit`, `gateway_limit` (the balance or the key's daily spend limit ran out after some ideas were reviewed), `provider_failed`, or `parent_message`. |
 | `data.parent_message` | Set with `needs_input`: the generator's question for the user. |
 | `data.ideas[]` | The ranked ideas, best first. |
 | `.id`, `.rank`, `.title`, `.summary` | What to show; `id` (such as `idea-002`) selects an idea for feedback. |
@@ -438,7 +446,7 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
 | `.first_action`, `.why_now`, `.effort_estimate`, `.completion_criteria` | The concrete next step, why it matters now, its size, and how to know it is done. |
 | `.handoff.evidence[].content` | The inputs the idea relies on. A `context` value starts with its meeting tag, such as `[M3]`. |
 | `data.warnings` | Gaps the run noticed. Mention them if they change how the user reads the ideas. |
-| `data.charged_cents`, `data.admission.admission_id` | What the run cost, and the id to give Vidbyte support if needed. |
+| `data.usage` | What the run used: `model_calls`, `input_tokens`, `cached_input_tokens`, and `output_tokens`. The report's `estimated_cost_usd` prices them at gpt-6-sol's rates plus 2%; the exact charge is on <https://vidbyte.pro/usage>. |
 
 Then run the free report, which does the mapping from ideas to meetings for you:
 
@@ -448,7 +456,8 @@ python3 "<skill>/scripts/meetings.py" report --out-dir "<OUT_DIR>"
 
 It prints, and saves as `<OUT_DIR>/report.md`, the ideas grouped by `now`, `next`, and `later`,
 each with the meetings it names (by tag in its evidence or text, or by exact title) and their
-numbers, then the ten heaviest meetings no idea names, then the charge.
+numbers, then the ten heaviest meetings no idea names, then the run's model usage and estimated
+cost.
 
 ## Deliver
 
@@ -456,8 +465,9 @@ numbers, then the ten heaviest meetings no idea names, then the charge.
    ideas support: drop it, shorten it (such as 60 to 25 minutes), replace it with a written update,
    delegate it, keep every other occurrence, or batch it onto one day. Leave out every meeting on
    the user's keep list, even when an idea names it, and say why. If `status` is `needs_input`,
-   show `parent_message` and ask the user; a run with their answer added is a new charge. If there
-   are no ideas, say so, with `stop_reason`, and offer to work from `meetings.md` alone.
+   show `parent_message` and ask the user; a run with their answer added is a new usage-billed
+   run. If there are no ideas, say so, with `stop_reason`, and offer to work from `meetings.md`
+   alone.
 
 2. **Compute what the changes give back, free:**
 
@@ -478,7 +488,9 @@ numbers, then the ten heaviest meetings no idea names, then the charge.
    6.5 of the 8 focus hours a week you asked for." If the total is short, offer more changes from
    the report's "Meetings no idea names" list and run `whatif` again. Repeat any "Check with the
    user" line `whatif` prints, for 1:1s and meetings with people outside the user's domain. End
-   with the charge: "This run cost <charged_cents> cents from your Vidbyte balance."
+   with the usage: "This run made <model_calls> model calls with <input_tokens> input and
+   <output_tokens> output tokens, about $<estimated_cost_usd> from your Vidbyte balance; the exact
+   amount is on vidbyte.pro/usage."
 
 4. **Draft one message per organizer,** to the name in `plan.json` `write_to`. For a meeting the
    user organizes, write to its attendees. Keep each message short and specific: what changes,
@@ -527,29 +539,23 @@ numbers, then the ten heaviest meetings no idea names, then the charge.
 |---|---|
 | 3, from `gather` | No meeting in the window. Check that the export covers the coming two weeks and the right calendar. |
 | 1, from `gather` | The source could not be read; the message says why without showing the address. For HTTP 401, 403, or 404, the address was reset or the calendar is no longer published: ask for a new one or an exported file. |
-| 2, from `meetings.py` | The script names the problem, such as an unknown option, a bad time zone, an `inputs.json` value that is too long, a paid attempt already started in this `OUT_DIR`, or Codex not logged in. Fix it; do not retry unchanged. |
+| 2, from `meetings.py` | The script names the problem, such as an unknown option, a bad time zone, an `inputs.json` value that is too long, or a paid attempt already started in this `OUT_DIR`. Fix it; do not retry unchanged. |
 | 2, from `vidbyte-cli` | Fix the flag the message names. `Suggestion project was not found: too-many-meetings.` means the project does not exist: create it (Gather inputs, step 6) or set `"project": null`. |
-| 4 | Stop. Follow `references/setup.md` step 2. |
+| 4 | Stop. No Vidbyte key is stored, or the key lacks `models:invoke` (the message says which). Nothing was billed. Follow `references/setup.md` step 2. |
 | 5 | Stop. Follow "Out of credits" in `references/troubleshooting.md`. Never top up without the user's yes. |
 | 127, from `meetings.py` | `vidbyte-cli` is not on `PATH`. Follow `references/setup.md` step 1. |
 | Other | Read `references/troubleshooting.md`. |
 
-If a paid run fails or is cut off, read `<OUT_DIR>/result.stderr.txt` first:
+If a paid run fails or is cut off, read `<OUT_DIR>/result.stderr.txt` and the report's `error`
+first. The model calls that finished before the failure were billed, and nothing recovers or
+refunds them: there is no admission and no idempotency key.
 
-- **It does not contain `Vidbyte has verified the admission for this run.`** The admission may
-  have been charged while its reply was lost. Recover it without paying twice by rerunning with the
-  saved key, after telling the user:
-
-  ```bash
-  python3 "<skill>/scripts/meetings.py" run --out-dir "<OUT_DIR>" --paid --idempotency-key "<key from idempotency-key.txt>"
-  ```
-
-  The key recovers the purchase only: the backend returns the admission already bought, and the
-  ideas are generated again. Keep `inputs.json` unchanged between attempts.
-- **It contains that line.** The run was paid for. A failure after it, such as
-  `stop_reason: provider_failed`, is usually Codex: check `codex login status`. Another run is a
-  new 2-cent charge plus model usage, so ask the user first, then run `gather` again into a new
-  folder.
+- **`stop_reason: gateway_limit`.** The balance or the key's daily spend limit ran out after some
+  ideas were reviewed. Deliver those ideas, then follow "Out of credits" in
+  `references/troubleshooting.md` before any new run.
+- **Exit 1 with `The model gateway did not complete the suggestion run.`** A provider outage or a
+  reply that did not validate. Another run is a new usage-billed run, so ask the user first, then
+  run `gather` again into a new folder.
 
 ## Guardrails
 
@@ -558,7 +564,7 @@ If a paid run fails or is cut off, read `<OUT_DIR>/result.stderr.txt` first:
 - Run at most one file-writing Vidbyte agent in a workspace at a time. This skill writes no files
   in the workspace; its one Vidbyte run edits nothing.
 - Never run `meetings.py run --paid`, or `vidbyte-cli agents suggest run` without `--dry-run`,
-  before the user's yes. One yes covers one paid run, with one idempotency key.
+  before the user's yes. One yes covers one paid run, in one `OUT_DIR`.
 - Never change the calendar: do not create, move, shorten, decline, or delete events, and do not
   answer invites. A host with a calendar tool may apply one change only after the user approved
   that change. Never send a message to anyone without the user's approval of that message.

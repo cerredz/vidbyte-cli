@@ -277,3 +277,27 @@ admission on `agents suggest run`, so `min-cli-version` is `0.3.0`, and the PR m
    through `--cli` and a fake `codex`.
 4. `cmp` of each `references/` file against `git show origin/main:` of the canonical copy.
 5. A grep of the diff for email addresses, home paths, and tokens before every commit.
+
+## Update: usage-billed Suggestion Agent (2026-10-11)
+
+This commit follows cerredz/vidbyte-cli#22, which made the same change to
+`pick-up-where-my-sessions-left-off`.
+
+- No admission and no key: `agents suggest run` in vidbyte-cli 0.3.0 no longer buys a 2-cent
+  admission or runs on the user's Codex. `meetings.py run` no longer makes or accepts an
+  idempotency key and no longer runs `codex login status`, and Preflight drops `runtime doctor` and
+  `codex login status`. The Vidbyte key needs the `models:invoke` permission instead.
+- Model and rates: every generator, critic, and revision step is one model call through Vidbyte's
+  model gateway on gpt-6-sol at high reasoning effort, billed from the Vidbyte balance at $2 per
+  million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. With the default
+  two rounds and no extra compute, a run makes about five calls.
+- Cap and bound: the dry and the paid run both pass `--max-total-tokens 400000`. The worst case,
+  seven calls (five plus two repair retries) with the 32,000-token reply cap and one call in flight
+  past the cap, is about $2.93, which the skill states as "under about $4".
+- Guard and report: `paid-run.txt`, written just before the paid run, replaces
+  `idempotency-key.txt`; a folder with it or `result.json` refuses a second paid run. The run
+  report has `models`, `usage`, and `estimated_cost_usd` instead of `charged_cents` and
+  `idempotency_key`, `report` ends with the usage and the estimate, and SKILL.md adds the
+  `gateway_limit` stop reason.
+- `references/setup.md` and `references/troubleshooting.md` are now the canonical copies from #22,
+  so until #22 merges, Verification step 4 compares them with that branch, not `origin/main`.

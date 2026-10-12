@@ -10,7 +10,7 @@ Subcommands, in the order the skill runs them:
             email addresses, links, and dial-in codes, and writes meetings.md (sent to the model),
             inputs.json (the run's flag values), and meetings.json (local only) to a new folder.
   run       Runs `vidbyte-cli --json --no-input agents suggest run ...` from inside that folder.
-            --dry-run is free. --paid is the one charged step; run it only after the user's yes.
+            --dry-run is free. --paid is the one billed step; run it only after the user's yes.
   report    Free. Lists the returned ideas by horizon, each with the meetings it names.
   whatif    Free. Applies changes (drop, shorten, async, delegate, move, every-other) to the coming
             weeks and prints the focus hours each change gives back, alone and all together.
@@ -28,7 +28,6 @@ import datetime as dt
 import json
 import os
 import re
-import secrets
 import shlex
 import shutil
 import statistics
@@ -47,12 +46,21 @@ except ImportError:  # Python 3.8 and older have no zoneinfo; main() refuses to 
 
 UTC = dt.timezone.utc
 
-SLUG = "too-many-meetings"
 PROJECT_KEY = "too-many-meetings"
 CATEGORIES = ("stop_or_defer", "simplification", "delegation")
 HORIZON = "any"
 COUNT = 6
 FORBIDDEN = "declining or leaving meetings without telling the organizer"
+# The run starts no new model call once it has used this many tokens, which bounds its cost.
+MAX_TOTAL_TOKENS = 400000
+
+# vidbyte-cli's default model for both roles, and its regular rates in US dollars per million
+# tokens (https://developers.openai.com/api/docs/models/gpt-6-sol), which Vidbyte's model gateway
+# bills plus a 2% markup. They only estimate a finished run's cost; vidbyte.pro/usage is exact.
+MODEL = "gpt-6-sol"
+RATES_PER_MILLION = {"input": 2.0, "cached_input": 0.2, "output": 10.0}
+MARKUP = 1.02
+USAGE_KEYS = ("model_calls", "input_tokens", "cached_input_tokens", "output_tokens")
 
 # inputs.json keys that `run` turns into flags, in the order they are passed, with the most values
 # this skill passes for each.
@@ -74,7 +82,6 @@ LARGE_MEETING = 8          # "more than 8 people"
 CHAIN_GAP_MINUTES = 5      # meetings closer than this are back to back
 SHORTEN_TO_MINUTES = 25
 SHORTEN_FROM_MINUTES = 50  # only meetings this long or longer get a "cut to 25 min" estimate
-KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 PROJECT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 TAG_IN_TEXT = re.compile(r"(?<![A-Za-z0-9])M(\d{1,3})(?![A-Za-z0-9])")
 
@@ -2184,7 +2191,7 @@ def validate_inputs(data):
     return {"goal": goal, "project": project, "values": values}, problems
 
 
-def build_argv(exe, inputs, dry_run, key):
+def build_argv(exe, inputs, dry_run):
     argv = [exe, "--json", "--no-input", "agents", "suggest", "run", "--goal", inputs["goal"]]
     if inputs["project"]:
         argv += ["--project", inputs["project"]]
@@ -2195,8 +2202,31 @@ def build_argv(exe, inputs, dry_run, key):
         for value in inputs["values"].get(kind, []):
             argv += [flag, value]
     argv += ["--files", "meetings.md"]
-    argv += ["--dry-run"] if dry_run else ["--idempotency-key", key]
+    argv += ["--max-total-tokens", str(MAX_TOTAL_TOKENS)]
+    if dry_run:
+        argv.append("--dry-run")
     return argv
+
+
+def estimate_usd(usage, models):
+    """Estimates a finished run's cost in dollars, or None when it made no call or left gpt-6-sol."""
+    if not usage.get("model_calls") or any(model != MODEL for model in models):
+        return None
+    cached = int(usage.get("cached_input_tokens") or 0)
+    fresh = max(int(usage.get("input_tokens") or 0) - cached, 0)
+    output = int(usage.get("output_tokens") or 0)
+    rates = RATES_PER_MILLION
+    dollars = (fresh * rates["input"] + cached * rates["cached_input"] + output * rates["output"]) / 1000000
+    return round(dollars * MARKUP, 2)
+
+
+def run_usage(data):
+    """The models a suggestions.result names, its token usage, and the estimated cost in dollars."""
+    settings = data.get("settings") or {}
+    models = list(OrderedDict.fromkeys(m for m in (settings.get("model"), settings.get("critic_model")) if m))
+    usage = data.get("usage") or {}
+    counts = OrderedDict((key, int(usage.get(key) or 0)) for key in USAGE_KEYS)
+    return models, counts, estimate_usd(usage, models)
 
 
 def resolve_cli(value):
@@ -2218,22 +2248,6 @@ def cli_missing_message(value):
 
 def display_command(argv):
     return " ".join(shlex.quote(a) for a in ["vidbyte-cli"] + argv[1:])
-
-
-def codex_login_problem():
-    """None when `codex login status` succeeds; otherwise why the paid run must not start."""
-    exe = shutil.which("codex")
-    if not exe:
-        return "codex is not on PATH. The Suggestion Agent runs in the user's Codex; install it first."
-    try:
-        proc = subprocess.run([exe, "login", "status"], capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", timeout=60, stdin=subprocess.DEVNULL)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        return "`codex login status` could not run (%s)." % type(error).__name__
-    if proc.returncode != 0:
-        return ("`codex login status` says Codex is not logged in. vidbyte-cli would charge the run and then fail, "
-                "so ask the user to run `codex login` in their own terminal first.")
-    return None
 
 
 def run_cli(argv, out_dir, stdout_name):
@@ -2267,9 +2281,7 @@ def run_cli(argv, out_dir, stdout_name):
 def cmd_run(args):
     out_dir = os.path.abspath(os.path.expanduser(args.out_dir))
     if args.dry_run == args.paid:
-        raise UsageError("Pass exactly one of --dry-run (free check) or --paid (the charged run, only after the user said yes).")
-    if args.idempotency_key and not args.paid:
-        raise UsageError("--idempotency-key goes with --paid, to recover an earlier paid attempt.")
+        raise UsageError("Pass exactly one of --dry-run (free check) or --paid (the usage-billed run, only after the user said yes).")
     if not os.path.isfile(os.path.join(out_dir, "meetings.md")):
         raise UsageError("meetings.md not found in %s. Run gather first and pass the OUT_DIR it printed." % out_dir)
     inputs, problems = validate_inputs(load_json(os.path.join(out_dir, "inputs.json"), "inputs.json"))
@@ -2281,43 +2293,27 @@ def cmd_run(args):
         print(json.dumps({"error": cli_missing_message(args.cli)}))
         return 127
     print("Using vidbyte-cli at %s" % exe, file=sys.stderr)
-    key = ""
-    if args.paid:
-        problem = codex_login_problem()
-        if problem:
-            raise UsageError(problem)
-        result_path = os.path.join(out_dir, "result.json")
-        key_path = os.path.join(out_dir, "idempotency-key.txt")
-        finished = os.path.isfile(result_path) and os.path.getsize(result_path) > 0
-        if args.idempotency_key:
-            if not KEY_RE.match(args.idempotency_key):
-                raise UsageError("--idempotency-key must be 8-128 letters, digits, dots, underscores, colons, or hyphens.")
-            if finished:
-                raise UsageError("result.json already holds the output of a paid run, so there is nothing to recover. Read it instead.")
-            key = args.idempotency_key
-        elif finished or os.path.exists(result_path) or os.path.exists(key_path):
-            # Any earlier paid attempt here may already have been charged. A fresh key would buy a
-            # second admission, so only an explicit recovery key or a new folder may continue.
-            raise UsageError(
-                "A paid run was already started in this folder (see idempotency-key.txt and result.json). To recover "
-                "an attempt that stopped before Vidbyte verified its admission, rerun with --idempotency-key and the "
-                "saved key. Any other new run is a new charge: ask the user first, then gather into a new folder.")
-        else:
-            key = "%s:%s:%s" % (SLUG, dt.datetime.now().strftime("%Y%m%d"), secrets.token_hex(3))
-            with open(key_path, "w", encoding="utf-8", newline="\n") as handle:
-                handle.write(key + "\n")
-        print("Idempotency key for this run: %s (saved in idempotency-key.txt)" % key, file=sys.stderr)
-    argv = build_argv(exe, inputs, args.dry_run, key)
+    marker = os.path.join(out_dir, "paid-run.txt")
+    if args.paid and (os.path.exists(marker) or os.path.exists(os.path.join(out_dir, "result.json"))):
+        # The model calls an earlier paid run here finished were billed, and nothing recovers
+        # them. Another run is a new charge, so it needs the user's yes and a new folder.
+        raise UsageError(
+            "A paid run was already started in this folder (see paid-run.txt and result.json), and the model calls it "
+            "finished were billed. Read result.json if it is there. Any other run is a new usage-billed run: ask the "
+            "user first, then gather into a new folder.")
+    argv = build_argv(exe, inputs, args.dry_run)
     length = sum(len(a) + 3 for a in argv)
     if length > MAX_ARGV_CHARS:
         raise UsageError("The command would be %d characters; shorten the inputs.json values to stay under %d." % (
             length, MAX_ARGV_CHARS))
+    if args.paid:
+        with open(marker, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write("Paid run started %s with --max-total-tokens %d.\n" % (
+                dt.datetime.now().isoformat(timespec="seconds"), MAX_TOTAL_TOKENS))
     print("Running in %s:\n%s" % (out_dir, display_command(argv)), file=sys.stderr)
     sys.stderr.flush()
     code, stdout_path, stderr_path, error = run_cli(argv, out_dir, "dry-run.json" if args.dry_run else "result.json")
     report = {"exit_code": code, "stderr_file": stderr_path}
-    if args.paid:
-        report["idempotency_key"] = key
     if code == 0:
         try:
             with open(stdout_path, encoding="utf-8") as handle:
@@ -2325,10 +2321,11 @@ def cmd_run(args):
             data = document.get("data") or {}
         except (OSError, ValueError):
             document, data = {}, {}
+        models, usage, estimate = run_usage(data)
         report.update({
             "result_file": stdout_path, "kind": document.get("kind"), "status": data.get("status"),
             "stop_reason": data.get("stop_reason"), "ideas": len(data.get("ideas") or []),
-            "charged_cents": data.get("charged_cents"),
+            "models": models, "usage": usage, "estimated_cost_usd": estimate,
             "context_manifest": [{"ref": m.get("ref"), "kind": m.get("kind"), "status": m.get("status")}
                                  for m in data.get("context_manifest") or []],
             "warnings": data.get("warnings") or [],
@@ -2418,10 +2415,11 @@ def cmd_report(args):
         lines += ["", "## Meetings no idea names (top %d by hours a week)" % len(rest), ""]
         lines += ["- " + meeting_line(s) for s in rest]
     lines.append("")
-    if data.get("charged_cents") is not None:
-        admission = (data.get("admission") or {}).get("admission_id", "")
-        lines.append("This run cost %s cents from the Vidbyte balance%s." % (
-            data["charged_cents"], " (admission %s)" % admission if admission else ""))
+    _models, usage, estimate = run_usage(data)
+    if usage["model_calls"]:
+        cost = "billed from the Vidbyte balance" if estimate is None else "about $%.2f from the Vidbyte balance" % estimate
+        lines.append("This run made %d model calls with %d input and %d output tokens, %s; the exact amount is on "
+                     "vidbyte.pro/usage." % (usage["model_calls"], usage["input_tokens"], usage["output_tokens"], cost))
     for warning in data.get("warnings") or []:
         lines.append("Warning: " + str(warning))
     text = "\n".join(lines) + "\n"
@@ -2637,7 +2635,7 @@ def main(argv=None):
             "  python3 meetings.py gather --ics ~/Downloads/calendar.ics --tz America/New_York --keep \"customer calls\"\n"
             "  python3 meetings.py gather --ics-url-file ~/calendar-url.txt --work-hours 08:30-17:30\n"
             "  python3 meetings.py run --out-dir <OUT_DIR> --dry-run   # free\n"
-            "  python3 meetings.py run --out-dir <OUT_DIR> --paid      # charged; ask the user first\n"
+            "  python3 meetings.py run --out-dir <OUT_DIR> --paid      # billed by usage; ask the user first\n"
             "  python3 meetings.py report --out-dir <OUT_DIR>\n"
             "  python3 meetings.py whatif --out-dir <OUT_DIR> --drop M4 --shorten M1=25 --move M9=thu\n"
             "  python3 meetings.py feedback --out-dir <OUT_DIR> --idea idea-002 --reject --reason \"I need that sync\"\n"))
@@ -2671,14 +2669,13 @@ def main(argv=None):
     gather.add_argument("--today", metavar="YYYY-MM-DD", help="Use this date as today (for tests).")
     gather.add_argument("--out-dir", metavar="DIR", help="Write here instead of a new folder in the system temp directory.")
 
-    run = sub.add_parser("run", help="Run vidbyte-cli agents suggest run from inputs.json (--dry-run free, --paid charged).",
+    run = sub.add_parser("run", help="Run vidbyte-cli agents suggest run from inputs.json (--dry-run free, --paid billed by usage).",
                          description="Check <out-dir>/inputs.json, then run `vidbyte-cli --json --no-input agents suggest run` "
                                      "from inside <out-dir>. Saves stdout to dry-run.json or result.json and stderr next "
                                      "to it, prints a JSON summary, and exits with vidbyte-cli's exit code.")
     run.add_argument("--out-dir", required=True, metavar="DIR", help="The OUT_DIR that gather printed.")
-    run.add_argument("--dry-run", action="store_true", help="Validate the full request for free: no model, no charge.")
-    run.add_argument("--paid", action="store_true", help="The charged run. Use only after the user agreed to the cost.")
-    run.add_argument("--idempotency-key", metavar="KEY", help="Reuse the saved key to recover an earlier paid attempt without paying twice.")
+    run.add_argument("--dry-run", action="store_true", help="Validate the full request for free: no model call, no charge.")
+    run.add_argument("--paid", action="store_true", help="The usage-billed run. Use only after the user agreed to the cost.")
     run.add_argument("--cli", metavar="PATH", help="Path of the vidbyte-cli to run. Default: vidbyte-cli on PATH. Tests pass a recording fake here, so they can never reach the real CLI.")
 
     report = sub.add_parser("report", help="List the ideas by horizon with the meetings each one names (free).")
