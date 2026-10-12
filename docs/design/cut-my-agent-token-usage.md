@@ -123,10 +123,12 @@ idea with its source sessions and the tokens tied to the pattern it targets.
     the first `token_usage_record` in a file (older Codex), it sums `last_token_usage` and skips a
     `token_count` whose `total_token_usage` equals the previous one, because Codex re-emits the
     last count on resume. Codex `input_tokens` includes `cached_input_tokens`, so fresh input is
-    `input - cached`; `output_tokens` includes reasoning. Compactions are `compacted` records;
-    a compaction counts as a context-limit hit when the request before it filled at least 80% of
-    `model_context_window`. Subagent threads (`source.subagent.thread_spawn.parent_thread_id`)
-    are counted inside their parent when the parent is in the window.
+    `input - cached - cache_write`; `output_tokens` includes reasoning. Compactions are
+    `compacted` records. Codex does not record whether a compaction was automatic or asked for,
+    so the digest reports Codex compactions as compactions, with the peak context of the
+    conversation, and never calls them context-limit hits. Subagent threads
+    (`source.subagent.thread_spawn.parent_thread_id`) are counted inside their parent when the
+    parent is in the window.
 - **Rank.** Each session's total is fresh input + cache reads + cache writes + output, subagents
   included. Sessions are ranked by that total and the top 10 (`--top`) are kept. The window totals
   cover every session read, so the top-N share is real. Sessions started by programs (Claude Agent
@@ -169,13 +171,17 @@ idea with its source sessions and the tokens tied to the pattern it targets.
   `*TOKEN*` / `*SECRET*` / `*PASSWORD*` assignments, email addresses, absolute home paths in every
   spelling (shown as `~`), and the login name (shown as `[user]`). It runs over every prompt,
   title, file path, command, and subagent description before anything is written, and again over
-  `inputs.json` values before the run.
+  `inputs.json` values before the run. In text copied from transcripts it also replaces UUIDs
+  (session ids inside file paths) with `[id]`, and rewrites words such as `S3` to `S-3`, so a
+  user's own label can never be read as a session tag.
 - **Run.** `token_usage.py suggest` validates `inputs.json` (allowed keys, counts, lengths, session
   tags), builds the argv, and runs `vidbyte-cli` without a shell, from inside the output folder,
   with `--files digest.md` as a relative path, so the file's path that reaches the model holds no
   home folder. The paid mode needs `--paid`, makes and saves one idempotency key, and refuses to
   start in a folder that already holds a paid attempt unless the caller recovers it with
   `--idempotency-key` and no result was saved yet. This guard is copied from `sessions.py`.
+  `--cli <path>` runs a named `vidbyte-cli` executable instead of the one on `PATH`, for a CLI
+  installed outside `PATH` and for tests with a stand-in.
 - **Flag choices.**
   - The goal frames everything through usage: "These are the N sessions that used the most tokens
     ... Given that these use the most usage, what should I change so the same work costs fewer
@@ -279,6 +285,7 @@ ideas, comes from `SuggestionAdmissionLimit` and the `count` help text on `main`
 5. `token_usage.py suggest --dry-run` run with the real digest against a CLI built from the
    internal `main`, with an isolated state folder: exit 0, `stop_reason: dry_run`, every manifest
    entry `included`, no charge. Invalid inputs fail with exit 2.
-6. The paid-run guards and `report`/`feedback` tested with a stand-in `vidbyte-cli` first on
-   `PATH`, confirmed with `command -v vidbyte-cli` before each test.
+6. The paid-run guards and `report`/`feedback` tested with a recording stand-in `vidbyte-cli`,
+   passed explicitly with `--cli` and also first on `PATH`, confirmed with `command -v vidbyte-cli`
+   in the same shell call; the stand-in's call log matched the expected number of calls.
 7. `cmp` of both `references/` files against the canonical copies.
