@@ -81,6 +81,12 @@ STOPWORDS = {"the", "and", "for", "with", "that", "this", "from", "your", "have"
              "there", "slack", "thread", "message", "file", "private", "channel", "group"}
 
 
+def write_text_lf(path, text):
+    """Write UTF-8 text with LF line endings (Path.write_text has no newline= before Python 3.10)."""
+    with open(str(path), "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
 # --------------------------------------------------------------------------------------------
 # Redaction (patterns from pick-up-where-my-sessions-left-off, plus phone numbers and extra names)
 
@@ -515,8 +521,8 @@ def cmd_gather(args) -> int:
     if problems:  # a bug here must never produce a file that breaks the shared format
         print(json.dumps({"error": "internal: generated items.json is invalid", "problems": problems[:20]}, indent=2))
         return 70
-    (out_dir / "items.json").write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
-    (out_dir / "digest.md").write_text(digest, encoding="utf-8", newline="\n")
+    write_text_lf(out_dir / "items.json", json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
+    write_text_lf(out_dir / "digest.md", digest)
     inputs = OrderedDict([("goal", build_goal(phrase)), ("project", PROJECT_KEY),
                           ("trajectory", [redact(one_line(args.focus))] if args.focus else []),
                           ("constraint", [redact(one_line(args.time_available))] if args.time_available else []),
@@ -525,7 +531,7 @@ def cmd_gather(args) -> int:
     if inputs_path.exists():
         warnings.append("inputs.json already existed in this folder and was left as it is.")
     else:
-        inputs_path.write_text(json.dumps(inputs, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+        write_text_lf(inputs_path, json.dumps(inputs, indent=2, ensure_ascii=False) + "\n")
     for name in ("dry-run.ok",):
         stale = out_dir / name
         if stale.exists():
@@ -821,7 +827,7 @@ def cmd_report(args) -> int:
     for warning in data.get("warnings") or []:
         lines.append("Warning: " + str(warning))
     text = "\n".join(lines).rstrip() + "\n"
-    (out_dir / "report.md").write_text(text, encoding="utf-8", newline="\n")
+    write_text_lf(out_dir / "report.md", text)
     print(text, end="")
     return 0
 
