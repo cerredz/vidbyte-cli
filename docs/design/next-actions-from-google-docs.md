@@ -298,3 +298,27 @@ merged until 0.3.0 is on PyPI. The price, 2 cents per block of up to ten request
    on it with the isolated CLI.
 8. `cmp` of both shared `references/` files against the canonical copies, and a leak scan of the
    diff for home paths, the login name, emails, and token shapes.
+
+## Update: usage-billed Suggestion Agent (2026-10-11)
+
+- `agents suggest run` in vidbyte-cli 0.3.0 no longer buys a 2-cent Vidbyte admission or runs on
+  the user's Codex. Each generator, critic, and revision step is one model call through Vidbyte's
+  model gateway, billed to the Vidbyte balance at the model's per-token rate plus 2%. The skill
+  keeps the defaults, so both roles run on gpt-6-sol at high reasoning effort ($2 input, $0.20
+  cached input, $10 output per million tokens).
+- The idempotency key, `idempotency-key.txt`, and the admission-recovery path are gone.
+  `google_docs.py run` passes `--max-total-tokens 400000` on both the dry and the paid run, so the
+  dry-run fingerprint covers the exact paid command. It writes `paid-run.txt` just before the paid
+  run and refuses a second paid run in a folder that holds that marker or a `result.json`.
+- A run makes about five model calls (one draft, then a critique and a revision in each of two
+  rounds). The cap plus one in-flight call bounds a run at 540,000 tokens; with up to seven
+  32,000-token replies (two for repair retries) the worst case is about $2.93, which SKILL.md
+  states as "under about $4".
+- `run` reports `models`, `usage` (`model_calls`, `input_tokens`, `cached_input_tokens`,
+  `output_tokens`), and `estimated_cost_usd` (gpt-6-sol rates plus 2%) instead of `charged_cents`
+  and `idempotency_key`; `report` ends with that usage and estimate instead of the cents charged.
+- Preflight drops `vidbyte-cli --json runtime doctor` and `codex login status`. The Vidbyte key
+  needs the `models:invoke` permission instead; without it the run stops with exit 4 at the first
+  model call, before anything is billed. `references/setup.md` and `references/troubleshooting.md`
+  are the new canonical copies.
+- cerredz/vidbyte-cli#22 (`pick-up-where-my-sessions-left-off`) is the reference implementation.

@@ -13,7 +13,7 @@ Five subcommands, run in this order by the next-actions-from-google-docs skill:
             plus inputs.json. With --from-items it reads an items.json written by the host
             agent's own Google Drive connector instead of calling Google.
   run       Checks inputs.json, then runs `vidbyte-cli --json --no-input agents suggest run ...`
-            from inside the output folder. --dry-run is free; --paid is the one charged step and
+            from inside the output folder. --dry-run is free; --paid is the one billed step and
             needs the user's yes first.
   report    Free and offline. Maps each idea in result.json to the documents it names and prints
             the next actions grouped by horizon, each with its source titles and links.
@@ -38,7 +38,6 @@ import json
 import os
 import random
 import re
-import secrets
 import shlex
 import shutil
 import socket
@@ -59,6 +58,16 @@ PROJECT_KEY = "notes-next-actions"
 CATEGORIES = ("immediate_next_steps", "prioritization", "completion", "continuation")
 HORIZON = "any"
 COUNT = 6
+# The run starts no new model call once it has used this many tokens, which bounds its cost.
+MAX_TOTAL_TOKENS = 400_000
+
+# vidbyte-cli's default model for both roles, and its regular rates in US dollars per million
+# tokens (https://developers.openai.com/api/docs/models/gpt-6-sol), which Vidbyte's model gateway
+# bills plus a 2% markup. They only estimate a finished run's cost; vidbyte.pro/usage is exact.
+MODEL = "gpt-6-sol"
+RATES_PER_MILLION = {"input": 2.0, "cached_input": 0.2, "output": 10.0}
+MARKUP = 1.02
+USAGE_KEYS = ("model_calls", "input_tokens", "cached_input_tokens", "output_tokens")
 
 DEFAULT_DAYS = 7
 DEFAULT_MAX_ITEMS = 30
@@ -113,7 +122,6 @@ FLAG_KINDS = OrderedDict([("trajectory", ("--trajectory", 2)), ("constraint", ("
 MAX_VALUE_CHARS = 400
 MAX_GOAL_CHARS = 1_000
 MAX_ARGV_CHARS = 24_000  # Windows refuses command lines over 32,767 characters.
-KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 PROJECT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 QUOTA_PROJECT_RE = re.compile(r"^[A-Za-z0-9:._-]{4,64}$")
 TEST_BASE_RE = re.compile(r"^http://(?:127\.0\.0\.1|localhost):\d{1,5}$")
@@ -1220,7 +1228,7 @@ def validate_inputs(data, redact: Redactor):
 
 
 def build_argv(exe: str, inputs: dict) -> list:
-    """The command without its mode flag; run adds --dry-run or --idempotency-key."""
+    """The paid command; run adds --dry-run to it for the free check of the same request."""
     argv = [exe, "--json", "--no-input", "agents", "suggest", "run", "--goal", inputs["goal"]]
     for category in CATEGORIES:
         argv += ["--category", category]
@@ -1231,7 +1239,26 @@ def build_argv(exe: str, inputs: dict) -> list:
     argv += ["--files", "digest.md"]  # Relative: the run starts inside the output folder.
     if inputs["project"]:
         argv += ["--project", inputs["project"]]
+    argv += ["--max-total-tokens", str(MAX_TOTAL_TOKENS)]
     return argv
+
+
+def run_models(data: dict) -> list:
+    """The models a run used for its generator and critic, from the result's settings."""
+    settings = data.get("settings") or {}
+    return list(OrderedDict.fromkeys(m for m in (settings.get("model"), settings.get("critic_model")) if m))
+
+
+def estimate_usd(usage: dict, models: list):
+    """Estimates a finished run's cost in dollars, or None when it made no call or left gpt-6-sol."""
+    if not usage.get("model_calls") or any(model != MODEL for model in models):
+        return None
+    cached = int(usage.get("cached_input_tokens") or 0)
+    fresh = max(int(usage.get("input_tokens") or 0) - cached, 0)
+    output = int(usage.get("output_tokens") or 0)
+    rates = RATES_PER_MILLION
+    dollars = (fresh * rates["input"] + cached * rates["cached_input"] + output * rates["output"]) / 1_000_000
+    return round(dollars * MARKUP, 2)
 
 
 def fingerprint(argv: list, out_dir: Path) -> str:
@@ -1288,9 +1315,7 @@ def display_command(argv: list) -> str:
 def cmd_run(args) -> int:
     out_dir = Path(args.out).expanduser()
     if args.dry_run == args.paid:
-        return usage_error("Pass exactly one of --dry-run (free check) or --paid (the charged run, only after the user said yes).")
-    if args.idempotency_key and not args.paid:
-        return usage_error("--idempotency-key only recovers a paid attempt; use it with --paid.")
+        return usage_error("Pass exactly one of --dry-run (free check) or --paid (the usage-billed run, only after the user said yes).")
     if not (out_dir / "digest.md").is_file():
         return usage_error("digest.md not found in %s. Run `gather` first and pass the out_dir it printed." % out_dir)
     redact = Redactor(Path.home())
@@ -1309,49 +1334,32 @@ def cmd_run(args) -> int:
         return usage_error("The command would be %d characters; shorten the inputs.json values to stay under %d." % (length, MAX_ARGV_CHARS))
     print_ = fingerprint(argv, out_dir)
     marker = out_dir / "dry-run.ok"
-    key = ""
+    paid_marker = out_dir / "paid-run.txt"
     if args.paid:
         saved = load_json(marker, "dry-run.ok") if marker.is_file() else {}
         if not isinstance(saved, dict) or saved.get("fingerprint") != print_:
             return usage_error("No passing dry run matches this exact request (digest.md and inputs.json). Run `run --dry-run` first, show the user the result, and ask again.")
-        result_path = out_dir / "result.json"
-        key_path = out_dir / "idempotency-key.txt"
-        finished = result_path.is_file() and result_path.stat().st_size > 0
-        saved_key = key_path.read_text(encoding="utf-8").strip() if key_path.is_file() else ""
-        if args.idempotency_key:
-            if not KEY_RE.match(args.idempotency_key):
-                return usage_error("--idempotency-key must be 8-128 letters, digits, dots, underscores, colons, or hyphens.")
-            if finished:
-                return usage_error("result.json already holds the output of a paid run, so there is nothing to recover. Read it instead.")
-            if saved_key and args.idempotency_key != saved_key:
-                return usage_error("This folder's paid attempt used the key in idempotency-key.txt; recovery must reuse that exact key.")
-            key = args.idempotency_key
-        elif finished or result_path.exists() or key_path.exists():
-            # Any earlier paid attempt here may already have been charged. A fresh key would buy
-            # a second admission, so only an explicit recovery key or a new folder may continue.
+        if paid_marker.exists() or (out_dir / "result.json").exists():
+            # The model calls an earlier paid run here finished were billed, and nothing recovers
+            # them. Another run is a new charge, so it needs the user's yes and a new folder.
             return usage_error(
-                "A paid run was already started in this folder (see idempotency-key.txt and result.json). "
-                "To recover an attempt that stopped before Vidbyte verified its admission, rerun with --idempotency-key and the saved key. "
-                "Any other new run is a new charge: ask the user first, then gather into a new folder."
+                "A paid run was already started in this folder (see paid-run.txt and result.json), and the model calls it finished were billed. "
+                "Read result.json if it is there. Any other run is a new usage-billed run: ask the user first, then gather into a new folder."
             )
-        else:
-            key = "%s:%s:%s" % (SLUG, dt.datetime.now().strftime("%Y%m%d"), secrets.token_hex(3))
-            key_path.write_text(key + "\n", encoding="utf-8")
-        print("Idempotency key for this run: %s (saved in idempotency-key.txt)" % key, file=sys.stderr)
-        argv = argv + ["--idempotency-key", key]
+        write_text(paid_marker, "Paid run started %s with --max-total-tokens %d.\n" % (dt.datetime.now().isoformat(timespec="seconds"), MAX_TOTAL_TOKENS))
     else:
         argv = argv + ["--dry-run"]
     print("Running %s in %s:\n%s" % (exe, out_dir, display_command(argv)), file=sys.stderr)
     code, stdout_path, stderr_path, error = run_cli(argv, out_dir, "dry-run.json" if args.dry_run else "result.json")
     report: dict = {"exit_code": code, "cli": exe, "stderr_file": str(stderr_path)}
-    if args.paid:
-        report["idempotency_key"] = key
     if code == 0:
         try:
             document = json.loads(stdout_path.read_text(encoding="utf-8"))
             data = document.get("data", {}) if isinstance(document, dict) else {}
         except ValueError:
             document, data = {}, {}
+        models = run_models(data)
+        usage = data.get("usage") or {}
         report.update(
             {
                 "result_file": str(stdout_path),
@@ -1359,7 +1367,9 @@ def cmd_run(args) -> int:
                 "status": data.get("status"),
                 "stop_reason": data.get("stop_reason"),
                 "ideas": len(data.get("ideas") or []),
-                "charged_cents": data.get("charged_cents"),
+                "models": models,
+                "usage": {key: int(usage.get(key) or 0) for key in USAGE_KEYS},
+                "estimated_cost_usd": estimate_usd(usage, models),
                 "context_manifest": [{"ref": m.get("ref"), "kind": m.get("kind"), "source": m.get("source"), "status": m.get("status")} for m in data.get("context_manifest") or []],
                 "warnings": data.get("warnings") or [],
             }
@@ -1450,9 +1460,13 @@ def cmd_report(args) -> int:
     if open_left:
         lines.append("Documents with open tasks that no action names: " + "; ".join("[%s](%s) (%d)" % (it["title"], it["link"], len(it["open_tasks"])) for it in open_left[:10]))
         lines.append("")
-    if data.get("charged_cents") is not None:
-        admission = (data.get("admission") or {}).get("admission_id", "")
-        lines.append("This run cost %s cents from your Vidbyte balance%s." % (data["charged_cents"], " (admission %s)" % admission if admission else ""))
+    usage = data.get("usage") or {}
+    if usage.get("model_calls"):
+        cost = estimate_usd(usage, run_models(data))
+        lines.append(
+            "This run made %d model calls with %d input and %d output tokens, %s from your Vidbyte balance; the exact amount is on vidbyte.pro/usage."
+            % (int(usage["model_calls"]), int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0), "billed by usage" if cost is None else "about $%.2f" % cost)
+        )
     for warning in data.get("warnings") or []:
         lines.append("Warning: " + str(warning))
     text = "\n".join(lines).rstrip() + "\n"
@@ -1507,7 +1521,7 @@ def main(argv=None) -> int:
             "  python3 google_docs.py gather --days 14 --include sheets --exclude Journal\n"
             "  python3 google_docs.py gather --from-items items.json  # written by the host's Drive connector\n"
             "  python3 google_docs.py run --out <out_dir> --dry-run   # free\n"
-            "  python3 google_docs.py run --out <out_dir> --paid      # charged; ask the user first\n"
+            "  python3 google_docs.py run --out <out_dir> --paid      # billed by usage; ask the user first\n"
             "  python3 google_docs.py report --out <out_dir>\n"
             "  python3 google_docs.py feedback --out <out_dir> --idea idea-002 --reject --reason \"already done\"\n"
         ),
@@ -1534,11 +1548,10 @@ def main(argv=None) -> int:
     gather.add_argument("--out", help="Output folder (default: a new folder under the system temp folder).")
     add_auth_options(gather)
 
-    run = sub.add_parser("run", help="Check inputs.json and run vidbyte-cli agents suggest run (--dry-run is free; --paid is charged).", description="Validate <out>/inputs.json, then run `vidbyte-cli --json --no-input agents suggest run` from inside <out>. Saves stdout to dry-run.json or result.json and stderr to a .stderr.txt file, prints a JSON summary, and exits with vidbyte-cli's exit code. --paid needs a passing dry run of the same request.")
+    run = sub.add_parser("run", help="Check inputs.json and run vidbyte-cli agents suggest run (--dry-run is free; --paid is billed by usage).", description="Validate <out>/inputs.json, then run `vidbyte-cli --json --no-input agents suggest run` from inside <out>. Saves stdout to dry-run.json or result.json and stderr to a .stderr.txt file, prints a JSON summary, and exits with vidbyte-cli's exit code. --paid needs a passing dry run of the same request.")
     run.add_argument("--out", required=True, help="The out_dir that gather printed.")
-    run.add_argument("--dry-run", action="store_true", help="Validate the full request for free: no model, no admission, no charge.")
-    run.add_argument("--paid", action="store_true", help="The charged run. Use only after the user agreed to the cost.")
-    run.add_argument("--idempotency-key", help="With --paid: reuse the saved key of an earlier attempt to recover its admission without paying twice.")
+    run.add_argument("--dry-run", action="store_true", help="Validate the full request for free: no model call, no charge.")
+    run.add_argument("--paid", action="store_true", help="The usage-billed run. Use only after the user agreed to the cost.")
     run.add_argument("--cli", default="vidbyte-cli", help="The vidbyte-cli executable to run (default: vidbyte-cli on PATH).")
 
     report = sub.add_parser("report", help="Print the next actions with their source documents (free).", description="Read <out>/result.json and items.json, map each idea to the documents it names, group by horizon, print the report, and save it as report.md.")
