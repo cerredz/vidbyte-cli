@@ -107,7 +107,8 @@ status no faster than every 10 seconds.
 
 ## Idempotency keys
 
-Priced commands accept `--idempotency-key`: one string of 8 to 128 letters, digits, dots,
+Priced commands that buy an admission accept `--idempotency-key` (`agents suggest run` buys none,
+so it has no key: each of its model calls is billed on its own). The key is one string of 8 to 128 letters, digits, dots,
 underscores, colons, or hyphens (`[A-Za-z0-9._:-]{8,128}`). Reusing the same key recovers an
 admission whose response was lost without paying twice. It does not resume local work, and it
 must never contain account data or secrets.

@@ -125,7 +125,8 @@ vidbyte-cli --json --no-input <command> \
 
 <!-- Keep `-- "<task text>"` only when the command takes a positional task (runtime persistence,
      runtime same-host-ensemble, runtime stages run, research start); `--` stops a task that
-     starts with "-" from being read as a flag. agents suggest run takes --goal instead. -->
+     starts with "-" from being read as a flag. agents suggest run takes --goal instead, and it
+     takes no --idempotency-key: it buys no admission, and each model call is billed by usage. -->
 <!-- Explain each non-obvious flag choice in one line, so a reader knows why this skill sets it. -->
 - `<--flag value>`: <why this value for this problem>.
 
