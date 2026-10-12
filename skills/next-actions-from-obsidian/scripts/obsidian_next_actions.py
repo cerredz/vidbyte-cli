@@ -264,7 +264,9 @@ def load_json(path: Path, label: str):
 
 
 def write_text(path: Path, text: str) -> None:
-    path.write_text(text, encoding="utf-8", newline="\n")
+    # Path.write_text has no newline= before Python 3.10.
+    with open(str(path), "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
 
 
 def window_start(args, now):
