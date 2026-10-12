@@ -165,7 +165,9 @@ Then `notion_next_actions.py report --out "<out_dir>"` prints the actions groupe
   needs `--paid`; refuses unless the last dry run passed on the same `digest.md` and `inputs.json`
   (checked by hash); checks `codex login status` first, because the CLI checks only that `codex` is
   on `PATH`; makes and saves one idempotency key; and refuses a folder that already holds a paid
-  attempt, unless the caller is recovering it with the saved key.
+  attempt, unless the caller is recovering it with the saved key. `suggest` and `feedback` run the
+  `vidbyte-cli` found on `PATH`, or the executable named by `--cli <path>`, which lets tests pass a
+  recording fake explicitly instead of relying on `PATH` order.
 - **Flag choices.**
   - `--goal`: the user's own question with the window filled in, plus one sentence asking the
     agent to name the source page titles, so `report` can link each action back to Notion.
@@ -275,8 +277,10 @@ must not merge until 0.3.0 is on PyPI.
    paths, and the login name redacted.
 3. `gather --from-items` with a hand-written MCP-style file, including a bad file that must fail.
 4. `suggest --dry-run` and `--paid`, `report`, and `feedback` against a fake `vidbyte-cli` and a
-   fake `codex` that record their arguments, first on `PATH`, confirmed with `command -v` and
-   Python's `shutil.which` before each test. The paid guard's refusals are tested too.
+   fake `codex` that record their arguments. Every `suggest` and `feedback` call passes the fake
+   with `--cli`; `PATH` also holds only the fakes, confirmed with `command -v` in the same shell
+   call and with Python's `shutil.which`. The test counts the calls the fake recorded against the
+   calls that should have reached it. The paid guard's refusals are tested too.
 5. One real `--dry-run` with a synthetic digest against a CLI built from the internal `main`, with
    an isolated state folder, behind a wrapper that refuses any `suggest run` without `--dry-run`.
 6. `cmp` of both `references/` files against the canonical copies.
