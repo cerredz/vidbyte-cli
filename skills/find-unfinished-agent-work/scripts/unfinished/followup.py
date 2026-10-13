@@ -70,8 +70,8 @@ class TaskWeights:
         return set(finding.keywords) | {FILE_PREFIX + name for name in finding.files}
 
     def weight(self, token: str) -> float:
-        # log(total / sessions using the token): near 0 for words every session uses, high for rare ones.
-        return math.log(self.total / max(self.counts.get(token, 1), 1)) + 0.01
+        # log((total + 1) / sessions using it): near 0 for a word most of many sessions use, high for a rare one.
+        return math.log((self.total + 1) / max(self.counts.get(token, 1), 1))
 
     def share(self, mine: set, theirs: set, shared: set) -> float:
         # The weight of the shared tokens as a fraction of the smaller-scoring side's total.

@@ -138,11 +138,12 @@ class StatusJudge:
     @staticmethod
     def _fold_chains(ordered: list, items: dict) -> None:
         # Follows "continued in a later unfinished session" links to their newest item and folds the rest into it.
+        # A link to an item that is not strictly newer is never followed, so a cycle cannot fold every item away.
         for item in ordered:
             head, seen = item, {id(item)}
             while head.later is not None and not head.later.finished and id(head.later.finding) in items:
                 following = items[id(head.later.finding)]
-                if id(following) in seen:
+                if id(following) in seen or following.last <= head.last:
                     break
                 seen.add(id(following))
                 head = following

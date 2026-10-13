@@ -174,6 +174,10 @@ Everything in this section is free and stays on this machine.
      minutes and may still be open in another terminal.
    - If `other_claude_dirs_not_read` lists folders, such as `~/.claude-work`, ask once whether to
      include them; if yes, run `gather` again into a new folder with one `--claude-dir` per folder.
+   - `read` has one entry per store with `harness`, `root`, `status` (`read`, `missing`, or
+     `error`), `candidates`, and `kept`. If an entry has `"status": "error"`, that store could not
+     be opened, such as a locked OpenCode database: say which tool was not read and show its
+     `error`, and offer to run `gather` again into a new folder once that tool is closed.
    - If `unreadable` is not empty, say that some session files could not be read.
 
 4. **Read `digest.md` from start to end.** It is at most 70,000 characters. Full blocks come first

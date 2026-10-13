@@ -189,10 +189,11 @@ class FeedbackCommand:
         if exe is None:
             CommandIO.print_json({"error": SETUP_HINT})
             return 127
-        argv = FeedbackArgv.build(exe, "accept" if self.args.accept else "reject", project, idea["title"], self.args.reason or "", Redactor(Path.home()))
+        verb = "accept" if self.args.accept else "reject"
+        argv = FeedbackArgv.build(exe, verb, project, idea["title"], self.args.reason or "", Redactor(Path.home()))
         invoker = CliInvoker(self.args.cli)
         code, stdout_path, _stderr_path, error = invoker.run(argv, out_dir, "feedback-%s.json" % self.args.idea)
-        report = {"exit_code": code, "idea": self.args.idea, "project": project, "verb": argv[6], "command": invoker.display(argv)}
+        report = {"exit_code": code, "idea": self.args.idea, "project": project, "verb": verb, "command": invoker.display(argv)}
         if code != 0 and isinstance(error, dict):
             report["error"] = {k: error.get(k) for k in ("code", "message", "hint", "retryable") if k in error}
         CommandIO.print_json(report)

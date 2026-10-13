@@ -202,7 +202,7 @@ class PastedText:
                 seen[line] = seen.get(line, 0) + 1
         self.repeated = {line for line, count in seen.items() if count >= PASTE_MIN_SESSIONS}
 
-    def strip(self, text: str) -> str:
+    def remove_from(self, text: str) -> str:
         # The text without pasted lines when 4+ of its lines are pasted; otherwise the text unchanged.
         raw = str(text or "")
         lines = raw.splitlines()
@@ -324,8 +324,8 @@ class UnfinishedDetector:
     def _collect_facts(self, session, finding: Finding) -> None:
         # Gathers the user's own request text, task keywords and numbers, touched files, branches, and pull requests.
         todo_text = " ".join(content for content, _ in session.todos)
-        finding.first_request = self._pasted.strip(session.turns[0].text)
-        finding.last_request = self._pasted.strip(session.turns[-1].text) if len(session.turns) > 1 else finding.first_request
+        finding.first_request = self._pasted.remove_from(session.turns[0].text)
+        finding.last_request = self._pasted.remove_from(session.turns[-1].text) if len(session.turns) > 1 else finding.first_request
         first, last = finding.first_request, finding.last_request
         finding.opening = TaskText.opening(first)
         finding.keywords = TaskText.keywords(session.title, first[:2000], last[:1000], todo_text)
