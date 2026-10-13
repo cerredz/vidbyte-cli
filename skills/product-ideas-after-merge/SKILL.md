@@ -17,7 +17,7 @@ metadata:
 A team or a founder merges pull requests every day. Each merge quietly changes what is cheap to
 build next: an export makes scheduled reports cheap, a new webhook makes an integration cheap, a
 faster query makes a live view possible. Right after the merge, a feature built on that change
-costs the least it will ever cost.
+costs less than it will later.
 
 That moment usually passes unnoticed:
 
@@ -180,7 +180,7 @@ Pull requests from forks, and merges Dependabot performs itself, get no ideas: G
 runs no secrets, so the job fails before any Vidbyte charge. A Dependabot pull request that a
 person merges is a paid run that most likely returns no ideas, because the lens steers away from
 dependency upgrades. In a private repository, every job, even a skipped one, also uses GitHub
-Actions minutes from your plan.
+Actions minutes from the user's plan.
 
 What leaves the repository on each run: the pull request's diff (without lockfiles, the two
 installed files, and the folders from Gather inputs step 3), its title and description, and the
