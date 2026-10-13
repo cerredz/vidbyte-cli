@@ -76,7 +76,7 @@ This skill drives `vidbyte-cli`, the Vidbyte command-line tool, and its Suggesti
    session `[S#]`. It pre-fills the Suggestion Agent's typed inputs from the numbers.
 4. **Run the Suggestion Agent, after the user's yes.** One `vidbyte-cli agents suggest run` call
    sends the digest as evidence, plus a prompting rubric (`references/prompting-rubric.md`)
-   through `--instructions`. The rubric is a 36-item checklist from Anthropic, OpenAI, and Google
+   through `--instructions`. The rubric is a 39-item checklist from Anthropic, OpenAI, and Google
    guidance and recent papers, each item tagged for current or previous-generation models. Its
    model calls run on OpenAI's gpt-6-sol through Vidbyte's model gateway and are billed to the
    user's Vidbyte balance. A generator proposes critiques, and an independent critic reviews them.
@@ -181,7 +181,7 @@ Everything in this section is free and stays on this machine.
    | File | What it is | Sent to the model? |
    |---|---|---|
    | `digest.md` | The redacted digest: overall numbers, one section per signal with tagged examples, saved templates, recent openers, and whole-session samples. | Yes, as `--files` evidence |
-   | `prompting-rubric.md` | A byte copy of `references/prompting-rubric.md`: what a good critique contains, the 36 rubric items, and the signal-to-rubric map. | Yes, as `--instructions` |
+   | `prompting-rubric.md` | A byte copy of `references/prompting-rubric.md`: what a good critique contains, the 39 rubric items, and the signal-to-rubric map. | Yes, as `--instructions` |
    | `sessions.json` | The local index: each tag's session id, folder, source file, and redacted prompt text. | No, never |
    | `inputs.json` | The typed inputs for the run, already filled in from the numbers. You check them at step 5. | Its values, yes |
 
@@ -445,7 +445,7 @@ What each part does:
 - **`--instructions prompting-rubric.md`:** the rubric. It is appended to the fixed instructions
   of the generator and every critic. It tells them what a grounded critique contains and what not
   to say (generic advice, debunked tricks, or penalizing short follow-ups that worked). It also
-  gives the 36 rubric items with their sources and model generations.
+  gives the 39 rubric items with their sources and model generations.
   - It goes through `--instructions` and not `--files`, so that critiques cite the user's prompts,
     not the rubric.
   - The CLI accepts at most 20,000 bytes of instructions, and the script refuses a larger rubric.

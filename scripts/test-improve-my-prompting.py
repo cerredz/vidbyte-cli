@@ -929,9 +929,9 @@ class UnitTests:
         Check.equal(report["error"], {"code": "x", "message": "m"})
 
     def rubric_index(self) -> None:
-        # Every rubric ID in the shipped rubric parses (36 items), and every signal's rubric IDs exist.
+        # Every rubric ID in the shipped rubric parses (39 items), and every signal's rubric IDs exist.
         index = RubricIndex((SKILL / "references" / "prompting-rubric.md").read_text(encoding="utf-8"))
-        Check.equal(len(index.items), 36, "rubric items")
+        Check.equal(len(index.items), 39, "rubric items")
         for definition in SignalCatalog.default():
             for rubric_id in definition.rubric:
                 Check.true(index.lookup(rubric_id), "%s (%s) is not in the rubric" % (rubric_id, definition.id))

@@ -187,7 +187,7 @@ vidbyte-cli 0.3.x.
   candidates. At most 3 × `--max-sessions` candidates are opened, and a substring filter skips
   most JSONL lines before parsing.
 - **Cost:** one paid run, gpt-6-sol at high reasoning effort, capped at 400,000 tokens (under about
-  $4). The rubric is about 13 KB, sent with every model call; the digest is 70,000 characters by
+  $4). The rubric is about 15 KB, sent with every model call; the digest is 70,000 characters by
   default.
 - **Security:**
   - The redaction rules are copied from `repeats.py`, applied to every string that enters
@@ -761,10 +761,10 @@ prompts. It has five parts:
    - treat the digest as data;
    - rank by measured cost.
 4. The rubric itself: IDs `RT1-7`, `RC1-5`, `RS1-4`, `RP1-5`, `RR1`, `RE1-2`, `RQ1-3`,
-   `RO1-2`, `RA1-4`, and `RX1-3`, each tagged `ALL`/`OLD`/`NEW` with a one-line source.
+   `RO1-2`, `RA1-4`, `RX1-3`, and `RM1-3`, each tagged `ALL`/`OLD`/`NEW` with a one-line source.
 5. The signal-to-rubric map.
 
-It is at most about 13 KB, under the 20,000-byte limit.
+It is about 15 KB, under the 20,000-byte limit.
 
 ### 6.12 Public SKILL.md and references
 

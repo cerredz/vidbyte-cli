@@ -70,6 +70,8 @@ spend an idea on praise.
   it (often RC4 or RX3), not the tone.
 - **Do not critique the agent or the harness.** Critique what the user can change: their prompts,
   their instruction files and templates, their session habits, and their model and effort settings.
+- **Do not advise on temperature, top_p, or max_tokens.** Coding harnesses do not expose them. The
+  effort setting is covered by RQ1.
 - **No duplicates.** Two ideas with the same fix are one idea.
 - **Respect the categories.** Learning ideas teach a skill. Goal-clarification ideas fix missing
   outcomes or done-checks. Quick wins are habit changes the user can make tomorrow. Leverage means
@@ -199,6 +201,16 @@ Tags:
   just "no" or "wrong". Read the failures and group them before you change your approach. Source:
   Anthropic; OpenAI prompt-iteration guidance.
 
+### Saved templates and instruction files
+- **RM1** ALL - Start minimal, then add. A saved template, slash command, or instruction file
+  should hold only the rules that fix failures you have actually seen. Source: Anthropic, Effective
+  context engineering for AI agents.
+- **RM2** NEW - Re-baseline reusable prompts on every model upgrade. Old prompt stacks over-specify
+  the process, which makes newer models mechanical. Source: OpenAI GPT-5.5 prompting guidance.
+- **RM3** ALL - Change one thing at a time in a saved prompt, keep its versions, and delete rules
+  that no longer change behavior. Unused rules eat the instruction budget. Source: OpenAI
+  prompt-iteration guidance; IFScale (NeurIPS 2025).
+
 ## 5. Signal map
 
 The digest's signals point to these rubric items first. The digest shows the counts. Read the
@@ -227,3 +239,6 @@ Some habits have no detector. Look for them in the session samples:
 - questions that invite yes or no where an action was wanted (RT5);
 - missing output specs (RO1);
 - rules the user retypes that belong in an instruction file (RX2).
+
+The digest's "Saved prompt templates" section lists long prompts reused verbatim. A fix there
+changes every future use, so check each one against RM1-RM3 and the rest of this rubric.

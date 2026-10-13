@@ -10,8 +10,8 @@ from pathlib import Path
 from sessionkit.model import TextTools
 
 TAG_RE = re.compile(r"\[((?:[PS]\d+)(?:[ ,]+[PS]\d+)*)\]")
-RUBRIC_ID_RE = re.compile(r"\bR[TCSPREQOAX]\d{1,2}\b")
-RUBRIC_LINE_RE = re.compile(r"^- \*\*(R[TCSPREQOAX]\d{1,2})\*\* (ALL|OLD|NEW) - (.+?)(?: Source: (.+))?$")
+RUBRIC_ID_RE = re.compile(r"\bR[TCSPREQOAXM]\d{1,2}\b")
+RUBRIC_LINE_RE = re.compile(r"^- \*\*(R[TCSPREQOAXM]\d{1,2})\*\* (ALL|OLD|NEW) - (.+?)(?: Source: (.+))?$")
 IDEA_TEXT_FIELDS = ("title", "summary", "first_action", "why_now", "expected_benefit", "completion_criteria")
 QUOTE_CHARS = 300
 
