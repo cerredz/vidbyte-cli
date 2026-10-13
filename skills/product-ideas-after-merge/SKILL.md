@@ -249,7 +249,8 @@ Run these steps only after the user's yes, from the repository root. None of the
    ```
 
    Check its size with `wc -c .github/product-ideas-lens.md`: at most 4,000 bytes, because the
-   lens is repeated in every model call of every run.
+   lens is repeated in every model call of every run. If it is larger, shorten the product
+   paragraph and check again.
 
 2. **Write the workflow** to `.github/workflows/product-ideas.yml` with your file tool, exactly as
    below. Change one line only: for each folder Gather inputs step 3 printed, append
