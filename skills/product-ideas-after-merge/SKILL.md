@@ -364,8 +364,11 @@ How the workflow keeps each run safe and bounded:
   every commit of the pull request, for merge, squash, and rebase merges.
 - **Lockfiles and the two installed files are always left out of the diff**, so the install merge
   and later edits to only the lens or the workflow are skipped with no Vidbyte charge.
-- **Secrets only in the last step.** `VIDBYTE_API_KEY` and `SLACK_WEBHOOK_URL` are in the `env:` of
-  the step that runs `vidbyte-cli`; the checkout, Python, and install steps never see them.
+- **Secrets only in the environment of the step that needs them.** `VIDBYTE_API_KEY` and
+  `SLACK_WEBHOOK_URL` are in the `env:` of the step that runs `vidbyte-cli`, so the checkout,
+  Python, and install steps do not get them as environment variables. This does not isolate them:
+  all steps share one runner, and the last step runs the Python, the packages, and the git setup
+  that the earlier steps left, so a compromised action or package can still reach them.
 - **Pull request text only through `env:`.** The title, description, and SHAs reach the script as
   environment variables, expanded inside double quotes or passed to `printf` as arguments, so the
   shell never runs text from a pull request.
