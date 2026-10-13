@@ -310,7 +310,7 @@ class DigestPlan:
         return used + (60 if self.chosen_templates else 0)
 
     def _plan_samples(self, budget: int) -> None:
-        # Chooses up to six signal-heavy sessions and four typical ones, shrinking prompts to fit.
+        # Fills the remaining budget with sample sessions in candidate order, shrinking each to 12-3 prompts to fit.
         dry = DryTagBook()
         used = 0
         for session in self.sample_candidates():

@@ -11,13 +11,14 @@ from pathlib import Path
 from .claude_code import ClaudeCodeReader
 from .codex import CodexReader
 from .gemini import GeminiReader
+from .message_logs import FactoryReader, PiReader
 from .model import Clock
 from .opencode import OpenCodeReader
 
 MAX_SESSIONS_LIMIT = 500
 OPEN_FACTOR = 3  # Open at most 3 x max_sessions candidates, so a store full of skipped sessions stays fast.
 CURRENT_SESSION_VARS = ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "OPENCODE_SESSION_ID")
-HARNESSES = ("claude", "codex", "opencode", "gemini", "qwen")
+HARNESSES = ("claude", "codex", "opencode", "gemini", "qwen", "openclaude", "factory", "pi")
 
 
 class OptionTypes:
@@ -59,7 +60,7 @@ class OptionTypes:
 class CollectOptions:
     """Which stores to read, how many sessions to keep, and which sessions to leave out."""
 
-    def __init__(self, max_sessions: int = MAX_SESSIONS_LIMIT, since=None, project_dirs=(), claude_dirs=(), codex_home=None, opencode_dir=None, gemini_dir=None, qwen_dir=None, disabled=(), exclude_sessions=(), include_current: bool = False) -> None:
+    def __init__(self, max_sessions: int = MAX_SESSIONS_LIMIT, since=None, project_dirs=(), claude_dirs=(), codex_home=None, opencode_dir=None, gemini_dir=None, qwen_dir=None, disabled=(), exclude_sessions=(), include_current: bool = False, openclaude_dir=None, factory_dir=None, pi_dir=None) -> None:
         # Holds already-validated options; use from_args to build them from the standard flags.
         self.max_sessions = max_sessions
         self.since = since
@@ -69,6 +70,9 @@ class CollectOptions:
         self.opencode_dir = opencode_dir
         self.gemini_dir = gemini_dir
         self.qwen_dir = qwen_dir
+        self.openclaude_dir = openclaude_dir
+        self.factory_dir = factory_dir
+        self.pi_dir = pi_dir
         self.disabled = set(disabled)
         self.exclude_sessions = set(exclude_sessions)
         self.include_current = include_current
@@ -86,8 +90,12 @@ class CollectOptions:
         group.add_argument("--opencode-dir", default=None, help="OpenCode data folder (default $XDG_DATA_HOME/opencode or ~/.local/share/opencode).")
         group.add_argument("--gemini-dir", default=None, help="Gemini CLI folder (default ~/.gemini).")
         group.add_argument("--qwen-dir", default=None, help="Qwen Code folder (default ~/.qwen).")
+        group.add_argument("--openclaude-dir", default=None, help="OpenClaude folder (default ~/.openclaude).")
+        group.add_argument("--factory-dir", default=None, help="Factory Droid folder (default ~/.factory).")
+        group.add_argument("--pi-dir", default=None, help="Pi coding agent folder (default ~/.pi/agent).")
         for name in HARNESSES:
             group.add_argument("--no-%s" % name, action="store_true", help="Do not read %s sessions." % name)
+        group.add_argument("--only", action="append", default=[], choices=HARNESSES, help="Read only this harness. Repeat for several; overrides every --no-* flag.")
         group.add_argument("--exclude-session", action="append", default=[], help="Leave out the session with this id. Repeat for several.")
         group.add_argument("--include-current", action="store_true", help="Keep the session this command runs in (left out by default).")
 
@@ -100,7 +108,8 @@ class CollectOptions:
         return cls(
             max_sessions=args.max_sessions, since=since, project_dirs=args.project_dir, claude_dirs=args.claude_dir,
             codex_home=args.codex_home, opencode_dir=args.opencode_dir, gemini_dir=args.gemini_dir, qwen_dir=args.qwen_dir,
-            disabled={name for name in HARNESSES if getattr(args, "no_%s" % name, False)},
+            openclaude_dir=args.openclaude_dir, factory_dir=args.factory_dir, pi_dir=args.pi_dir,
+            disabled=set(HARNESSES) - set(args.only) if getattr(args, "only", None) else {name for name in HARNESSES if getattr(args, "no_%s" % name, False)},
             exclude_sessions=args.exclude_session, include_current=args.include_current,
         )
 
@@ -158,6 +167,9 @@ class SessionCollector:
     NOT_READ_STORES = (
         ("Cursor", (".cursor", "chats")),
         ("GitHub Copilot CLI", (".copilot", "session-state")),
+        ("Grok CLI", (".grok", "sessions")),
+        ("Amp", (".local", "share", "amp")),
+        ("Windsurf", (".codeium", "windsurf", "cascade")),
     )
     VSCODE_EXTENSIONS = (
         ("Cline", "saoudrizwan.claude-dev"),
@@ -220,6 +232,12 @@ class SessionCollector:
             readers["gemini"] = GeminiReader(Path(self.options.gemini_dir) if self.options.gemini_dir else self.home / ".gemini", "gemini-cli")
         if "qwen" not in self.options.disabled:
             readers["qwen"] = GeminiReader(Path(self.options.qwen_dir) if self.options.qwen_dir else self.home / ".qwen", "qwen-code")
+        if "openclaude" not in self.options.disabled:
+            readers["openclaude"] = ClaudeCodeReader([Path(self.options.openclaude_dir) if self.options.openclaude_dir else self.home / ".openclaude"], "openclaude")
+        if "factory" not in self.options.disabled:
+            readers["factory"] = FactoryReader(Path(self.options.factory_dir) if self.options.factory_dir else self.home / ".factory")
+        if "pi" not in self.options.disabled:
+            readers["pi"] = PiReader(Path(self.options.pi_dir) if self.options.pi_dir else self.home / ".pi" / "agent")
         return readers
 
     def _gather_candidates(self, result: CollectResult) -> list:

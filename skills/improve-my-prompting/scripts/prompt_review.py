@@ -2,7 +2,7 @@
 """Critique how a developer prompts their coding agents, from their own recent sessions.
 
 Subcommands:
-  gather    Read up to 500 recent Claude Code, Codex, OpenCode, Gemini CLI, and Qwen Code sessions
+  gather    Read up to 500 recent sessions from eight coding-agent harnesses
             (local, read-only, free) and write digest.md, sessions.json, inputs.json, and
             prompting-rubric.md into an output folder.
   suggest   Validate inputs.json and run `vidbyte-cli agents suggest run` from inside that folder

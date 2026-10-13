@@ -1,6 +1,6 @@
 ---
 name: improve-my-prompting
-description: Use when the user wants honest, specific feedback on how they prompt their coding agents - "how can I prompt Claude Code better?", "critique my prompts", "why do my agents keep misunderstanding me?", "what am I doing wrong with Codex?". Reads the user's most recent 500 Claude Code, Codex, OpenCode, Gemini CLI, and Qwen Code sessions on this machine with a bundled script, measures the prompting habits behind their corrections, interruptions, permission round-trips, and restarts, and compiles a redacted digest of their own tagged prompts. The Suggestion Agent critiques that digest against a research-backed prompting rubric scoped to the model generations the user runs, and each critique comes back with the user's own prompts as evidence, a before-and-after rewrite, and a check to measure next time. Drives the Vidbyte Suggestion Agent through vidbyte-cli.
+description: Use when the user wants honest, specific feedback on how they prompt their coding agents - "how can I prompt Claude Code better?", "critique my prompts", "why do my agents keep misunderstanding me?", "what am I doing wrong with Codex?". Reads the user's most recent 500 Claude Code, Codex, OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory Droid, and Pi sessions on this machine with a bundled script, measures the prompting habits behind their corrections, interruptions, permission round-trips, and restarts, and compiles a redacted digest of their own tagged prompts. The Suggestion Agent critiques that digest against a research-backed prompting rubric scoped to the model generations the user runs, and each critique comes back with the user's own prompts as evidence, a before-and-after rewrite, and a check to measure next time. Drives the Vidbyte Suggestion Agent through vidbyte-cli.
 metadata:
   agent: "suggestion-agent"
   commands: "agents suggest project list, agents suggest run, agents suggest handoff, agents suggest project create, agents suggest feedback accept, agents suggest feedback reject"
@@ -49,8 +49,8 @@ Seeing your own habits is the hard part:
   advice ("be more specific") that changes nothing.
 
 This skill reads only sessions saved on this machine by Claude Code, Codex, OpenCode, Gemini CLI,
-and Qwen Code. It names, but does not read, Cursor, GitHub Copilot CLI, Cline, Roo Code, and Kilo
-Code when it finds them. Its signals are keyword and shape heuristics tuned for English prompts, so
+Qwen Code, OpenClaude, Factory Droid, and Pi. It names, but does not read, Cursor, GitHub Copilot
+CLI, Cline, Roo Code, Kilo Code, Grok CLI, Amp, and Windsurf when it finds them. Its signals are keyword and shape heuristics tuned for English prompts, so
 the model is told to read the examples before trusting a count. Its redaction is pattern-based: it
 removes the common secret formats, not every possible secret. It critiques prompts only, and it
 changes no settings, templates, or instruction files by itself.
@@ -60,7 +60,7 @@ changes no settings, templates, or instruction files by itself.
 This skill drives `vidbyte-cli`, the Vidbyte command-line tool, and its Suggestion Agent.
 
 1. **Gather, free and local.** The bundled script `scripts/prompt_review.py` reads the user's 500
-   most recent interactive sessions across all five harnesses. It skips sessions started by
+   most recent interactive sessions across all eight harnesses. It skips sessions started by
    scripts, SDKs, subagents, and scheduled jobs. For every human prompt it records:
    - what the agent said just before;
    - whether the agent had finished or asked a question;
@@ -148,9 +148,9 @@ Everything in this section is free and stays on this machine.
    | "since Monday", "since October 1" | `--since 2026-10-05` (local time, the real date) |
    | "just my last 100 sessions" | `--max-sessions 100` (1-500) |
    | "in this repo", "for this project" | `--project-dir .` (keeps sessions that ran in this folder or below it) |
-   | "only Claude Code", "only Codex" | turn off the others: `--no-codex --no-opencode --no-gemini --no-qwen`, or `--no-claude --no-opencode --no-gemini --no-qwen` |
+   | "only Claude Code", "only Codex and OpenCode" | `--only claude`, or `--only codex --only opencode` (names: `claude`, `codex`, `opencode`, `gemini`, `qwen`, `openclaude`, `factory`, `pi`). `--no-<name>` turns off one. |
    | a second Claude Code config folder, such as `~/.claude-work` | `--claude-dir ~/.claude-work` (repeatable; the script expands `~` itself, so this works in PowerShell and cmd too) |
-   | sessions in a non-default place | `--codex-home DIR`, `--opencode-dir DIR`, `--gemini-dir DIR`, `--qwen-dir DIR` |
+   | sessions in a non-default place | `--codex-home DIR`, `--opencode-dir DIR`, `--gemini-dir DIR`, `--qwen-dir DIR`, `--openclaude-dir DIR`, `--factory-dir DIR`, `--pi-dir DIR` |
 
 2. **Run the gather script:**
 
@@ -167,9 +167,12 @@ Everything in this section is free and stays on this machine.
    | Codex | `$CODEX_HOME` (else `~/.codex`), including `sessions/` and `archived_sessions/` |
    | OpenCode | `$XDG_DATA_HOME/opencode` (else `~/.local/share/opencode`): its `opencode.db` and its older `storage/` folder |
    | Gemini CLI and Qwen Code | `~/.gemini` and `~/.qwen` |
+   | OpenClaude | `~/.openclaude`, which uses Claude Code's format |
+   | Factory Droid and Pi | `~/.factory/sessions` and `~/.pi/agent/sessions` |
 
    **What it skips:** SDK and `codex exec` sessions, subagent threads, OpenCode child sessions,
-   harness-written goal and schedule prompts, and the session it runs in. `--include-current`
+   harness-written goal and schedule prompts, Factory's reminders and notices, and the session it
+   runs in. `--include-current`
    keeps that last one.
 
    **What it writes:** four files into a new folder under the system temp folder, plus a JSON
