@@ -12,8 +12,8 @@
 `turn-corrections-into-skills` is a public agent skill that finds every place a developer had to
 correct their coding agent and proposes one agent skill (a `SKILL.md`) per kind of mistake. A
 bundled, standard-library Python script reads the developer's most recent sessions (at most 500)
-from Claude Code, Codex, OpenCode, Gemini CLI, and Qwen Code through the shared `sessionkit`
-package. It detects corrections locally and for free: a prompt that pushes back on what the agent
+from Claude Code, Codex, OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory Droid, and Pi through
+the shared `sessionkit` package. It detects corrections locally and for free: a prompt that pushes back on what the agent
 just did ("no, the other file", "why did you delete that", "undo that"), an interrupted turn
 followed by a redirect, and a prompt that supplies the fix after the agent's tool calls failed. For
 each correction it records what the agent did (its tool actions, its last words, failed calls,
@@ -39,7 +39,7 @@ listed on `/agents/skills` as a `coming-soon` entry, like every skill that needs
 - Add `skills/turn-corrections-into-skills/` to cerredz/vidbyte-cli, meeting the
   `write-agent-skill` contract (frontmatter, fixed section order, consent, exact commands, shared
   references byte-identical to blobs `8fb4e3cf` and `cb9656bc`).
-- Read up to 500 recent interactive sessions from five harnesses with the shared `sessionkit`
+- Read up to 500 recent interactive sessions from eight harnesses with the shared `sessionkit`
   package, copied byte for byte from the parent branch `skill/improve-my-prompting`.
 - Detect every correction locally with four signals (pushback, interrupt-then-redirect, fix after
   failed tool calls, restated or frustrated correction), capturing `Turn.actions`,
@@ -72,7 +72,8 @@ listed on `/agents/skills` as a `coming-soon` entry, like every skill that needs
   changing any agent setting. The only file the skill can write outside its output folder is a
   new `SKILL.md`, after an explicit yes.
 - Non-English correction detection. Keyword signals are English; other languages under-count.
-- Reading harnesses `sessionkit` does not read (Cursor, Copilot CLI, Cline, Roo Code, ...).
+- Reading harnesses `sessionkit` does not read (Cursor, Copilot CLI, Cline, Roo Code, Kilo Code,
+  Grok CLI, Amp, Windsurf); the summary names the ones it finds.
 - Publishing a vidbyte-cli release or flipping the listing to `available` (draft Vidbyte#691).
 
 ---
@@ -102,7 +103,7 @@ listed on `/agents/skills` as a `coming-soon` entry, like every skill that needs
   Codex reads `.agents/skills` from the working folder up to the repository root and
   `$HOME/.agents/skills` ([learn.chatgpt.com/docs/build-skills](https://learn.chatgpt.com/docs/build-skills)).
 - **What is hard without help.** Corrections are not labelled. They are spread over hundreds of
-  sessions in five storage formats, and the mistake itself is in tool calls (an `Edit` of the wrong
+  sessions from eight harnesses in seven storage formats, and the mistake itself is in tool calls (an `Edit` of the wrong
   file, a `Bash: npm install` in a pnpm repository) that a reader of the prompts alone never sees.
   Writing a good skill also takes judgment: a description that fires at the start of the task,
   rules that would have prevented the mistake, a check before "done".
@@ -150,7 +151,8 @@ listed on `/agents/skills` as a `coming-soon` entry, like every skill that needs
 1. `corrections.py gather` collects sessions with `sessionkit.collector.SessionCollector` and the
    standard `CollectOptions` flags (`--max-sessions` 1-500, default 500; `--days`, `--since`,
    `--project-dir`, `--claude-dir`, `--codex-home`, `--opencode-dir`, `--gemini-dir`, `--qwen-dir`,
-   `--no-*`, `--exclude-session`, `--include-current`), plus `--max-scenarios` (1-20, default 12),
+   `--openclaude-dir`, `--factory-dir`, `--pi-dir`, `--no-*`, `--only` (repeatable, overrides
+   `--no-*`), `--exclude-session`, `--include-current`), plus `--max-scenarios` (1-20, default 12),
    `--max-chars` (20,000-100,000, default 60,000), and `--out`.
 2. For every turn with index ≥ 1, the detector decides whether the prompt corrects the agent's
    previous turn, using the signals and suppressions in section 6.2, and records the signal names,
@@ -229,7 +231,7 @@ live in `scripts/correctionkit/`: the correction detector, the scenario builder,
 inventory, the digest writer, the suggest configuration, the idea report, and the scaffolder.
 
 ```
- sessionkit.SessionCollector (5 harnesses, <= 500 sessions)
+ sessionkit.SessionCollector (8 harnesses, <= 500 sessions)
         │ Session/Turn objects
         ▼
  CorrectionDetector ──▶ Correction (turn t corrects turn t-1) ──▶ Episode (consecutive corrections)
@@ -340,7 +342,14 @@ class CorrectionDetector:
 #### Logic / Algorithm
 1. Normalize each prompt: drop fenced code blocks, inline code, and lines that start with `>`;
    collapse whitespace; lower-case; keep the first 400 characters (`lead`).
-2. Skip turn 0, slash commands (`/clear`, `/skill args`), empty leads, go-aheads (≤ 8 words of
+2. Set aside templates first: a prompt of 25 or more words whose collapsed, lower-cased text appears
+   in 2 or more sessions or 3 or more times is a slash-command template (OpenCode expands them
+   inline as the user's text, sometimes 100+ times) or a reused paste, never a correction; the
+   count goes into `overall.templates_skipped`. Goal-continuation prompts the harness writes are
+   already dropped by sessionkit v2.
+   Skip turn 0, slash commands (`/clear`, `/skill args`) and `$skill` invocations, prompts that open
+   like a pasted template (a Markdown heading, a `<tag>`, or `1. **`/`- **`), self-fixes of the
+   user's own previous prompt (`next pr*`, `516 i mean`), empty leads, go-aheads (≤ 8 words of
    `yes|ok|okay|sure|continue|go ahead|proceed|do it|lgtm|sounds good|thanks|great|perfect|nice`),
    and pure resumes after an interruption (`continue|go on|keep going|resume|carry on`).
 3. Signals, matched in `lead` (the first 200 characters unless noted):
@@ -357,14 +366,22 @@ class CorrectionDetector:
    - `frustration` (strong): `wtf|what the hell|what are you doing|seriously\?|come on|are you kidding`.
    - `directive` (medium): `(stop|don'?t|do not|never) (add|change|touch|use|create|delete|run|commit|
      push|modify|edit|write|rewrite|remove|install|refactor|rename)\w*`, only when the previous turn made
-     a tool call.
+     a tool call. A leading `stop` counts only when followed by punctuation, the end, `it|that|this|
+     now|right|there|doing|you`, or a gerund ("stop using npm"), so "stop the runner and merge" is an
+     instruction; the middle word may not be an article ("stop the running server"). When `directive`
+     is the only signal it must sit in the first sentence: "Add the endpoint. Don't touch the
+     schema." is a new task with a constraint.
    - `still_broken` (medium): `still (not|broken|failing|fails|wrong|the same)|doesn'?t work|didn'?t
      work|not working|(it|that|you) broke|not fixed`.
    - `instead` (medium): `instead of|rather than|should(n'?t)? have`.
    - `interrupt_redirect` (medium): the previous turn was interrupted and the prompt is not a pure
-     resume and has at least 2 words.
-   - `fix_after_failure` (medium): the previous turn has `failed_actions >= 1`, the prompt has at most
-     120 words, it is not a generic nudge (`try again|retry|fix it|fix (the|these|those) errors|keep
+     resume, has at least 2 words, is not additive (`also`, `as well`, `btw`, `too`, `after you're
+     done`), and is not a question (`what|which|how|does|is|explain|tell me ...`): those add to the
+     task or ask about it instead of redirecting it.
+   - `fix_after_failure` (medium): the previous turn has `failed_actions >= 1` and either at least 3
+     failed calls or failed calls making up at least a quarter of its tool calls (one failed probe in
+     a long, successful turn is normal work), the prompt has at most 40 words and does not open as a
+     question, it is not a generic nudge (`try again|retry|fix it|fix (the|these|those) errors|keep
      going`), and it carries a fix cue: inline code or a command word (`npm|pnpm|yarn|pip|uv|python|
      pytest|git|gh|docker|make|cargo|go|node|npx|bun`), a path, or `use|try|run|you need to|the
      (issue|problem|error|fix) is|it'?s because|should be|it'?s in|look in|activate|install|set`.
@@ -373,16 +390,24 @@ class CorrectionDetector:
    ended with a question (`turn.after_question`): the user is redirecting a proposal, not undoing
    work. Drop the turn when its strength is `weak` and the previous turn had no tool call, no failed
    call, and no interruption, and drop a bare decline (`no`, `no thanks`, `nope`, ≤ 5 words) after a
-   question. Exclude `no problem|no worries|not bad|no rush|no need to worry`.
+   question. Exclude `no problem|no worries|not bad|no rush|no need to worry`. Drop a correction that
+   is not strong and opens with praise (`great|perfect|thanks|lgtm|looks good ...`): "great, merge
+   it" is a go-ahead, while "great, but you forgot the tests" keeps its strong pushback.
 5. A kept turn becomes a `Correction(session, turn, previous=turns[t-1], signals, strength,
    text=turn.text)`.
 6. Episodes: walk each session's corrections in order; a correction whose turn index is the previous
    correction's index + 1 joins that episode, otherwise it starts a new one. `ask_turn` is the turn
-   before the episode's first correction (the task the agent was doing). `prompts_lost` = number of
+   before the episode's first correction (the task the agent was doing), looking back past bare
+   resumes such as "continue" for up to 5 turns so the ask is the real task. `prompts_lost` = number of
    corrections; `tool_calls_redone` = sum of `previous.tool_calls`; `failed_actions` = sum of
    `previous.failed_actions`; `interrupted` = any `previous.interrupted`.
 7. `overall`: sessions and prompts by harness, corrections, episodes, sessions with a correction,
-   corrections per 100 prompts (0 when there are no prompts), counts by signal and by strength.
+   corrections per 100 prompts (0 when there are no prompts), counts by signal and by strength, and
+   `templates_skipped`.
+
+These suppressions were tuned on this machine's 500 real sessions: before them, about 30 of 105
+detected corrections were praise or additive notes after an interruption, a single failed probe in a
+long turn, or a typo fix; after them, 74 remained.
 
 #### Edge Cases & Error Handling
 - A pasted log containing "no," deep inside is not a correction, because only the lead is matched.
@@ -402,8 +427,8 @@ and ranks them.
 #### Interface / API
 ```python
 class MistakeKinds:
-    ORDER = ("destructive_action", "false_done", "ask_first", "unrequested_change", "wrong_target",
-             "wrong_tool", "environment_fix", "convention", "misread_intent", "off_track", "other")
+    ORDER = ("destructive_action", "stalled", "false_done", "ask_first", "unrequested_change", "wrong_target",
+             "wrong_tool", "environment_fix", "convention", "misread_intent", "rejected_approach", "off_track", "other")
     LABELS: dict                                            # kind -> plain-English label
     def classify(self, episode) -> str: ...
 class EpisodeFeatures:                                       # terms, tools, file_types, project, harness
@@ -423,6 +448,9 @@ class ScenarioBuilder:
    - `destructive_action`: `deleted|removed|wiped|overwrote|lost (my|the|all)|force.?push|reset --hard|
      dropped|nuked`, or a corrected action matching `rm -rf|git reset --hard|git push (-f|--force)|
      git checkout --|git clean|drop table|truncate` together with a strong signal.
+   - `stalled`: `stalled|hung|hangs|stuck|froze|timed out|not responding|taking too long|never
+     finished`: the agent ran a command that blocked until the user stepped in (on real data the
+     most common scenario: "continue, tool stalled" after an interrupted `npm run dev`).
    - `false_done`: `still_broken`, or `you said .{0,40}(done|fixed|works|passing)|tests? (fail|are
      failing|still)|did(n'?t| not) (run|test|verify|check)|(is|it'?s) not (done|working|fixed)`.
    - `ask_first`: `(don'?t|do not|never) (commit|push|merge|deploy|publish|release|open a pr)|ask (me )?
@@ -439,11 +467,15 @@ class ScenarioBuilder:
      variable|path|install|credential|login|token|permission|sudo|docker|node version|python version`.
    - `convention`: `comment|naming|style|format|lint|type hint|docstring|emoji|indent|convention|like the
      other|follow (the|our)|consistent|folder structure`.
-   - `misread_intent`: `i (meant|said|asked|wanted)|not what i|misunderstood|i was asking|re-?read`.
+   - `misread_intent`: `i (meant|said|asked|wanted)|not what i|misunderstood|i was asking|re-?read|
+     didn'?t answer|my (actual|main) question`.
+   - `rejected_approach`: `approach|design|interface|abstraction|architecture|don'?t like|cleaner|
+     simpler|over-engineered|too complex|hacky|duplicate (logic|code)`.
    - `off_track`: an `interrupt_redirect` episode with none of the above.
    - `other`: everything else.
 2. **Features.** Terms are stemmed content words of the correction texts (stopwords and generic
-   correction words such as `wrong`, `meant`, `undo` removed, length ≥ 3). Tools are known tool words
+   correction words such as `wrong`, `meant`, `undo` removed, length 3 to 24; email addresses, URLs,
+   numbers, and key-like words are dropped so a secret can never become a scenario term). Tools are known tool words
    in the correction texts plus the first word of each `Bash:` action. File types are extensions in
    the corrected actions and in paths inside the correction text. Project is the session's
    `project_name()`.
@@ -478,7 +510,8 @@ class SkillInventory:
 ```
 
 #### Logic / Algorithm
-1. Roots in order: each Claude config folder (`<dir>/skills`, scope `claude personal`),
+1. Roots in order: each Claude config folder and the OpenClaude folder read (`<dir>/skills`, scope
+   `claude personal`),
    `~/.agents/skills` (`agents personal`), `<codex home>/skills` (`codex personal`), then for up to 10
    project folders of the full scenarios that exist on disk: `.claude/skills`, `.agents/skills`,
    `.opencode/skills` (`claude project <name>` and so on).
@@ -502,6 +535,7 @@ class SkillInventory:
 
 #### Interface / API
 ```python
+class Plural:                                   # Plural.n(1, "session") -> "1 session"
 class TagBook:                                  # assigns S#, P#, C# in order of first use
     def session(self, session) -> str: ...
     def prompt(self, session, turn, role: str, scenario_tag: str) -> str: ...
@@ -550,6 +584,8 @@ class DigestWriter:
    by description; `success`, `constraint`, `avoid`: empty; `project`: `null`.
 9. **Focus file copy:** byte copy of `references/skills-from-corrections.md` to the output folder;
    exit 2 if it is over 20,000 bytes.
+10. Every count phrase goes through `Plural.n(count, noun)` ("1 correction", "2 corrections"), which
+    the report and the scaffolder share.
 
 #### Edge Cases & Error Handling
 - One scenario only: `count` is 2 (the CLI minimum); the focus file says the count is a maximum.
@@ -613,7 +649,7 @@ class SkillIdeaParser:
     SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
     def parse(self, idea: dict) -> SkillSpec: ...
 class IdeaReporter:
-    def __init__(self, out_dir: Path) -> None: ...
+    def __init__(self, out_dir: Path, redactor) -> None: ...   # re-redacts every quoted string
     def build(self) -> dict: ...      # writes report.md, returns the JSON summary
 ```
 
@@ -636,10 +672,13 @@ class IdeaReporter:
    actions, date, harness, project. How often: corrections, episodes, sessions, projects, prompts
    lost, tool calls redone, first and last date, summed over cited scenarios (each counted once).
 7. `uncovered`: full scenarios no grounded idea cites.
-8. `report.md`: per idea in rank order: title and slug, description, how often, what the model got
-   wrong with the quoted corrections, correct behavior, rules, steps, where it applies, evaluation
-   (`completion_criteria`), problems, and a warning block when not grounded. Then the uncovered
-   scenarios.
+8. `report.md` under `# Proposed skills from your corrections`: per grounded idea in rank order
+   (`## 1. `slug` - title (idea-001)`): description, how often, what the model got wrong with the
+   quoted corrections, correct behavior, rules, steps, where it applies (keeping `Trigger:` and
+   `Do not fire:` labels), evaluation (`completion_criteria`), and problems. Ungrounded ideas follow
+   under `# Without evidence from your sessions` with a warning that they are not scaffolded, then
+   `# Scenarios with no proposed skill`. The JSON summary lists `ideas`, `ungrounded`,
+   `uncovered_scenarios`, and `warnings`.
 
 #### Edge Cases & Error Handling
 - `result.json` missing or not `suggestions.result`: exit 2.
@@ -667,7 +706,9 @@ class SkillScaffolder:
 1. Load the idea and its `SkillSpec` (6.7). Overrides from `--slug` and `--description` win.
 2. Refuse (problems) when the idea is ungrounded, the slug is invalid, or the description is
    missing, over 1,024 characters, does not start with `Use when`, or contains `<`/`>`.
-3. Render, stripping every `[C#]`/`[P#]`/`[S#]` tag and redacting again:
+3. Render, stripping every `[C#]`/`[P#]`/`[S#]` tag (a tag that is the object of `in`, `from`, `like`,
+   `see`, `as in` becomes "an earlier session", so "the request in [P2]" reads "the request in an
+   earlier session"), capitalizing the first letter, and redacting again:
    ```markdown
    ---
    name: <slug>
@@ -699,7 +740,9 @@ class SkillScaffolder:
    folder).
 5. `write` (only with `--write --dest`): expand `~`, resolve the path, target
    `<dest>/<slug>/SKILL.md`; refuse when that file exists, when `dest` is inside a session store
-   (`.claude/projects`, `.codex/sessions`), or when the render had problems; create the folder and
+   (`.claude/projects`, `.codex/sessions`, `.codex/archived_sessions`, `opencode/storage`,
+   `.gemini/tmp`, `.qwen/tmp`, `.openclaude/projects`, `.factory/sessions`, `.pi/agent`), or when the
+   render had problems; create the folder and
    write with LF line endings.
 
 #### Edge Cases & Error Handling
@@ -777,11 +820,14 @@ Only skills published on `main` are named in the body (`stop-repeating-yourself`
 **Type:** New files (byte copy; never edited here)
 
 Copied from `skills/improve-my-prompting/scripts/sessionkit/` at commit
-`c6be5101575f15249de63216e6e6684dee759937` of branch `skill/improve-my-prompting` (nine files:
-`__init__`, `model`, `redaction`, `claude_code`, `codex`, `opencode`, `gemini`, `collector`,
-`runner`), and every file is checked with `git hash-object` against that commit. Used: `model` (`Session`, `Turn`, `Clock`, `TextTools`),
+`b72fe1873b58cee63de27fad952c35bbfb0cb88c` (sessionkit v4) of branch `skill/improve-my-prompting` (ten
+files: `__init__`, `model`, `redaction`, `claude_code`, `codex`, `opencode`, `gemini`,
+`message_logs`, `collector`, `runner`), and every file is checked with `git hash-object` against that commit. Used: `model` (`Session`, `Turn`, `Clock`, `TextTools`),
 `redaction.Redactor`, `collector` (`CollectOptions`, `SessionCollector`), `runner`
-(`InputsValidator`, `SuggestArgv`, `PaidRunGuard`, `CliInvoker`, `RunReporter`).
+(`InputsValidator`, `SuggestArgv`, `PaidRunGuard`, `CliInvoker`, `RunReporter`). v3 reports a store
+that cannot be opened as a `read[]` entry with `"status": "error"` and a redacted `error`; v4 adds
+OpenClaude (`~/.openclaude`, Claude Code format), Factory Droid (`~/.factory/sessions`), and Pi
+(`~/.pi/agent/sessions`), and `--only <harness>`.
 
 ### 6.13 Website listing
 
@@ -806,9 +852,10 @@ in the alphabetical block and one `ENTRIES` line right after `STOP_REPEATING_YOU
   "schema": 1,
   "skill": "turn-corrections-into-skills",
   "window": {"since": "ISO|null", "until": "ISO", "max_sessions": 500},
-  "read": [{"harness": "claude-code", "root": "~/.claude", "candidates": 0, "sessions": 0, "error": null}],
+  "read": [{"harness": "opencode", "root": "~/.local/share/opencode", "status": "read|missing|error", "candidates": 0, "kept": 0}],
   "overall": {"sessions": 0, "prompts": 0, "corrections": 0, "episodes": 0, "sessions_with_corrections": 0,
-              "per_100_prompts": 0.0, "by_signal": {}, "by_strength": {}, "by_kind": {}, "by_harness": {}},
+              "per_100_prompts": 0.0, "by_signal": {}, "by_strength": {}, "by_kind": {}, "by_harness": {},
+              "templates_skipped": 0},
   "count": 8,
   "scenarios": [{"tag": "C1", "kind": "wrong_tool", "label": "...", "full": true, "corrections": 5, "episodes": 4,
                  "sessions": ["S1", "S3"], "projects": {"app": 3}, "harnesses": {"claude-code": 3}, "file_types": {".ts": 2},
@@ -890,13 +937,17 @@ the local Python 3.8.20.
 - `CorrectionRules` → "what's wrong with this test?" is not a correction; "that's wrong" is — [Silent Failure]
 - `CorrectionRules` → "no problem, thanks" is not a correction — [Edge Case]
 - `CorrectionRules` → "> you said X" quoted text with "you didn't" inside the quote is not matched — [Hidden Failure]
-- `CorrectionRules` → turn 0 and slash commands are never corrections — [Hidden Assumption]
+- `CorrectionRules` → turn 0, slash commands, and `$skill` invocations are never corrections (`rules_commands_and_turn0`) — [Hidden Assumption]
+- `CorrectionRules` → "stop the runner and merge" and "Add the endpoint. Don't touch the schema." are instructions; "don't touch the schema, just add a column" is a `directive` (`rules_not_corrections`) — [Silent Failure]
+- `CorrectionRules` → after an interruption, "great, merge into main", an additive "... after you are done too", "next pr*", "516 i mean", and "and which ones do we already have" are not corrections, while "great, but you forgot the tests" stays strong pushback (`rules_praise_additive_selffix`) — [Silent Failure]
+- `CorrectionDetector` → a 25+ word prompt seen in two sessions is a template, never a correction, and `templates_skipped` counts it (`detector_templates`) — [Silent Failure]
+- `CorrectionDetector` → the ask turn skips a bare "continue" back to the real task (`detector_ask_lookback`) — [Hidden Assumption]
 - `CorrectionDetector` → corrections at turns 3, 4, 7 form two episodes (3-4, 7) with `prompts_lost` 2 and 1, and the ask turn of the first is turn 2 — [Silent Failure]
 - `CorrectionDetector` → the corrected actions come from the previous turn, not the correcting turn — [Silent Failure]
 - `CorrectionDetector` → a session with no turns, and a session with one turn, yield nothing; `overall` has 0 per 100 prompts with 0 prompts — [Edge Case]
 - `MistakeKinds` → "you deleted my migrations" is `destructive_action`; a strong pushback after `Bash: git reset --hard` is too — [Edge Case]
 - `MistakeKinds` → "it's still failing" is `false_done`; "don't commit yet" is `ask_first`; "wrong branch" is `wrong_target`; "use pnpm not npm" is `wrong_tool`; "I meant the docs page" is `misread_intent` — [Silent Failure]
-- `MistakeKinds` → an interrupt-redirect with no other cue is `off_track` — [Edge Case]
+- `MistakeKinds` → an interrupt-redirect with no other cue is `off_track`; "continue, tool stalled" after an interrupted `npm run dev` is `stalled`; "I don't like this approach" is `rejected_approach` (`kinds_table`) — [Edge Case]
 - `ScenarioBuilder` → three pnpm corrections in two projects cluster into one scenario; a "wrong branch" correction stays separate — [Silent Failure]
 - `ScenarioBuilder` → two episodes of different kinds never share a scenario even with identical words — [Hidden Assumption]
 - `ScenarioBuilder` → ranking: a scenario in 3 sessions outranks one with 3 corrections in 1 session; a destructive singleton gets its bonus — [Silent Failure]
@@ -912,11 +963,17 @@ the local Python 3.8.20.
 - `SkillIdeaParser` → parses slug, description, got-wrong, correct, rules, steps from a well-formed idea; derives a slug and lists a problem when the title has none — [Silent Failure]
 - `SkillIdeaParser` → flags a slug with `claude`, over 64 chars, and a description over 1,024 chars or with `<` — [Edge Case]
 - `IdeaReporter` → an idea citing `[C1 P4]` is grounded with its quoted correction; an idea with no tags is `grounded: false`; `[P99]` is listed as unknown; an uncited full scenario is in `uncovered`; two ideas with one slug are flagged — [Silent Failure]
-- `SkillScaffolder` → the draft has valid frontmatter, no `[P#]` tags, and the description quoted when it has a colon; `write` refuses an existing file and an ungrounded idea — [Hidden Failure]
+- `SkillScaffolder` → the draft has valid frontmatter, no `[P#]` tags, "in an earlier session" where a tag was cited, a dated draft comment with singular/plural counts, and the description quoted when it has a colon; `write` refuses an existing file, an ungrounded idea, and a destination inside Pi's session store — [Hidden Failure]
 
 ### Integration Tests
-- `gather` over Claude Code and Codex fixtures (plus OpenCode/Gemini when `sessionkit` fixtures allow): exit 0; the summary's corrections, episodes, and scenarios match the fixtures; the out folder holds the four files.
-- `gather` over fixtures with no corrections exits 3 with `reason: no_corrections`; with every harness disabled exits 3 with `no_sessions`.
+- `gather_end_to_end`: over Claude Code and Codex fixtures, exit 0; 5 corrections, 4 episodes, scenarios `C1 wrong_tool` (2 sessions), `C2 false_done`, `C3 off_track`, count 3; the four files; both existing skills found.
+- `gather_no_secrets`: the secret and email reach no file; the home path appears only in `corrections.json`'s local fields (`sessions[].cwd`/`source`, `skills_found` paths, `read` roots); a secret never becomes a scenario term.
+- `gather_tags`: every tag in `digest.md` and `inputs.json` resolves; the C1 block keeps its correction and actions; counts use the singular for 1.
+- `gather_nothing`: no corrections exits 3 `no_corrections`; all eight `--no-*` flags, or `--only pi` on a home without Pi, exit 3 `no_sessions`.
+- `gather_more_harnesses`: OpenClaude, Factory Droid, and Pi fixtures are all read; the OpenClaude and Pi corrections are found, the Factory session has none; the OpenClaude skill is listed; the goal names the three harnesses; `--only pi --no-pi` keeps only Pi.
+- `gather_bad_opencode`: a non-SQLite `opencode.db` is a `read[]` entry with `"status": "error"` and an error text, and the Claude Code correction is still found.
+- `gather_bad_out_and_flags`: a non-empty `--out` and `--max-chars 1000` exit 2.
+- `suggest_bad_inputs`: an untagged `mistakes` value exits 2 with `problems`, and the fake is never called.
 - `suggest --dry-run` with the fake: exit 0, the recorded argv equals the expected argv, the cwd is the output folder, paths are relative, no `paid-run.txt`.
 - `suggest --paid` with the fake: writes `paid-run.txt` and `result.json`; a second `--paid` exits 2 and the fake records no second call (no silent double charge).
 - `suggest --paid` where the fake exits 5 with an error JSON on stderr: the summary carries `error.code` and exits 5.
@@ -928,7 +985,8 @@ the local Python 3.8.20.
 
 ### Manual / QA Test Cases
 1. Given this machine's real stores, when `gather` runs with defaults, then it finishes in under 3 minutes and reports counts only (sessions, corrections, scenarios); the out folder is deleted afterwards — [Hidden Failure]
-2. Given the real digest, when `suggest --dry-run` runs against the scratch-venv CLI with a blank `VIDBYTE_API_KEY`, then exit 0, `stop_reason: dry_run`, and both files in the manifest — [Hidden Assumption]
+2. Given the real digest, when `suggest --dry-run` runs against the scratch-venv CLI with a blank `VIDBYTE_API_KEY`, then exit 0, `stop_reason: dry_run`, `digest.md` in the manifest, and `--instructions skills-from-corrections.md` in the argv (the dry-run manifest does not list the instructions file) — [Hidden Assumption]
+5. Given `--only pi --only factory --only openclaude` on the real stores, when `gather` runs, then only those three harnesses are kept and their corrections are found — [Hidden Assumption]
 3. Given `--max-sessions 1`, when `gather` runs, then exactly one session is read and the exit is 0 or 3 — [Edge Case]
 4. Given the website worktree, when `npm run build` runs, then the only `[agent-skills]` warning is `fetch-failed` for this slug — [Hidden Assumption]
 
@@ -940,7 +998,7 @@ the local Python 3.8.20.
 |------------|--------------------|---------|------|
 | `vidbyte-cli` | 0.3.0+ (PyPI has 0.2.0) | `agents suggest run`, `handoff`, `project`, `feedback` | Listed `coming-soon` until 0.3.x ships |
 | Vidbyte model gateway / OpenAI gpt-6-sol | via `agents suggest run` | Generator and critics | Usage-billed; capped at 400,000 tokens |
-| `sessionkit` (byte copy) | `c6be510` on `skill/improve-my-prompting` | Session reading, redaction, paid-run plumbing | A bug there is fixed in the parent and re-copied |
+| `sessionkit` (byte copy) | `b72fe18` (v4) on `skill/improve-my-prompting` | Session reading, redaction, paid-run plumbing | A bug there is fixed in the parent and re-copied |
 | Python | 3.8+ standard library | The helper script | `sqlite3` missing disables OpenCode's database |
 | cerredz/Vidbyte `defineAgentSkill`, lint N050 | `main` | Website listing | N050 checks the commands against the vendored contract |
 
@@ -960,7 +1018,7 @@ the local Python 3.8.20.
 
 ## 13. Open Questions
 
-- [x] `sessionkit` source commit: `c6be5101575f15249de63216e6e6684dee759937` (parent branch
+- [x] `sessionkit` source commit: `b72fe1873b58cee63de27fad952c35bbfb0cb88c` (v4; parent branch
   `skill/improve-my-prompting`). If the parent changes `sessionkit` before it merges, re-copy.
 - [ ] `min-cli-version: "0.3.0"` matches every sibling suggestion skill; usage billing landed after
   0.3.0 and the first PyPI release will be 0.3.2. Move all suggestion skills together (Vidbyte#691)?
@@ -982,7 +1040,7 @@ the local Python 3.8.20.
 ### Alternative 2: Extend `stop-repeating-yourself`
 - What: add a "corrections" pattern kind to `repeats.py`.
 - Why rejected: that skill needs repetition across sessions and picks the cheapest fix kind; this one
-  needs single costly errors, the agent's actions, five harnesses, and a skill specification per
+  needs single costly errors, the agent's actions, eight harnesses, and a skill specification per
   scenario. Different inputs, outputs, and consent steps.
 
 ### Alternative 3: Send the focus file with `--files`
