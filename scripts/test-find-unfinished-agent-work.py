@@ -812,11 +812,11 @@ class UnitTests:
                     "project": project, "title": title, "last": last, "resume": {"cwd": "/code/%s" % project, "command": "claude --resume id-%s" % tag,
                     "bash": 'cd "/code/%s" && claude --resume id-%s' % (project, tag), "powershell": 'Set-Location "/code/%s"; claude --resume id-%s' % (project, tag), "env": {}, "note": ""}}
         index = {"schema": 1, "window": {"since": None}, "counts": {"sessions": 9}, "items": [
-            item("S1", "still open", "billing", "2026-10-10T10:00:00+00:00", "Retry backoff"),
+            dict(item("S1", "still open", "billing", "2026-10-10T10:00:00+00:00", "Retry backoff"), repo={"exists": True, "dirty": 0, "branches": [{"name": "feat/retry", "exists": True, "unpushed": 2}]}),
             item("S2", "still open", "billing", "2026-10-12T10:00:00+00:00", "Retry backoff, part 2"),
             item("S3", "probably done", "docs", "2026-10-09T10:00:00+00:00", "Docs page"),
             dict(item("S4", "still open", "web", "2026-10-11T10:00:00+00:00", "Navbar fix"), left={"todos": ["Fix the navbar overflow"], "remaining": ["Next steps: test it on mobile."], "question": ""}),
-            item("S5", "unknown", "api", "2026-10-08T10:00:00+00:00", "Old migration"),
+            dict(item("S5", "unknown", "api", "2026-10-08T10:00:00+00:00", "Old migration"), why="the session was interrupted", repo={"exists": False, "branches": []}),
         ], "prompts": [{"tag": "P1", "session": "S2", "index": 0, "text": "x"}]}
         Writer.text(out / "sessions.json", json.dumps(index))
         if with_result:
@@ -875,12 +875,19 @@ class UnitTests:
                 Check.true(line.startswith("- [ ] "), "bad item line: %r" % line)
 
     def report_local_only(self) -> None:
-        # --local-only builds the checklist from sessions.json alone, listing every open and unknown session.
+        # --local-only builds the checklist from sessions.json alone: every open and unknown session, each with a why and a first step.
         out = self._report_folder("r5", with_result=False)
         summary = ChecklistReporter(out, "bash", local_only=True).build()
         Check.equal([e["tag"] for e in summary["added_from_local_check"]], ["S2", "S4", "S1", "S5"], "local-only items")
         Check.equal(summary["counts"]["ideas"], 0, "ideas")
-        Check.true("without a Suggestion Agent run" in (out / "checklist.md").read_text(encoding="utf-8"), "intro")
+        text = (out / "checklist.md").read_text(encoding="utf-8")
+        Check.true("without a Suggestion Agent run" in text, "intro")
+        Check.equal(text.count("  - First step: "), 4, "every local item needs a first step")
+        Check.true('First step: Resume [S4] and pick up its first open todo: "Fix the navbar overflow".' in text, "todo first step")
+        Check.true("First step: Review branch feat/retry, which has 2 commits on no remote" in text, "unpushed-branch first step")
+        Check.true("First step: Check whether the work from the removed folder was merged or dropped" in text, "removed-folder first step")
+        Check.true("First step: Resume [S2] and ask the agent what is still left to do." in text, "default first step")
+        Check.true("Why unfinished: the session was interrupted" in text, "why line for an unknown item")
 
 
 class Home:
@@ -1071,6 +1078,7 @@ class IntegrationTests:
         Check.true("merged" in by_title["Open a pull request for the invoice rounding fix"]["reason"], "PR reason: %r" % by_title)
         Check.true("uncommitted" in by_title["Webhook retry backoff"]["reason"], "repo facts missing: %r" % by_title["Webhook retry backoff"]["reason"])
         Check.equal(by_title["Webhook retry backoff"]["left"]["todos"], ["Wire the retry into the worker"], "left todos")
+        Check.true(all(e.get("why") for e in index["items"]), "an item has no why: %r" % [e["title"] for e in index["items"] if not e.get("why")])
         Check.true("same first request" in by_title["Migrate the settings page to the new form library"]["reason"], "later-session reason")
         pi = by_title["Port the CSV importer to the streaming parser"]
         Check.equal((pi["status"], pi["resume"]["command"]), ("still open", "pi --session pi-1"), "Pi item")

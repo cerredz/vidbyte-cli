@@ -215,9 +215,38 @@ class ChecklistReporter:
             "  - Project: %s · Session: %s%s · Last touched: %s" % (record.get("project"), tag, self._harness(record.get("harness")), Clock.local_stamp(Clock.parse_ts(record.get("last")))),
             "  - Local check: %s — %s" % (status, TextTools.one_line(record.get("reason"), 260)),
         ]
+        why = TextTools.one_line(record.get("why"), 260)
+        if why and why not in (record.get("reason") or ""):
+            lines.append("  - Why unfinished: %s" % why)
         lines.extend(self._left_lines(record.get("left") or {}))
+        lines.append("  - First step: %s" % self._first_step(record))
         lines.extend(self._resume_lines(record))
         return lines
+
+    @staticmethod
+    def _first_step(record: dict) -> str:
+        # A concrete first step for a locally found item, from what the local check and the session itself recorded.
+        tag = "[%s]" % record["tag"] if record.get("tag") else "the session"
+        left = record.get("left") or {}
+        repo = record.get("repo") or {}
+        reason = record.get("reason") or ""
+        unpushed = [b for b in repo.get("branches") or [] if b.get("exists") and b.get("unpushed")]
+        if record.get("may_be_running"):
+            return "Check whether %s is still running in another terminal before you resume it." % tag
+        if repo.get("exists") is False:
+            return "Check whether the work from the removed folder was merged or dropped; tick this item off if so."
+        if left.get("question"):
+            return "Resume %s and answer its open question." % tag
+        if left.get("todos"):
+            return 'Resume %s and pick up its first open todo: "%s".' % (tag, TextTools.one_line(left["todos"][0], 120))
+        if left.get("remaining"):
+            return "Resume %s and start on what the agent said is left." % tag
+        if unpushed:
+            count = unpushed[0].get("unpushed")
+            return "Review branch %s, which has %s commit%s on no remote, and push it if the work is wanted." % (unpushed[0].get("name"), count, "" if count == 1 else "s")
+        if repo.get("dirty") and "uncommitted" in reason and "may belong to a later session" not in reason:
+            return "Review the uncommitted changes in the session's folder (`git status`), then resume %s." % tag
+        return "Resume %s and ask the agent what is still left to do." % tag
 
     @staticmethod
     def _left_lines(left: dict) -> list:

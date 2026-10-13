@@ -499,6 +499,7 @@ class DigestWriter:
             "prompts_count": len(session.turns),
             "end_state": session.end_state,
             "signals": item.finding.signal_ids(),
+            "why": self.local(item.finding.why()),
             "score": item.finding.score,
             "finished_in": self._later_ref(later) if item.later is not None and item.later.finished else None,
             "continued_in": head_tag if item.status == FOLDED else None,

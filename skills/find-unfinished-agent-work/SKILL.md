@@ -46,22 +46,23 @@ that was left unfinished, checked against later sessions and the repository as i
 different from the `pick-up-where-my-sessions-left-off` skill, which reads one recent window (the
 last 24 hours by default) and ranks what to do next. This skill reads only sessions saved on this
 machine by eight harnesses: Claude Code, Codex, OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory
-Droid, and Pi. It does not read Cursor, Grok CLI, Amp, Windsurf, or other tools. Its statuses are heuristics from local evidence, not certainty. It never resumes, finishes,
-or changes anything by itself; every git command it runs is read-only. Its redaction is
-pattern-based: it removes the common secret formats, not every possible secret.
+Droid, and Pi. It does not read Cursor, Grok CLI, Amp, Windsurf, or other tools. Its statuses are
+heuristics from local evidence, not certainty. It never resumes, finishes, or changes anything by
+itself; every git command it runs is read-only. Its redaction is pattern-based: it removes the
+common secret formats, not every possible secret.
 
 ## How vidbyte-cli solves it
 
 This skill drives `vidbyte-cli`, the Vidbyte command-line tool, and its Suggestion Agent. First, a
 free script that ships with this skill, `scripts/unfinished_work.py`, reads the most recent sessions
-of the eight harnesses and checks each one, locally, for the signs above. For every session that looks
-unfinished it then looks for proof that the work was done anyway: a later session in the same
-project that covers the same task, a pull request the session opened that is now merged (through
-the GitHub CLI, `gh`, when it is installed and logged in), and the repository's state now
-(`git status`, commits not on any remote, whether the session's branch still exists). Each session
-is marked `still open`, `probably done`, or `unknown`, with the reason. The script removes secrets,
-email addresses, and home-folder paths, and writes one Markdown digest in which every session has a
-tag such as `[S4]` and every prompt a tag such as `[P12]`.
+of the eight harnesses and checks each one, locally, for the signs above. For every session that
+looks unfinished it then looks for proof that the work was done anyway: a later session in the same
+project that covers the same task, a pull request the session opened that is now merged (through the
+GitHub CLI, `gh`, when it is installed and logged in), and the repository's state now (`git status`,
+commits not on any remote, whether the session's branch still exists). Each session is marked `still
+open`, `probably done`, or `unknown`, with the reason. The script removes secrets, email addresses,
+and home-folder paths, and writes one Markdown digest in which every session has a tag such as
+`[S4]` and every prompt a tag such as `[P12]`.
 
 After the user's yes, one `vidbyte-cli agents suggest run` call sends the digest to the Suggestion
 Agent together with this skill's focus instructions, `references/unfinished-work-checklist.md`,
@@ -481,11 +482,11 @@ The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exi
    touched, the local status and its reason, why it is unfinished, the first step, the done check,
    and one resume command per session. Resume commands are spelled for PowerShell on Windows and
    bash elsewhere; pass `--shell bash` or `--shell powershell` to choose. OpenClaude documents no
-   resume flag, so its sessions get a note to open them from its own session list instead. It then adds every
-   `still open` and `unknown` session that no item cites, marked "found by the local check", with
-   what the session itself says is left (its open todos, the agent's remaining-work lines, and any
-   unanswered question), and puts items that cite no session in a last group, "Not traced to a
-   session". It prints
+   resume flag, so its sessions get a note to open them from its own session list instead. It then
+   adds every `still open` and `unknown` session that no item cites, marked "found by the local
+   check", with why it is unfinished, what the session itself says is left (its open todos, the
+   agent's remaining-work lines, and any unanswered question), and a first step built from those
+   facts, and puts items that cite no session in a last group, "Not traced to a session". It prints
    `checklist`, `items` (each with `idea_id`, `title`, `project`, `sessions`, `last`,
    `local_status`, `grounded`, `unknown_tags`, and `flags`), `added_from_local_check`, `ungrounded`,
    and `counts`.
