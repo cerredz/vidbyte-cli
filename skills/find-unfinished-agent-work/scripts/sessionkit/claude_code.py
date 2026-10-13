@@ -1,4 +1,4 @@
-"""Claude Code reader: <config dir>/projects/<project>/<session>.jsonl transcripts."""
+"""Claude Code (and OpenClaude) reader: <config dir>/projects/<project>/<session>.jsonl transcripts."""
 
 from __future__ import annotations
 
@@ -27,8 +27,9 @@ class ClaudeCodeReader:
     }
     WANTED = ('"type":"user"', '"type":"assistant"', '"type": "user"', '"type": "assistant"', '"ai-title"', '"custom-title"', '"type":"summary"')
 
-    def __init__(self, config_dirs: list) -> None:
-        # Keeps the config folders (each holding projects/) in the order given, without duplicates.
+    def __init__(self, config_dirs: list, harness: str = "claude-code") -> None:
+        # Keeps the config folders (each holding projects/) in the order given; OpenClaude reuses this format.
+        self.harness = harness
         self.roots: list = []
         for folder in config_dirs:
             path = Path(folder).expanduser()
