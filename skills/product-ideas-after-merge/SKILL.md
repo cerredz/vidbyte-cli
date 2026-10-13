@@ -153,7 +153,9 @@ such as `--json` and `--no-input` always come before the command path.
 | `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Run, step 3, on this machine | Validates and resolves the complete request without invoking a model. Needs no Vidbyte key, balance, or token usage, and is not billed. The result contains no ideas and names `dry_run` as its stopping reason. It also checks the lens passed with `--instructions`, so a lens the runner would refuse fails here first. Writes no files. |
 | `vidbyte-cli --json --no-input agents suggest run ... --send-to slack` | Run, in the workflow, on GitHub's runner after each merged pull request | Develops concrete next actions for one goal: a generator proposes ideas and an independent critic reviews them. Every generator and critic turn is one call to Vidbyte's model gateway, billed to the balance of the key at its model's rate plus 2% (gpt-6-sol: $2 per million input tokens, $10 per million output tokens). The token limit is checked before each new call and stops new work once observed usage reaches it, here 400,000; it does not interrupt an active call, which is billed in full. Bare `slack` posts to the webhook in `SLACK_WEBHOOK_URL`, read from the environment only and never the keyring. Every target and credential is checked before the agent starts, so a missing webhook costs nothing. The result is sent only after the agent returns normally; one receipt line goes to stderr, and stdout keeps the result. When the send fails, the command exits with status 1 after the result is printed, so running it again repeats the paid run. It needs a vidbyte-sdk release that ships the output connectors. Writes no files in the repository. |
 
-This skill never runs `vidbyte-cli billing top-up`, and neither does the workflow.
+This skill never runs `vidbyte-cli billing top-up`, and neither does the workflow. The one exception
+is "Out of credits" in `references/troubleshooting.md`, on this machine, after the user's explicit
+yes (Troubleshooting, exit 5).
 
 ## Cost and consent
 
