@@ -38,7 +38,7 @@ flowchart TD
     D -->|exit 0| H["Deliver: secrets to set, merge to activate, how to stop"]
     H -.->|a pull request is merged| R["Runner: job if merged == true"]
     R --> F["git fetch pull/N/head; git diff --output pr.diff.txt;<br/>printf title and body to pr.md"]
-    F -->|empty after exclusions, or over 100,000 bytes| N["One ::notice::, exit 0, no Vidbyte charge"]
+    F -->|no changed lines after exclusions, or over 100,000 bytes| N["One ::notice::, exit 0, no Vidbyte charge"]
     F -->|within the bound| S["agents suggest run ... --send-to slack<br/>stdout to RUNNER_TEMP/product-ideas.json"]
     S -->|exit 0| K["One Slack message; stderr: Sent to slack."]
     S -->|exit 1, 2, 4, or 5| E["Failed job; error document on stderr"]
@@ -92,9 +92,12 @@ First action: <first action>
 - **Judgment at install, a gate at run time.** Every decision that needs a person is made while
   the user is present: whether the files already exist, the product paragraph, and which tracked
   build folders (`dist`, `build`, `out`, `vendor`, `node_modules`) to leave out of the diff. The
-  unattended run only checks two facts in the shell: the diff is empty after exclusions, or the
-  diff and description are over 100,000 bytes. Either one prints one `::notice::` line naming its
-  cause and exits 0 before any `vidbyte-cli` call.
+  unattended run only checks two facts in the shell: the diff has no changed lines after
+  exclusions, or the diff and description are over 100,000 bytes. Either one prints one
+  `::notice::` line naming its cause and exits 0 before any `vidbyte-cli` call. The first check
+  looks for a hunk header, a line that starts with `@@ `, rather than for an empty file: git writes
+  header lines for binary files, renames, and mode changes, so a pull request that only updates an
+  image would otherwise be a paid run on file names.
 - **The diff.** `actions/checkout@v4` with `fetch-depth: 0`, then
   `git fetch --no-tags origin "pull/$PR_NUMBER/head"`, then a three-dot
   `git diff --output="$RUNNER_TEMP/pr.diff.txt" "$BASE_SHA...$HEAD_SHA"` with the lockfile globs,
@@ -234,7 +237,7 @@ repository, the CLI, or GitHub:
 
 ## Verification
 
-1. A validation pack kept outside the committed files (39 tests, Python `unittest` with PyYAML,
+1. A validation pack kept outside the committed files (40 tests, Python `unittest` with PyYAML,
    Git Bash) passes in full. It covers each item below.
 2. Every `vidbyte-cli` command path, root option, and long option written as code in `SKILL.md`,
    plus `metadata.commands`, was checked against `contracts/cli-commands.json` on the internal
@@ -249,8 +252,9 @@ repository, the CLI, or GitHub:
 4. The workflow's `run:` script, parsed out of `SKILL.md`, ran with `bash -e` in a throwaway
    repository with a local bare origin and pull requests reachable only as `refs/pull/<N>/head`,
    with a recording fake `vidbyte-cli` first on `PATH`. A merge that adds only the two installed
-   files, a lockfile-only pull request, and a pull request that changes only an excluded `dist`
-   folder each printed one `its diff is empty after exclusions` notice and never called the CLI.
+   files, a lockfile-only pull request, a pull request that adds only a PNG image, and a pull
+   request that changes only an excluded `dist` folder each printed one
+   `its diff is empty after exclusions` notice and never called the CLI.
    An oversized pull request printed one notice with its exact byte count; 100,000 bytes ran and
    100,001 bytes skipped. A normal pull request called the CLI once with the exact argv, the diff
    held every commit of the pull request and nothing else, a title and body full of quotes,

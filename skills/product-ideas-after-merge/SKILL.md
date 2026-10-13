@@ -291,7 +291,7 @@ Run these steps only after the user's yes, from the repository root. None of the
                ':(exclude,glob)**/pnpm-lock.yaml' ':(exclude,glob)**/go.sum' \
                ':(exclude).github/workflows/product-ideas.yml' ':(exclude).github/product-ideas-lens.md'
              printf '# %s\n\n%s\n' "$PR_TITLE" "$PR_BODY" > "$RUNNER_TEMP/pr.md"
-             if [ ! -s "$RUNNER_TEMP/pr.diff.txt" ]; then
+             if ! grep -q '^@@ ' "$RUNNER_TEMP/pr.diff.txt"; then
                echo "::notice::No product ideas for pull request #$PR_NUMBER: its diff is empty after exclusions. Nothing was sent to Vidbyte."
                exit 0
              fi
@@ -375,9 +375,11 @@ How the workflow keeps each run safe and bounded:
 - **A pinned CLI.** The install step pins vidbyte-cli itself to exactly 0.3.3, so a later release
   cannot change the command or its cost without a new yes. Its own dependencies, including
   vidbyte-sdk, resolve within the CLI's declared ranges on each run.
-- **One notice per skip.** When the diff is empty after exclusions, or the diff and description are
-  over 100,000 bytes, the step prints one `::notice::` line naming the cause and exits 0 before any
-  `vidbyte-cli` call.
+- **One notice per skip.** When the diff has no changed lines after exclusions (it is empty, or it
+  holds only binary files, renames, or mode changes, which git lists by name only), or the diff and
+  description are over 100,000 bytes, the step prints one `::notice::` line naming the cause and
+  exits 0 before any `vidbyte-cli` call. The gate looks for a line that starts with `@@ `, which
+  git writes only at the start of a block of changed lines.
 
 ## Read the result
 
@@ -405,8 +407,9 @@ charge is on <https://vidbyte.pro/usage>.
   `0 of 3 ideas (needs_input)` followed by a question from the agent, was billed and needs no
   action. Nobody can answer the question from Slack, and a re-run of the job is a new charge.
 - A green job with one `::notice::` line and no message was skipped with no Vidbyte charge.
-  `its diff is empty after exclusions` means nothing was left to send: the install merge, or a pull
-  request that changed only lockfiles, the two installed files, or excluded folders.
+  `its diff is empty after exclusions` means no changed lines were left to send: the install merge,
+  or a pull request that changed only lockfiles, binary files, the two installed files, or excluded
+  folders, or that only renamed files or changed their modes.
   `the diff and description are <N> bytes, over 100000` means the pull request was too large for
   the per-run ceiling.
 - A failed job: see Troubleshooting.
