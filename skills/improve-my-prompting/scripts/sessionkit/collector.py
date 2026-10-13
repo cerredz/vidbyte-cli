@@ -125,6 +125,14 @@ class CollectResult:
         # Counts kept sessions per harness.
         return Counter(s.harness for s in self.sessions)
 
+    @staticmethod
+    def _redacted_entry(entry: dict, redactor) -> dict:
+        # One read[] entry with its root folder and any error message redacted.
+        redacted = dict(entry, root=redactor(entry["root"]))
+        if "error" in entry:
+            redacted["error"] = redactor(entry["error"])
+        return redacted
+
     def summary(self, redactor) -> dict:
         # A JSON-ready, redacted account of the collection for gather output and sessions.json.
         return {
@@ -135,7 +143,7 @@ class CollectResult:
             "kept_by_harness": dict(self.by_harness()),
             "prompts": sum(s.prompt_count for s in self.sessions),
             "injected_prompts_dropped": sum(s.injected_prompts for s in self.sessions),
-            "read": [dict(entry, root=redactor(entry["root"])) for entry in self.read],
+            "read": [self._redacted_entry(entry, redactor) for entry in self.read],
             "skipped": dict(self.skipped),
             "unreadable": dict(self.unreadable),
             "other_claude_dirs_not_read": [redactor(p) for p in self.other_claude_dirs_not_read],
@@ -218,15 +226,20 @@ class SessionCollector:
         # Lists every reader's candidates, records one read[] entry per root, and sorts newest first.
         everything = []
         for reader in self.readers.values():
+            listing_error = ""
             try:
                 found = reader.candidates(self.options.since)
             except Exception as exc:  # A store with an unexpected layout must not stop the others.
                 found = []
-                result.notes.append("%s candidates not listed: %s" % (reader.harness, exc))
+                listing_error = "candidates not listed: %s" % exc
+                result.notes.append("%s %s" % (reader.harness, listing_error))
             for root in reader.roots:
                 mine = [c for c in found if Path(c.root) == Path(root)]
-                status = "read" if Path(root).exists() else "missing"
-                result.read.append({"harness": reader.harness, "root": str(root), "status": status, "candidates": len(mine), "kept": 0})
+                entry = {"harness": reader.harness, "root": str(root), "status": "read" if Path(root).exists() else "missing", "candidates": len(mine), "kept": 0}
+                error = listing_error or getattr(reader, "root_errors", {}).get(str(root), "")
+                if error:
+                    entry.update(status="error", error=error)
+                result.read.append(entry)
             everything.extend(found)
         floor = dt.datetime.min.replace(tzinfo=dt.timezone.utc)
         everything.sort(key=lambda c: c.last_activity or floor, reverse=True)

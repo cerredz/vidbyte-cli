@@ -9,4 +9,4 @@ Only the Python standard library is used, and Python 3.8 or newer is enough. sql
 optional: without it, OpenCode's database is skipped and reported.
 """
 
-SESSIONKIT_VERSION = "2"
+SESSIONKIT_VERSION = "3"

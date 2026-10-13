@@ -188,7 +188,8 @@ Everything in this section is free and stays on this machine.
 3. **Read the summary.**
    - `read.kept_by_harness` and `read.prompts` give the volume.
    - `read.read` lists every folder with its candidates and kept sessions. `read.skipped` counts
-     skips by reason.
+     skips by reason. An entry with `"status": "error"` has an `error` field: that store, or part
+     of it, was not read. Tell the user which harness is missing from the critique.
    - If `read.other_claude_dirs_not_read` lists folders, such as `~/.claude-work`, ask the user
      once whether to include them. If yes, run `gather` again with one `--claude-dir` per folder.
    - If `read.not_read` names tools such as Cursor or Cline, tell the user those were not read.
@@ -583,9 +584,9 @@ The script prints a JSON report and exits with `vidbyte-cli`'s exit code.
 | 127, from `prompt_review.py` | `vidbyte-cli` was not found. Follow `references/setup.md` step 1. If it is installed outside `PATH`, add `--cli "<full path to vidbyte-cli>"` to the `suggest` or `feedback` command. |
 | Other | Read `references/troubleshooting.md`. |
 
-If OpenCode's database could not be opened, the summary's `read.notes` says so, and its sessions
-are missing from the window. The script retries on a private copy first. Close OpenCode and run
-`gather` again if the note persists.
+If OpenCode's database could not be opened, its `read.read` entry has `"status": "error"` and an
+`error` field, and its sessions are missing from the window. The script retries on a private copy
+first. Close OpenCode and run `gather` again if the error persists.
 
 If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` and the report's `error`
 first. The model calls that finished before the failure were billed, and nothing recovers or
