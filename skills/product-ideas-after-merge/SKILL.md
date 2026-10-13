@@ -409,6 +409,9 @@ charge is on <https://vidbyte.pro/usage>.
 - A message that reads `0 of 3 ideas (no_suggestions)` and `No ideas were returned.`, or
   `0 of 3 ideas (needs_input)` followed by a question from the agent, was billed and needs no
   action. Nobody can answer the question from Slack, and a re-run of the job is a new charge.
+- `(partial)` after the count, as in `2 of 3 ideas (partial)`, means fewer ideas survived review,
+  or the run stopped at the 400,000-token cap or a call's output cap; in the cap case the slate may
+  be unreviewed. It was billed and needs no action.
 - A green job with one `::notice::` line and no message was skipped with no Vidbyte charge.
   `its diff is empty after exclusions` means no changed lines were left to send: the install merge,
   or a pull request that changed only lockfiles, binary files, the two installed files, or excluded
