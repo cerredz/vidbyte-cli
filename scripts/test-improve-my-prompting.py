@@ -42,6 +42,8 @@ from sessionkit.claude_code import ClaudeCodeReader  # noqa: E402
 from sessionkit.codex import CodexReader  # noqa: E402
 from sessionkit.opencode import OpenCodeReader  # noqa: E402
 from sessionkit.gemini import GeminiReader  # noqa: E402
+from sessionkit.message_logs import FactoryReader, PiReader  # noqa: E402
+from sessionkit.model import ActionText  # noqa: E402
 from prompting.digest import DigestWriter, TagBook  # noqa: E402
 from prompting.report import IdeaReporter, RubricIndex  # noqa: E402
 from prompting.signals import SignalCatalog, SignalDetector, TemplateIndex  # noqa: E402
@@ -347,6 +349,48 @@ class GeminiFixtures:
         ]
 
 
+class MessageLogFixtures:
+    """Factory Droid and Pi message logs."""
+
+    @staticmethod
+    def msg(minutes: float, message: dict) -> dict:
+        # One {"type": "message"} record.
+        return {"type": "message", "id": "m%s" % minutes, "timestamp": Stamp.iso(minutes), "message": message}
+
+    @staticmethod
+    def text(value: str) -> dict:
+        # One text content part.
+        return {"type": "text", "text": value}
+
+    @staticmethod
+    def factory(cwd: str) -> list:
+        # A reminder-only message, a prompt with a reminder part, a UI notice, and a reply with a tool call.
+        m, t = MessageLogFixtures.msg, MessageLogFixtures.text
+        return [
+            {"type": "session_start", "id": "fac-1", "title": "New Session", "sessionTitle": "Fix login", "owner": "me", "version": 2, "cwd": cwd},
+            m(20, {"role": "user", "visibility": "llm_only", "content": [t("<system-reminder>tools</system-reminder>")]}),
+            m(20.1, {"role": "user", "content": [t("<system-reminder>x</system-reminder>"), t("Fix the login redirect in app/auth.ts")]}),
+            m(20.2, {"role": "user", "visibility": "user_only", "content": [t("No active subscription")]}),
+            m(21, {"role": "assistant", "content": [t("Fixing."), {"type": "tool_use", "id": "t", "name": "Edit", "input": {"file_path": "app/auth.ts"}}]}),
+            m(21.5, {"role": "assistant", "content": [t("Fixed: the redirect now goes to /home.")]}),
+        ]
+
+    @staticmethod
+    def pi(cwd: str) -> list:
+        # A failed tool call, an aborted reply, a correction, and a finished reply.
+        m, t = MessageLogFixtures.msg, MessageLogFixtures.text
+        return [
+            {"type": "session", "version": 3, "id": "pi-1", "timestamp": Stamp.iso(30), "cwd": cwd},
+            {"type": "model_change", "id": "x", "parentId": None, "timestamp": Stamp.iso(30), "provider": "deepseek", "modelId": "deepseek-v4-pro"},
+            m(30.1, {"role": "user", "content": [t("List the files in src/")], "timestamp": Stamp.ms(30.1)}),
+            m(30.2, {"role": "assistant", "model": "deepseek-v4-pro", "content": [{"type": "thinking", "thinking": "hmm"}, {"type": "toolCall", "id": "c1", "name": "bash", "arguments": {"command": "ls src"}}], "stopReason": "toolUse"}),
+            m(30.3, {"role": "toolResult", "toolCallId": "c1", "toolName": "bash", "isError": True, "content": [t("no such dir")]}),
+            m(30.4, {"role": "assistant", "model": "deepseek-v4-pro", "content": [], "stopReason": "aborted"}),
+            m(31, {"role": "user", "content": [t("no, list app/ instead")]}),
+            m(31.5, {"role": "assistant", "model": "deepseek-v4-pro", "content": [t("Here they are.")], "stopReason": "stop"}),
+        ]
+
+
 class Home:
     """A temporary home folder holding every harness store."""
 
@@ -374,6 +418,11 @@ class Home:
         Writer.json(h / ".gemini" / "tmp" / gemini_hash / "chats" / "session-broken.json", None, 331, raw='{"sessionId": "broken", "messages": [')
         GeminiFixtures.chat(h / ".qwen", "proj", "qwen-session-1", 340, [{"type": "user", "timestamp": Stamp.iso(340), "content": "Summarize src/main.py"}, {"type": "qwen", "timestamp": Stamp.iso(341), "model": "qwen3-coder", "content": "It boots the app."}])
         (h / ".cursor" / "chats").mkdir(parents=True, exist_ok=True)
+        (h / ".grok" / "sessions").mkdir(parents=True, exist_ok=True)
+        Writer.jsonl(h / ".openclaude" / "projects" / "C--repo" / "openclaude-1.jsonl", [ClaudeFixtures.user("Rename the helper in src/util.py", 40, self.repo), ClaudeFixtures.assistant(41, self.repo, "Renamed.")], 41)
+        Writer.jsonl(h / ".factory" / "sessions" / "-C-repo" / "fac-1.jsonl", MessageLogFixtures.factory(self.repo), 21.5)
+        Writer.json(h / ".factory" / "sessions" / "-C-repo" / "fac-1.settings.json", {"model": "x"}, 21)
+        Writer.jsonl(h / ".pi" / "agent" / "sessions" / "--C--repo--" / "2026-10-01T00-00-00-000Z_pi-1.jsonl", MessageLogFixtures.pi(self.repo), 31.5)
 
 
 class FakeCli:
@@ -643,6 +692,54 @@ class UnitTests:
         Check.equal(reader.read(broken, None, stats), None)
         Check.equal(stats["unreadable_files"], 1)
 
+    def openclaude_reading(self) -> None:
+        # ~/.openclaude is read by default in Claude Code's format and labeled openclaude.
+        options = CollectOptions(disabled={"claude", "codex", "opencode", "gemini", "qwen", "factory", "pi"})
+        result = SessionCollector(options, home=self.home.path).collect()
+        Check.equal([(s.harness, s.turns[0].text) for s in result.sessions], [("openclaude", "Rename the helper in src/util.py")])
+
+    def factory_reading(self) -> None:
+        # Reminders and UI notices are not prompts, the default title is dropped, and the reply's tool call counts.
+        from collections import Counter
+        reader = FactoryReader(self.home.path / ".factory")
+        candidates = reader.candidates(None)
+        Check.equal([Path(c.ref).name for c in candidates], ["fac-1.jsonl"], "candidates (settings files are not sessions)")
+        session = reader.read(candidates[0], None, Counter())
+        Check.equal([t.text for t in session.turns], ["Fix the login redirect in app/auth.ts"])
+        Check.equal((session.session_id, session.title, session.cwd, session.harness), ("fac-1", "Fix login", self.home.repo, "factory-droid"))
+        Check.equal(session.turns[0].actions, ["Edit app/auth.ts"])
+        Check.equal(session.end_state, "finished")
+
+    def pi_reading(self) -> None:
+        # A failed tool result counts, an aborted reply interrupts, thinking is not agent text, and the reply model counts.
+        from collections import Counter
+        reader = PiReader(self.home.path / ".pi" / "agent")
+        session = reader.read(reader.candidates(None)[0], None, Counter())
+        Check.equal([t.text for t in session.turns], ["List the files in src/", "no, list app/ instead"])
+        first = session.turns[0]
+        Check.equal(first.actions, [ActionText.describe("bash", {"command": "ls src"})])
+        Check.equal((first.failed_actions, first.interrupted), (1, True))
+        Check.true("hmm" not in (first.reply_text or ""), "thinking leaked into the reply")
+        Check.equal((session.session_id, session.end_state, dict(session.models)), ("pi-1", "finished", {"deepseek-v4-pro": 3}))
+        expanded = '<skill name="design-doc" location="C:/x/SKILL.md">\nBODY\n</skill>\n\nbuild the export page'
+        Check.equal(reader.clean_prompt(expanded), "/design-doc build the export page", "skill expansion")
+        Check.equal(reader.clean_prompt("a <skill> tag mid-prompt"), "a <skill> tag mid-prompt", "plain prompt changed")
+
+    def collector_only(self) -> None:
+        # --only keeps the named harnesses and overrides --no-*; an unknown name exits 2.
+        parser = argparse.ArgumentParser()
+        CollectOptions.add_arguments(parser)
+        options = CollectOptions.from_args(parser.parse_args(["--only", "codex", "--only", "pi", "--no-pi"]))
+        everything = {"claude", "codex", "opencode", "gemini", "qwen", "openclaude", "factory", "pi"}
+        Check.equal(sorted(everything - options.disabled), ["codex", "pi"])
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                parser.parse_args(["--only", "cursor"])
+        except SystemExit as stop:
+            Check.equal(stop.code, 2)
+            return
+        raise AssertionError("--only cursor was accepted")
+
     def collector_cap(self) -> None:
         # With more sessions than the cap, keeps the newest across harnesses, newest first; skipped sessions do not count.
         options = CollectOptions(max_sessions=5, claude_dirs=[str(self.home.path / ".claude-alt")], codex_home=str(self.home.path / ".codex"), opencode_dir=str(self.home.path / ".local" / "share" / "opencode"), gemini_dir=str(self.home.path / ".gemini"), qwen_dir=str(self.home.path / ".qwen"))
@@ -876,12 +973,12 @@ class IntegrationTests:
         code, doc, out, err = self.runner.run("gather", "--claude-dir", str(self.home.path / ".claude-alt"), "--out", str(self.out))
         Check.equal(code, 0, "exit (stderr: %s)" % err[-400:])
         read = doc["read"]
-        Check.equal(read["kept_by_harness"], {"qwen-code": 1, "gemini-cli": 1, "opencode": 3, "codex": 1, "claude-code": 2}, "kept_by_harness")
+        Check.equal(read["kept_by_harness"], {"qwen-code": 1, "gemini-cli": 1, "opencode": 3, "codex": 1, "claude-code": 2, "openclaude": 1, "factory-droid": 1, "pi": 1}, "kept_by_harness")
         Check.equal(read["skipped"].get("sdk"), 1, "sdk skipped")
         Check.equal(read["skipped"].get("non_interactive"), 1, "exec skipped")
         Check.equal(read["skipped"].get("subagent"), 1, "subagent skipped")
         Check.true(any(p.endswith(".claude-work") for p in read["other_claude_dirs_not_read"]), "claude-work not listed: %r" % read["other_claude_dirs_not_read"])
-        Check.true("Cursor" in read["not_read"], "Cursor not listed")
+        Check.true("Cursor" in read["not_read"] and "Grok CLI" in read["not_read"], "Cursor or Grok CLI not listed: %r" % read["not_read"])
         Check.equal(read["unreadable"].get("unreadable_lines"), 1, "corrupt line")
         Check.equal([e for e in read["read"] if e["status"] == "error"], [], "read[] errors")
         for name in ("digest.md", "sessions.json", "inputs.json", "prompting-rubric.md"):
@@ -917,7 +1014,7 @@ class IntegrationTests:
 
     def gather_nothing(self) -> None:
         # Every harness disabled exits 3 and names the folders read.
-        code, doc, _out, _err = self.runner.run("gather", "--no-claude", "--no-codex", "--no-opencode", "--no-gemini", "--no-qwen", "--out", str(self.base / "out-none"))
+        code, doc, _out, _err = self.runner.run("gather", "--no-claude", "--no-codex", "--no-opencode", "--no-gemini", "--no-qwen", "--no-openclaude", "--no-factory", "--no-pi", "--out", str(self.base / "out-none"))
         Check.equal(code, 3)
         Check.true("error" in doc and "read" in doc, "summary lacks error or read")
 
@@ -1026,7 +1123,8 @@ class Suite:
             ("claude_injected", "Silent Failure"), ("claude_interrupt", "Hidden Failure"), ("claude_sdk", "Hidden Assumption"), ("claude_corrupt_line", "Hidden Failure"),
             ("codex_skips", "Hidden Assumption"), ("codex_reading", "Silent Failure"), ("opencode_v2", "Silent Failure"), ("opencode_v1", "Hidden Failure"),
             ("opencode_legacy", "Silent Failure"), ("opencode_no_v2", "Hidden Assumption"), ("opencode_bad_db", "Hidden Failure"), ("gemini_reading", "Edge Case"),
-            ("gemini_truncated", "Hidden Failure"), ("collector_cap", "Silent Failure"), ("collector_bounds", "Edge Case"), ("collector_project_dir", "Silent Failure"),
+            ("gemini_truncated", "Hidden Failure"), ("openclaude_reading", "Silent Failure"), ("factory_reading", "Silent Failure"), ("pi_reading", "Silent Failure"),
+            ("collector_only", "Edge Case"), ("collector_cap", "Silent Failure"), ("collector_bounds", "Edge Case"), ("collector_project_dir", "Silent Failure"),
             ("collector_empty", "Edge Case"), ("signals_correction", "Silent Failure"), ("signals_go_ahead", "Hidden Assumption"), ("signals_vague_opener", "Edge Case"),
             ("signals_drip", "Edge Case"), ("signals_emphasis", "Silent Failure"), ("signals_tricks", "Edge Case"), ("signals_empty", "Edge Case"),
             ("signals_ranking", "Silent Failure"), ("signals_templates", "Silent Failure"), ("digest_budget", "Silent Failure"), ("rubric_copy", "Hidden Assumption"),
