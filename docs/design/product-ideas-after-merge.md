@@ -137,18 +137,17 @@ First action: <first action>
 
 On every merged pull request, not on demand. The user chose the automatic trigger: "after a pr"
 means after every merge, with nobody asking, which a skill that waits for a yes before each run
-cannot do. Section 5,
-rule 1 of the rulebook required a stated cost and a yes before every paid command, so this PR adds
-one paragraph after rule 5 and one checklist item. They let a skill install a CI workflow that
-starts paid runs, with consent asked once at install, but only when what starts the paid run (the
-event plus any condition the workflow checks before it) is something only the user or people with
-write access can cause. This skill's event, `pull_request` `closed`, can be caused by an outsider
-closing their own pull request; the job's condition `merged == true` is what makes the paid path
-write-access-only. The one yes names the event, the most one run can cost and the cap, what leaves
-the repository, and how to stop it, and a change to what the workflow runs, its cap, its trigger,
-or its CLI version needs a new yes. A paragraph, not a sixth numbered rule, because every skill
-restates the numbered rules in its Guardrails, and a sixth would make all existing skills
-non-compliant.
+cannot do. Section 5, rule 1 of the rulebook required a stated cost and a yes before every paid
+command, so this PR adds one paragraph after rule 5 and one checklist item. They let a skill
+install a CI workflow that starts paid runs, with consent asked once at install, but only when
+what starts the paid run (the event plus any condition the workflow checks before it) is
+something only the user or people with write access can cause. This skill's event,
+`pull_request` `closed`, can be caused by an outsider closing their own pull request; the job's
+condition `merged == true` is what makes the paid path write-access-only. The one yes names the
+event, the most one run can cost and the cap, what leaves the repository, and how to stop it, and
+a change to what the workflow runs, its cap, its trigger, or its CLI version needs a new yes. A
+paragraph, not a sixth numbered rule, because every skill restates the numbered rules in its
+Guardrails, and a sixth would make all existing skills non-compliant.
 
 The rule permits installed automation; it does not require it. The `stop-repeating-yourself`
 guardrail "A scheduled job or a hook never starts a paid run" and the
