@@ -467,8 +467,10 @@ The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exi
    touched, the local status and its reason, why it is unfinished, the first step, the done check,
    and one resume command per session. Resume commands are spelled for PowerShell on Windows and
    bash elsewhere; pass `--shell bash` or `--shell powershell` to choose. It then adds every
-   `still open` and `unknown` session that no item cites, marked "found by the local check", and
-   puts items that cite no session in a last group, "Not traced to a session". It prints
+   `still open` and `unknown` session that no item cites, marked "found by the local check", with
+   what the session itself says is left (its open todos, the agent's remaining-work lines, and any
+   unanswered question), and puts items that cite no session in a last group, "Not traced to a
+   session". It prints
    `checklist`, `items` (each with `idea_id`, `title`, `project`, `sessions`, `last`,
    `local_status`, `grounded`, `unknown_tags`, and `flags`), `added_from_local_check`, `ungrounded`,
    and `counts`.

@@ -811,7 +811,7 @@ class UnitTests:
             item("S1", "still open", "billing", "2026-10-10T10:00:00+00:00", "Retry backoff"),
             item("S2", "still open", "billing", "2026-10-12T10:00:00+00:00", "Retry backoff, part 2"),
             item("S3", "probably done", "docs", "2026-10-09T10:00:00+00:00", "Docs page"),
-            item("S4", "still open", "web", "2026-10-11T10:00:00+00:00", "Navbar fix"),
+            dict(item("S4", "still open", "web", "2026-10-11T10:00:00+00:00", "Navbar fix"), left={"todos": ["Fix the navbar overflow"], "remaining": ["Next steps: test it on mobile."], "question": ""}),
             item("S5", "unknown", "api", "2026-10-08T10:00:00+00:00", "Old migration"),
         ], "prompts": [{"tag": "P1", "session": "S2", "index": 0, "text": "x"}]}
         Writer.text(out / "sessions.json", json.dumps(index))
@@ -865,6 +865,7 @@ class UnitTests:
         headings = [line[3:] for line in text.splitlines() if line.startswith("## ")]
         Check.equal(headings, ["billing", "web", "docs", "api", "Not traced to a session"], "project order")
         Check.true('Set-Location "/code/web"; claude --resume id-S4' in text, "PowerShell resume command missing")
+        Check.true("Open todos: Fix the navbar overflow" in text and "Next steps: test it on mobile." in text, "what is left is missing from a local item")
         for line in text.splitlines():
             if line.startswith("- ["):
                 Check.true(line.startswith("- [ ] "), "bad item line: %r" % line)
@@ -1048,6 +1049,7 @@ class IntegrationTests:
         by_title = {e["title"]: e for e in index["items"]}
         Check.true("merged" in by_title["Open a pull request for the invoice rounding fix"]["reason"], "PR reason: %r" % by_title)
         Check.true("uncommitted" in by_title["Webhook retry backoff"]["reason"], "repo facts missing: %r" % by_title["Webhook retry backoff"]["reason"])
+        Check.equal(by_title["Webhook retry backoff"]["left"]["todos"], ["Wire the retry into the worker"], "left todos")
         Check.true("same first request" in by_title["Migrate the settings page to the new form library"]["reason"], "later-session reason")
         digest = (self.out / "digest.md").read_text(encoding="utf-8")
         for needle in (SECRET_KEY, SECRET_EMAIL, str(self.runner.home.path), "codex-int-1"):

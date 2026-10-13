@@ -507,8 +507,17 @@ class DigestWriter:
                          branches=[b.to_json() for b in item.branches]),
             "pull_requests": [p.to_json() for p in item.pulls],
             "mentioned_pull_requests": list(item.finding.mentioned_pr_urls),
+            "left": self._left(item.finding),
             "resume": self.resume.build(session),
             "prompts": [t for t, i, _turn in self.tags.prompts.values() if i is item],
+        }
+
+    def _left(self, finding) -> dict:
+        # What the session itself says is left: open todos, remaining-work lines, and an unanswered question (local only).
+        return {
+            "todos": [self.local(TextTools.one_line(content, 160)) for content, _status in finding.open_todos[:3]],
+            "remaining": [self.local(line) for line in finding.remaining_lines[:2]],
+            "question": self.local(finding.closing_question) if finding.closing_question else "",
         }
 
     def _later_ref(self, finding) -> dict:

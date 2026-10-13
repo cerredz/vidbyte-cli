@@ -214,7 +214,22 @@ class ChecklistReporter:
             "  - Project: %s · Session: %s%s · Last touched: %s" % (record.get("project"), tag, self._harness(record.get("harness")), Clock.local_stamp(Clock.parse_ts(record.get("last")))),
             "  - Local check: %s — %s" % (status, TextTools.one_line(record.get("reason"), 260)),
         ]
+        lines.extend(self._left_lines(record.get("left") or {}))
         lines.extend(self._resume_lines(record))
+        return lines
+
+    @staticmethod
+    def _left_lines(left: dict) -> list:
+        # "Left to do" from the session's open todos and remaining-work lines, and its unanswered question.
+        lines = []
+        todos = [TextTools.one_line(t, 160) for t in left.get("todos") or [] if t]
+        if todos:
+            lines.append("  - Open todos: %s" % "; ".join(todos))
+        remaining = [TextTools.one_line(r, 240) for r in left.get("remaining") or [] if r]
+        if remaining:
+            lines.append("  - The agent said: %s" % " ".join('"%s"' % r for r in remaining))
+        if left.get("question"):
+            lines.append('  - Unanswered question: "%s"' % TextTools.one_line(left["question"], 240))
         return lines
 
     def _resume_lines(self, record: dict) -> list:
