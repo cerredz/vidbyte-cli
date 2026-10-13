@@ -134,6 +134,7 @@ class CollectResult:
             "kept": len(self.sessions),
             "kept_by_harness": dict(self.by_harness()),
             "prompts": sum(s.prompt_count for s in self.sessions),
+            "injected_prompts_dropped": sum(s.injected_prompts for s in self.sessions),
             "read": [dict(entry, root=redactor(entry["root"])) for entry in self.read],
             "skipped": dict(self.skipped),
             "unreadable": dict(self.unreadable),

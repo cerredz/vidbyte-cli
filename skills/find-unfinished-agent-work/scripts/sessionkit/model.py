@@ -16,6 +16,10 @@ REPLY_TAIL_CHARS = 400
 FINAL_TEXT_CHARS = 1200
 DUPLICATE_SECONDS = 10.0
 END_STATES = ("finished", "question", "interrupted", "working", "error", "unknown")
+# Prompts a harness writes on the user's behalf: goal continuations are dropped as turns, and a
+# session that opens with a scheduled-task prompt is not a person typing.
+INJECTED_PROMPT_PREFIXES = ("Continue working toward the active session goal",)
+SCHEDULED_PROMPT_PREFIXES = ("At the scheduled time, carry out",)
 
 
 class Candidate:
@@ -294,6 +298,7 @@ class Session:
         self.end_state = "unknown"
         self.final_agent_text = ""
         self.skip_reason = ""
+        self.injected_prompts = 0
         self._last_agent_text = ""
         self._reply_parts: list = []
         self._last_prompt = ("", None)
@@ -342,6 +347,11 @@ class Session:
         text = str(text or "").strip()
         if not text:
             return None
+        if text.startswith(INJECTED_PROMPT_PREFIXES):
+            self.injected_prompts += 1
+            return None
+        if not self.turns and text.startswith(SCHEDULED_PROMPT_PREFIXES):
+            self.skip_reason = self.skip_reason or "automation"
         previous_text, previous_ts = self._last_prompt
         if previous_text == text and (previous_ts is None or stamp is None or abs((stamp - previous_ts).total_seconds()) < DUPLICATE_SECONDS):
             return None  # Codex can record one prompt twice, as an event and as an item.
