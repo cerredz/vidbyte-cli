@@ -681,6 +681,8 @@ class UnitTests:
             "opencode": (str(home / ".local" / "share" / "opencode" / "opencode.db") + "#sid", "opencode --session sid", {}),
             "gemini-cli": (str(home / ".gemini" / "tmp" / "h" / "chats" / "c.json"), "gemini --resume sid", {}),
             "qwen-code": (str(home / ".qwen" / "tmp" / "h" / "chats" / "c.json"), "qwen --resume sid", {}),
+            "factory-droid": (str(home / ".factory" / "sessions" / "p" / "sid.jsonl"), "droid --resume sid", {}),
+            "pi": (str(home / ".pi" / "agent" / "sessions" / "p" / "sid.jsonl"), "pi --session sid", {}),
         }
         for harness, (source, command, env) in cases.items():
             session = SessionBuilder.make(["Do the thing in the repo"], harness=harness, sid="sid", cwd=cwd, source=source)
@@ -692,6 +694,8 @@ class UnitTests:
         Check.true('$env:CLAUDE_CONFIG_DIR = "' in claude["powershell"] and claude["powershell"].startswith("Set-Location"), "powershell: " + claude["powershell"])
         default = builder.build(SessionBuilder.make(["x y z w"], sid="sid", cwd=cwd, source=str(home / ".claude" / "projects" / "x" / "s.jsonl")))
         Check.equal(default["env"], {}, "default Claude folder env")
+        fork = builder.build(SessionBuilder.make(["x y z w"], harness="openclaude", sid="sid", cwd=cwd, source=str(home / ".openclaude" / "projects" / "x" / "s.jsonl")))
+        Check.true(fork["command"] == "" and fork["bash"] == "" and "own session list" in fork["note"], "openclaude: %r" % fork)
         nowhere = builder.build(SessionBuilder.make(["x y z w"], sid="sid", cwd="gemini project ab12cd34", harness="gemini-cli"))
         Check.true(nowhere["cwd"] == "" and "not known" in nowhere["note"], "note: %r" % nowhere)
 
@@ -893,6 +897,8 @@ class Home:
         self.plain.mkdir(parents=True)
         self.forms = self.path / "code" / "forms"
         self.forms.mkdir(parents=True)
+        self.pi_proj = self.path / "code" / "pi-proj"
+        self.pi_proj.mkdir(parents=True)
         self.build()
 
     def build(self) -> None:
@@ -905,6 +911,7 @@ class Home:
         Writer.jsonl(codex / "rollout-int.jsonl", self.codex_interrupted(str(self.notes)), 205)
         Writer.jsonl(codex / "rollout-early.jsonl", self.codex_forms("codex-early", str(self.forms), 300, finished=False), 305)
         Writer.jsonl(codex / "rollout-late.jsonl", self.codex_forms("codex-late", str(self.forms), 400, finished=True), 405)
+        Writer.jsonl(self.path / ".pi" / "agent" / "sessions" / "--pi-proj--" / "2026-10-01_pi-1.jsonl", self.pi_aborted(str(self.pi_proj)), 505)
 
     @staticmethod
     def user(text, minutes: float, cwd: str) -> dict:
@@ -956,6 +963,19 @@ class Home:
             r("response_item", OrderedDict([("type", "function_call"), ("name", "shell_command"), ("arguments", json.dumps({"command": ["bash", "-lc", "pytest -q"]})), ("call_id", "c1")]), 202),
             r("response_item", OrderedDict([("type", "function_call_output"), ("call_id", "c1"), ("output", "Exit code: 1\nFAILED")]), 202.5),
             r("event_msg", OrderedDict([("type", "turn_aborted"), ("reason", "interrupted")]), 205),
+        ]
+
+    @staticmethod
+    def pi_aborted(cwd: str) -> list:
+        # Still open: a Pi session whose last reply was aborted after a failing tool call.
+        def m(minutes, message):
+            return {"type": "message", "id": "m%s" % minutes, "timestamp": Stamp.iso(minutes), "message": message}
+        return [
+            {"type": "session", "version": 3, "id": "pi-1", "timestamp": Stamp.iso(500), "cwd": cwd},
+            m(500.1, {"role": "user", "content": [{"type": "text", "text": "Port the CSV importer to the streaming parser"}]}),
+            m(500.2, {"role": "assistant", "model": "deepseek-v4-pro", "content": [{"type": "toolCall", "id": "c1", "name": "bash", "arguments": {"command": "npm test"}}], "stopReason": "toolUse"}),
+            m(500.3, {"role": "toolResult", "toolCallId": "c1", "toolName": "bash", "isError": True, "content": [{"type": "text", "text": "2 failing"}]}),
+            m(500.4, {"role": "assistant", "model": "deepseek-v4-pro", "content": [], "stopReason": "aborted"}),
         ]
 
     def codex_forms(self, session_id: str, cwd: str, minutes: float, finished: bool) -> list:
@@ -1040,8 +1060,9 @@ class IntegrationTests:
         # gather over Claude Code and Codex: exit 0, counts per status, the four files, git used, gh used.
         code, doc, out, err = self.runner.run("gather", "--out", str(self.out))
         Check.equal(code, 0, "exit (stderr: %s)" % err[-500:])
-        Check.equal(doc["sessions_read"], 6, "sessions read")
-        Check.equal(doc["counts"], {"candidates": 4, "still_open": 2, "unknown": 0, "probably_done": 2, "folded": 0}, "counts")
+        Check.equal(doc["sessions_read"], 7, "sessions read")
+        Check.equal(doc["by_harness"], {"claude-code": 3, "codex": 3, "pi": 1}, "sessions by harness")
+        Check.equal(doc["counts"], {"candidates": 5, "still_open": 3, "unknown": 0, "probably_done": 2, "folded": 0}, "counts")
         for name in ("digest.md", "sessions.json", "inputs.json", "unfinished-work-checklist.md"):
             Check.true((self.out / name).is_file(), name + " missing")
         Check.equal((doc["checks"]["git"], doc["checks"]["gh"]), ("used", "used"), "checks")
@@ -1051,6 +1072,8 @@ class IntegrationTests:
         Check.true("uncommitted" in by_title["Webhook retry backoff"]["reason"], "repo facts missing: %r" % by_title["Webhook retry backoff"]["reason"])
         Check.equal(by_title["Webhook retry backoff"]["left"]["todos"], ["Wire the retry into the worker"], "left todos")
         Check.true("same first request" in by_title["Migrate the settings page to the new form library"]["reason"], "later-session reason")
+        pi = by_title["Port the CSV importer to the streaming parser"]
+        Check.equal((pi["status"], pi["resume"]["command"]), ("still open", "pi --session pi-1"), "Pi item")
         digest = (self.out / "digest.md").read_text(encoding="utf-8")
         for needle in (SECRET_KEY, SECRET_EMAIL, str(self.runner.home.path), "codex-int-1"):
             Check.true(needle not in digest, "digest leaks %r" % needle)
@@ -1073,11 +1096,11 @@ class IntegrationTests:
         Check.equal(entry["status"], "error", "opencode read status")
         Check.true(entry.get("error"), "no error text: %r" % entry)
         Check.true(str(self.base) not in json.dumps(entry), "read[] leaks the home path: %r" % entry)
-        Check.equal(doc["sessions_read"], 6, "other stores still read")
+        Check.equal(doc["sessions_read"], 7, "other stores still read")
 
     def gather_nothing(self) -> None:
         # Every harness disabled exits 3; a folder whose only session finished gives next "nothing_to_send".
-        code, doc, _o, _e = self.runner.run("gather", "--out", str(self.base / "int-none"), "--no-claude", "--no-codex", "--no-opencode", "--no-gemini", "--no-qwen")
+        code, doc, _o, _e = self.runner.run("gather", "--out", str(self.base / "int-none"), "--no-claude", "--no-codex", "--no-opencode", "--no-gemini", "--no-qwen", "--no-openclaude", "--no-factory", "--no-pi")
         Check.equal(code, 3, "exit with every harness off")
         code, doc, _o, err = self.runner.run("gather", "--out", str(self.base / "int-done"), "--project-dir", str(self.runner.home.plain))
         Check.equal(code, 0, "exit (stderr: %s)" % err[-300:])

@@ -5,9 +5,9 @@ goal; they do not replace your output format.
 
 ## The situation
 
-A developer works with several coding agents (Claude Code, Codex, OpenCode, Gemini CLI, Qwen Code),
-often in many sessions at once, across many projects. Flipping between sessions, they close some or
-walk away from them before the work is done, and then forget them. They asked for one thing: a
+A developer works with several coding agents (such as Claude Code, Codex, OpenCode, Gemini CLI,
+and Pi), often in many sessions at once, across many projects. Flipping between sessions, they close
+some or walk away from them before the work is done, and then forget them. They asked for one thing: a
 checklist of everything they still have to finish, so nothing they started stays forgotten.
 
 The attached digest (`digest.md`) was built on their machine from their most recent sessions, up to

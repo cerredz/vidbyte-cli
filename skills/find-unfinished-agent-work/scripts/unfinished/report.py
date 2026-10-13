@@ -17,6 +17,7 @@ from pathlib import Path
 
 from sessionkit.model import Clock, TextTools
 
+from .digest import HARNESS_NAMES
 from .suggest import CHECKLIST_FILE, INDEX_FILE, RESULT_FILE
 
 TAG_GROUP_RE = re.compile(r"\[((?:[SP]\d+)(?:[ ,;]+[SP]\d+)*)\]")
@@ -236,9 +237,9 @@ class ChecklistReporter:
         # "Resume [S4]: `command`" in the chosen shell, plus the note when there is one.
         resume = record.get("resume") or {}
         command = resume.get(self.shell) or resume.get("command")
-        if not command:
-            return []
         label = record.get("tag") or record.get("session_id", "")[:8]
+        if not command:
+            return ["  - Resume [%s]: %s" % (label, resume["note"])] if resume.get("note") else []
         lines = ["  - Resume [%s]: `%s`" % (label, command)]
         if resume.get("note") and not resume.get("cwd"):
             lines.append("  - Note: %s" % resume["note"])
@@ -286,4 +287,4 @@ class ChecklistReporter:
     @staticmethod
     def _harness(name: object) -> str:
         # The display name of a harness id.
-        return {"claude-code": "Claude Code", "codex": "Codex", "opencode": "OpenCode", "gemini-cli": "Gemini CLI", "qwen-code": "Qwen Code"}.get(str(name), str(name))
+        return HARNESS_NAMES.get(str(name), str(name))

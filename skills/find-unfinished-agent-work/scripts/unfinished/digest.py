@@ -35,7 +35,8 @@ REPLY_CHARS = 200
 FINAL_CHARS = 500
 INDEX_PROMPT_CHARS = 2000
 TABLE_ROWS = 40
-HARNESS_NAMES = {"claude-code": "Claude Code", "codex": "Codex", "opencode": "OpenCode", "gemini-cli": "Gemini CLI", "qwen-code": "Qwen Code"}
+HARNESS_NAMES = {"claude-code": "Claude Code", "codex": "Codex", "opencode": "OpenCode", "gemini-cli": "Gemini CLI", "qwen-code": "Qwen Code",
+                 "openclaude": "OpenClaude", "factory-droid": "Factory Droid", "pi": "Pi"}
 
 
 class TagBook:

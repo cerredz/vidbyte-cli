@@ -1,6 +1,6 @@
 ---
 name: find-unfinished-agent-work
-description: Use when the user wants to find the coding-agent work they started and never finished - "which of my sessions did I never finish?", "what did I leave half done across my agents?", "give me a checklist of everything I still have to finish". Reads up to 500 recent Claude Code, Codex, OpenCode, Gemini CLI, and Qwen Code sessions with a bundled script, flags the ones that stopped before the work was done, drops work a later session or a merged pull request finished, checks the rest against each repository as it is now, and returns one checklist grouped by project, each item tied to its sessions with the command to resume them. Drives the Vidbyte Suggestion Agent through vidbyte-cli.
+description: Use when the user wants to find the coding-agent work they started and never finished - "which of my sessions did I never finish?", "what did I leave half done across my agents?", "give me a checklist of everything I still have to finish". Reads up to 500 recent sessions of eight coding harnesses (Claude Code, Codex, OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory Droid, and Pi) with a bundled script, flags the ones that stopped before the work was done, drops work a later session or a merged pull request finished, checks the rest against each repository as it is now, and returns one checklist grouped by project, each item tied to its sessions with the command to resume them. Drives the Vidbyte Suggestion Agent through vidbyte-cli.
 metadata:
   agent: "suggestion-agent"
   commands: "agents suggest project list, agents suggest run, agents suggest handoff, agents suggest project create, agents suggest feedback accept, agents suggest feedback reject"
@@ -32,8 +32,8 @@ A session can look finished and still not be:
 - The work is still sitting in the repository: uncommitted changes, commits on no remote, a branch
   the session created and never pushed, or a pull request that is still open.
 
-The evidence is on disk. Every tool saves its sessions locally, but in five different formats in
-five different places, and a developer can have hundreds of sessions. Session pickers show titles,
+The evidence is on disk. Every tool saves its sessions locally, but each in its own format and
+its own folder, and a developer can have hundreds of sessions. Session pickers show titles,
 not whether the work got done. A naive list of every session that ended badly is also wrong: many
 of those tasks were finished later, in another session or by a merged pull request, and a list full
 of false alarms gets ignored. Asking a new agent to "look through my old sessions" fails too: the
@@ -45,8 +45,8 @@ This skill sweeps the long tail: the 500 most recent sessions, with no time limi
 that was left unfinished, checked against later sessions and the repository as it is now. That is
 different from the `pick-up-where-my-sessions-left-off` skill, which reads one recent window (the
 last 24 hours by default) and ranks what to do next. This skill reads only sessions saved on this
-machine by Claude Code, Codex, OpenCode, Gemini CLI, and Qwen Code; it does not read Cursor or other
-tools. Its statuses are heuristics from local evidence, not certainty. It never resumes, finishes,
+machine by eight harnesses: Claude Code, Codex, OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory
+Droid, and Pi. It does not read Cursor, Grok CLI, Amp, Windsurf, or other tools. Its statuses are heuristics from local evidence, not certainty. It never resumes, finishes,
 or changes anything by itself; every git command it runs is read-only. Its redaction is
 pattern-based: it removes the common secret formats, not every possible secret.
 
@@ -54,7 +54,7 @@ pattern-based: it removes the common secret formats, not every possible secret.
 
 This skill drives `vidbyte-cli`, the Vidbyte command-line tool, and its Suggestion Agent. First, a
 free script that ships with this skill, `scripts/unfinished_work.py`, reads the most recent sessions
-of the five tools and checks each one, locally, for the signs above. For every session that looks
+of the eight harnesses and checks each one, locally, for the signs above. For every session that looks
 unfinished it then looks for proof that the work was done anyway: a later session in the same
 project that covers the same task, a pull request the session opened that is now merged (through
 the GitHub CLI, `gh`, when it is installed and logged in), and the repository's state now
@@ -93,7 +93,7 @@ first.
 Run these in order. If a `vidbyte-cli` check fails, read `references/setup.md`, fix only what
 failed, and run the preflight again. Step 3 of that file lists what the Suggestion Agent needs: no
 Codex and no OpenAI key, only a Vidbyte key with the `models:invoke` permission. The skill reads
-every tool's sessions from disk, so it needs none of those tools installed or logged in.
+every harness's sessions from disk, so it needs none of those tools installed or logged in.
 
 ```bash
 vidbyte-cli --version                  # must be 0.3.0 or newer
@@ -128,7 +128,8 @@ Everything in this section is free and stays on this machine.
    | "this month", "the last 30 days" | `--days 30` |
    | "since October 1" | `--since 2026-10-01` (local time, the real date) |
    | "in this repo", "for this project" | `--project-dir .` (keeps sessions that ran in this folder or below it, so worktrees inside it count) |
-   | "only Codex", "not OpenCode" | `--no-claude`, `--no-codex`, `--no-opencode`, `--no-gemini`, `--no-qwen` for each tool to leave out |
+   | "only Claude Code", "only Codex and Pi" | `--only claude`, or `--only codex --only pi` (repeat `--only` once per harness: `claude`, `codex`, `opencode`, `gemini`, `qwen`, `openclaude`, `factory`, `pi`; it overrides every `--no-*` flag) |
+   | "not OpenCode" | `--no-opencode` (one `--no-<harness>` per harness to leave out, with the same names) |
    | a second Claude Code config folder, such as `~/.claude-work` | `--claude-dir ~/.claude-work` (the script expands `~` itself, so this works in PowerShell and cmd too) |
    | "don't run anything in my repos", "don't call GitHub" | `--no-git`, `--no-gh` (statuses then rest on later sessions only) |
 
@@ -139,15 +140,26 @@ Everything in this section is free and stays on this machine.
    python3 "<skill>/scripts/unfinished_work.py" gather --days 30 --project-dir .
    ```
 
-   It reads Claude Code from `$CLAUDE_CONFIG_DIR` (else `~/.claude`) plus every `--claude-dir`,
-   Codex from `$CODEX_HOME` (else `~/.codex`), OpenCode from `$XDG_DATA_HOME/opencode` (else
-   `~/.local/share/opencode`), Gemini CLI from `~/.gemini`, and Qwen Code from `~/.qwen`. It keeps
-   only sessions a person typed into, leaves out subagents, scripts, and scheduled jobs, and leaves
-   out the session it runs in when the host exposes that session's id (`--include-current` keeps
-   it). For git and `gh` it runs only read-only commands (`git rev-parse`, `git symbolic-ref`,
-   `git status --porcelain`, `git remote`, `git rev-list`, `gh auth status`, and `gh pr view`), in
-   at most 80 folders (`--max-repo-checks`), with no network fetch. It writes four files into a new folder under the system temp folder and
-   prints a JSON summary. Keep its `out_dir`:
+   It reads each harness from its own folder:
+
+   | Harness | Folder | Change it with |
+   |---|---|---|
+   | Claude Code | `$CLAUDE_CONFIG_DIR`, else `~/.claude` | `--claude-dir` (adds a folder; repeatable) |
+   | Codex | `$CODEX_HOME`, else `~/.codex` | `--codex-home` |
+   | OpenCode | `$XDG_DATA_HOME/opencode`, else `~/.local/share/opencode` | `--opencode-dir` |
+   | Gemini CLI | `~/.gemini` | `--gemini-dir` |
+   | Qwen Code | `~/.qwen` | `--qwen-dir` |
+   | OpenClaude | `~/.openclaude` | `--openclaude-dir` |
+   | Factory Droid | `~/.factory/sessions` | `--factory-dir` (the folder that holds `sessions/`) |
+   | Pi | `~/.pi/agent/sessions` | `--pi-dir` (the folder that holds `sessions/`) |
+
+   It keeps only sessions a person typed into, leaves out subagents, scripts, and scheduled jobs,
+   and leaves out the session it runs in when the host exposes that session's id
+   (`--include-current` keeps it). For git and `gh` it runs only read-only commands (`git
+   rev-parse`, `git symbolic-ref`, `git status --porcelain`, `git remote`, `git rev-list`, `gh auth
+   status`, and `gh pr view`), in at most 80 folders (`--max-repo-checks`), with no network fetch.
+   It writes four files into a new folder under the system temp folder and prints a JSON summary.
+   Keep its `out_dir`:
 
    | File | What it is | Sent to the model? |
    |---|---|---|
@@ -179,6 +191,8 @@ Everything in this section is free and stays on this machine.
      be opened, such as a locked OpenCode database: say which tool was not read and show its
      `error`, and offer to run `gather` again into a new folder once that tool is closed.
    - If `unreadable` is not empty, say that some session files could not be read.
+   - If `not_read` names tools, such as Cursor or Windsurf, say that their sessions exist on this
+     machine but this skill cannot read them.
 
 4. **Read `digest.md` from start to end.** It is at most 70,000 characters. Full blocks come first
    for the sessions where work can be lost (uncommitted changes, unpushed commits, an open pull
@@ -466,7 +480,8 @@ The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exi
    project, projects and items newest first, each with its sessions and tools, when it was last
    touched, the local status and its reason, why it is unfinished, the first step, the done check,
    and one resume command per session. Resume commands are spelled for PowerShell on Windows and
-   bash elsewhere; pass `--shell bash` or `--shell powershell` to choose. It then adds every
+   bash elsewhere; pass `--shell bash` or `--shell powershell` to choose. OpenClaude documents no
+   resume flag, so its sessions get a note to open them from its own session list instead. It then adds every
    `still open` and `unknown` session that no item cites, marked "found by the local check", with
    what the session itself says is left (its open todos, the agent's remaining-work lines, and any
    unanswered question), and puts items that cite no session in a last group, "Not traced to a

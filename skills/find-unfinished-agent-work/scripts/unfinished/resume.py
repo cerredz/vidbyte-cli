@@ -1,8 +1,10 @@
 """The command that resumes one session in its own harness, run from the session's folder.
 
 Commands, from each tool's documentation: `claude --resume <id>`, `codex resume <id>`,
-`opencode --session <id>`, `gemini --resume <id>`, and `qwen --resume <id>`. These live only in the
-local index (sessions.json) and the local checklist; they are never sent to the model.
+`opencode --session <id>`, `gemini --resume <id>`, `qwen --resume <id>`, `droid --resume <id>`
+(Factory Droid), and `pi --session <id>`. OpenClaude has no documented resume flag, so its sessions
+get a note instead of a command. These live only in the local index (sessions.json) and the local
+checklist; they are never sent to the model.
 """
 
 from __future__ import annotations
@@ -17,7 +19,10 @@ COMMANDS = {
     "opencode": "opencode --session %s",
     "gemini-cli": "gemini --resume %s",
     "qwen-code": "qwen --resume %s",
+    "factory-droid": "droid --resume %s",
+    "pi": "pi --session %s",
 }
+NO_COMMAND_NOTE = "No resume command is documented for this tool; open the session from the tool's own session list, in the session's folder."
 PER_PROJECT_NOTE = "This tool lists sessions per project folder, so run the command from the session's folder."
 
 
@@ -35,16 +40,18 @@ class ResumeCommandBuilder:
         env = self._env(session)
         cwd = session.cwd if FolderNames.is_real(session.cwd) else ""
         note = ""
-        if not cwd:
+        if not command:
+            note = NO_COMMAND_NOTE
+        elif not cwd:
             note = "The session's folder is not known; run the command from the project folder."
-        elif session.harness in ("gemini-cli", "qwen-code", "claude-code"):
+        elif session.harness in ("gemini-cli", "qwen-code", "claude-code", "pi"):
             note = PER_PROJECT_NOTE
         return {
             "cwd": cwd,
             "command": command,
             "env": env,
-            "bash": self._bash(cwd, env, command),
-            "powershell": self._powershell(cwd, env, command),
+            "bash": self._bash(cwd, env, command) if command else "",
+            "powershell": self._powershell(cwd, env, command) if command else "",
             "note": note,
         }
 
