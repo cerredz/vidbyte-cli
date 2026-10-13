@@ -465,13 +465,16 @@ charge is on <https://vidbyte.pro/usage>.
 | 1 | Follow "Exit 1 on a job" below. Any other message: read `references/troubleshooting.md`; a re-run of the job is a new charge. |
 | Other | Read `references/troubleshooting.md`. |
 
-On a failed job, open the log of the "Post product ideas to Slack" step. Under `--json`, every
-refusal is one error document on stderr; read its `message` and `hint`.
+On a failed job, read the log of the "Post product ideas to Slack" step in the Actions tab, or with
+`gh run view <run-id> --log-failed` (`gh run list --workflow product-ideas.yml` lists the runs with
+their IDs). Under `--json`, every refusal is one error document on stderr; read its `message` and
+`hint`.
 
 **Exit 4 on a job.** Nothing was billed.
 
 1. First check where the pull request came from, at no charge:
-   `gh pr view <N> --json isCrossRepository,mergedBy`. If `isCrossRepository` is `true`, or
+   `gh pr view <number> --json isCrossRepository,mergedBy`, where `<number>` is the number of the
+   merged pull request whose job failed. If `isCrossRepository` is `true`, or
    `mergedBy.login` contains `dependabot`, the run got no secrets by design. There is nothing to
    fix; do not change the secrets or re-run, because a re-run fails the same way.
 2. Otherwise a secret is missing or wrong, and the `message` says which:
