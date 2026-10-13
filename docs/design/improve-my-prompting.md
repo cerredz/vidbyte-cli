@@ -12,7 +12,7 @@
 `improve-my-prompting` is a public agent skill that gives a developer detailed, evidence-backed
 critique of how they prompt their coding agents. A bundled, standard-library Python script reads
 the developer's most recent sessions (at most 500) from the local session stores of Claude Code,
-Codex, OpenCode, Gemini CLI, and Qwen Code. It measures prompting habits that have a visible cost in
+Codex, OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory Droid, and Pi. It measures prompting habits that have a visible cost in
 those sessions, such as corrections, interrupted turns, go-ahead round trips, openers with no
 context, requirements drip-fed over many turns, oversized pastes, and tricks that research has
 debunked. It redacts secrets, emails, and home paths, and writes a digest of the developer's own
@@ -32,14 +32,15 @@ vidbyte-cli 0.3.x.
 ### Goals
 - Add `skills/improve-my-prompting/` to cerredz/vidbyte-cli, meeting the `write-agent-skill`
   contract (frontmatter, fixed section order, consent, exact commands, shared references).
-- Read local session data from five harnesses: Claude Code (every config folder the user names),
-  Codex, OpenCode (its SQLite database and its older JSON store), Gemini CLI, and Qwen Code. By
+- Read local session data from eight harnesses: Claude Code (every config folder the user names),
+  Codex, OpenCode (its SQLite database and its older JSON store), Gemini CLI, Qwen Code,
+  OpenClaude, Factory Droid, and Pi. By
   default, read the 500 most recent interactive sessions across all of them.
 - Measure prompting signals locally and for free. Map each signal to rubric items, and put
   counts, rates, and tagged examples in a redacted digest of at most 100,000 characters (70,000 by
   default).
 - Ship `references/prompting-rubric.md`, a condensed and evidence-tagged version of the prompting
-  checklist researched in this session (vendor guides from Anthropic, OpenAI, and Google; the
+  checklist researched for it (vendor guides from Anthropic, OpenAI, and Google; the
   Wharton Prompting Science Reports; Laban et al.; IFScale; Chroma's context-rot study; Leviathan
   et al.; FormatSpread). Send it to the Suggestion Agent with `--instructions`, so the generator
   and every critic judge against it.
@@ -50,8 +51,8 @@ vidbyte-cli 0.3.x.
 - List the skill on `/agents/skills` with a validated `defineAgentSkill` entry in the Vidbyte repo.
 
 ### Non-Goals
-- Reading Cursor, GitHub Copilot CLI, Aider, Cline, Roo Code, Kilo Code, Windsurf, Amp, or
-  Antigravity sessions. Their local formats are undocumented, binary, cloud-only, or not on this
+- Reading Cursor, GitHub Copilot CLI, Aider, Cline, Roo Code, Kilo Code, Grok CLI, Windsurf, Amp,
+  or Antigravity sessions. Their local formats are undocumented, binary, cloud-only, or not on this
   machine to verify against. The script reports the folders it found and did not read.
 - Critiquing the agents' work, code quality, or token usage. `cut-my-agent-token-usage` covers token
   usage, and `stop-repeating-yourself` covers turning repeated instructions into durable rules.
@@ -66,8 +67,8 @@ vidbyte-cli 0.3.x.
 ## 3. Background & Context
 
 - **Why now.** The user asked for a skill that routes their coding-agent conversations to the
-  Suggestion Agent and returns critique of their prompting, built on the research checklist
-  compiled earlier in this session. Prompting quality is a problem every coding-agent user has, and
+  Suggestion Agent and returns critique of their prompting, built on a research checklist.
+  Prompting quality is a problem every coding-agent user has, and
   one they can measure from their own transcripts. Outside evidence shows the pain is broad and has
   a real cost: drip-feeding requirements over several turns cost a 39% average drop across 200,000
   simulated conversations (Laban et al., ICLR 2026). Instruction compliance falls as rules pile up
@@ -75,14 +76,13 @@ vidbyte-cli 0.3.x.
   reliable gain (Wharton Prompting Science Reports 3 and 4, 2025).
 - **What it solves.** Developers do not see their own prompting patterns. The evidence, such as a
   "no, I meant…" correction, an interrupted run, or a "yes, go ahead" round trip, is spread across
-  hundreds of transcripts in four incompatible formats. These are too large for a new agent session
+  hundreds of transcripts in incompatible formats. These are too large for a new agent session
   to read, and pasting them would leak secrets.
 - **Current state.** Three merged skills already read local transcripts and drive
   `agents suggest run` with a redacted digest: `pick-up-where-my-sessions-left-off`
   (`sessions.py`), `cut-my-agent-token-usage` (`token_usage.py`), and `stop-repeating-yourself`
   (`repeats.py`). They read Claude Code and Codex only. This skill reuses their redaction rules,
-  their Claude/Codex parsing logic, and their paid-run flow, and adds OpenCode, Gemini CLI, and Qwen
-  Code.
+  their Claude/Codex parsing logic, and their paid-run flow, and adds six more harnesses.
 - **Constraints and dependencies.**
   - The CLI surface comes from `contracts/cli-commands.json` on cerredz/vidbyte-cli-internal
     `main` (generated at `f1321179`). `agents suggest run` has `--instructions`, `--files`,
@@ -92,13 +92,13 @@ vidbyte-cli 0.3.x.
   - `--instructions`: at most 8 files and 20,000 bytes in total. The text is appended after the
     fixed system prompt of the generator, every critic, and every extra-compute generator. Paths and
     contents are never echoed.
-  - Known traps (memory `vidbyte-skill-cli-constraints`):
+  - Known traps:
     - `--horizon` other than `any` filters silently after the run is billed.
     - `--mistakes`/`--avoid` values that an idea repeats word for word drop that idea, so values
       start with tags.
     - Helper scripts must run on Python 3.8, so never use `Path.write_text(newline=)`.
-  - Tests must never reach the real `vidbyte-cli`: the OS keyring holds a live key (memory
-    `vidbyte-cli-tests-can-charge`). Every paid-path test passes a recording fake with `--cli`.
+  - Tests must never reach the real `vidbyte-cli`, since the OS keyring may hold a live key. Every
+    paid-path test passes a recording fake with `--cli`.
   - Shared references must be byte-identical to the canonical copies: `setup.md` blob `8fb4e3cf`,
     `troubleshooting.md` blob `cb9656bc`.
 
@@ -107,7 +107,7 @@ vidbyte-cli 0.3.x.
 ## 4. Requirements
 
 ### Functional Requirements
-1. `prompt_review.py gather` reads sessions from the five harnesses. By default it keeps the 500
+1. `prompt_review.py gather` reads sessions from the eight harnesses (`--only <name>` picks some). By default it keeps the 500
    most recent interactive sessions by last activity, across harnesses. `--max-sessions` (1-500)
    lowers the cap, and `--days`/`--since` narrow the window.
 2. Claude Code is read from `$CLAUDE_CONFIG_DIR` (else `~/.claude`) plus every `--claude-dir`.
@@ -121,9 +121,12 @@ vidbyte-cli 0.3.x.
    - the legacy `storage/` JSON tree.
 
    The database is opened read-only. If that fails, the script copies the database and its WAL
-   files into the output folder, reads the copy, and deletes it.
+   files into a private temporary folder, reads the copy, and deletes it. If the copy fails too,
+   that root's `read[]` entry gets `"status": "error"` and a redacted `error`.
 5. Gemini CLI is read from `--gemini-dir`, else `~/.gemini`, and Qwen Code from `--qwen-dir`, else
-   `~/.qwen`. Both use `tmp/*/chats/session-*.json`.
+   `~/.qwen`. Both use `tmp/*/chats/session-*.json`. OpenClaude (`--openclaude-dir`, else
+   `~/.openclaude`) uses Claude Code's format. Factory Droid (`--factory-dir`, else `~/.factory`)
+   and Pi (`--pi-dir`, else `~/.pi/agent`) write `sessions/*/*.jsonl` message logs.
 6. Only sessions a person typed into are kept. The script skips SDK sessions, Claude sidechains,
    Codex `exec`/automation/subagent threads, OpenCode child sessions (`parent_id` set), and the
    session it runs in. The current session is detected through `CLAUDE_CODE_SESSION_ID`,
@@ -137,13 +140,18 @@ vidbyte-cli 0.3.x.
      interrupted that response.
 8. Injected text is never treated as a human prompt. This covers system reminders, command
    caveats, skill bodies, tool results, Codex environment and AGENTS.md blocks, OpenCode synthetic
-   parts, and built-in slash commands without arguments.
+   parts, and built-in slash commands without arguments. Prompts a harness writes on the user's
+   behalf are dropped and counted (`injected_prompts_dropped`), such as OpenChamber's
+   goal-continuation prompt. A session that opens with a scheduled-task prompt (`At the scheduled
+   time, carry out`) is skipped as `automation`.
 9. The signal detector computes the signals in section 6.6 over every kept prompt. Each signal
    carries its rubric item IDs, its count of prompts and sessions, and ranked examples.
-10. `digest.md` holds four parts:
+10. `digest.md` holds six parts:
     - a header with the window, harnesses, models, and how to read the tags;
     - the overall numbers;
     - one section per signal with tagged examples;
+    - saved prompt templates: long prompts reused verbatim, each shown once with its use count;
+    - recent openers: the first prompts of recent sessions, with what followed;
     - session samples that show whole prompt sequences.
 
     It is redacted and at most `--max-chars` (default 70,000, at most 100,000).
@@ -175,10 +183,9 @@ vidbyte-cli 0.3.x.
     rule N050, imported in `catalog.js` `ENTRIES` after `CUT_MY_AGENT_TOKEN_USAGE`.
 
 ### Non-Functional Requirements
-- **Performance:** `gather` over 500 sessions on this machine (about 1.3k OpenCode sessions and
-  several thousand Claude/Codex files present) finishes in under 3 minutes. Files are opened only
-  for the 500 selected sessions plus skipped candidates, with at most 3 × `--max-sessions`
-  candidates opened. A cheap substring filter skips most lines of each JSONL before JSON parsing.
+- **Performance:** `gather` over 500 sessions takes about 6 seconds on a machine with 3,000+
+  candidates. At most 3 × `--max-sessions` candidates are opened, and a substring filter skips
+  most JSONL lines before parsing.
 - **Cost:** one paid run, gpt-6-sol at high reasoning effort, capped at 400,000 tokens (under about
   $4). The rubric is about 13 KB, sent with every model call; the digest is 70,000 characters by
   default.
@@ -246,7 +253,7 @@ Key decisions:
   agentic runs (autonomy and stop rules).
 - **Two packages, one of them shared.** One script would pass 2,000 lines, so the helper is split.
   `scripts/sessionkit/` holds everything that is not about prompting: the session model,
-  redaction, the five harness readers, the collector, and the generic suggest-run plumbing (CLI
+  redaction, the harness readers, the collector, and the generic suggest-run plumbing (CLI
   invocation, input validation, the paid-run guard, cost estimate). Three sibling skills are being
   built in parallel from the same session data: `turn-corrections-into-skills`,
   `find-unfinished-agent-work`, and `automate-recurring-chores`. Each of them copies `sessionkit/`
@@ -358,7 +365,7 @@ class Redactor:
 
 ### 6.4 Harness readers
 
-**File(s):** `scripts/sessionkit/claude_code.py`, `codex.py`, `opencode.py`, `gemini.py`
+**File(s):** `scripts/sessionkit/claude_code.py`, `codex.py`, `opencode.py`, `gemini.py`, `message_logs.py`
 **Type:** New files
 
 #### What it does
@@ -426,12 +433,19 @@ class GeminiReader:         # <root>/tmp/*/chats/session-*.json; harness "gemini
   4. An `info` message reading `Request cancelled.` marks an interrupt.
   5. The project folder is resolved from `<root>/projects.json` when it maps a folder to this
      `projectHash` (sha256 of the folder path); otherwise it is shown as `gemini project <hash8>`.
+- **OpenClaude:** the Claude Code reader over `~/.openclaude`, labeled `openclaude`.
+- **Factory Droid / Pi** (`MessageLogReader`): a header record (`session_start` / `session`) gives
+  the id and folder; `message` records route by role. Factory messages marked `llm_only` or
+  `user_only` and `<system-reminder>` parts are not prompts. Pi's inlined
+  `<skill name=...>body</skill>` becomes `/name typed text`. `toolCall`/`tool_use` parts count,
+  `isError` results are failures, and `stopReason` `aborted` is an interrupt.
 
 #### Edge Cases & Error Handling
 - An unreadable line, file, or row increments `stats["unreadable_lines"]` or
   `stats["unreadable_files"]` and is skipped.
 - A database that is locked or opens with an error: retry on a copy (FR 4). If that fails too, the
-  error is recorded in `read[]` and the other harnesses continue.
+  root's `read[]` entry gets `"status": "error"` and a redacted `error` (sessionkit v3), and the
+  other harnesses continue. A reader whose `candidates()` raises is reported the same way.
 - `sqlite3` not importable: OpenCode's database is reported as `skipped: sqlite3 unavailable`. The
   legacy JSON store is still read.
 - Schema drift, such as a missing table or column: that backend is skipped and its absence noted.
@@ -454,6 +468,8 @@ class SessionCollector:
     def __init__(self, options: CollectOptions, home: Path) -> None: ...
     def collect(self) -> CollectResult: ...    # sessions newest-first + read summary
 class CollectOptions:  # max_sessions, since, project_dirs, claude_dirs, codex_home, opencode_dir, gemini_dir, qwen_dir, disabled harnesses, exclude ids
+    @staticmethod
+    def add_arguments(parser, default_max_sessions: int = 500, default_days: int = None) -> None: ...  # sibling skills pick their own defaults
 class CollectResult:   # sessions, read (per source), skipped (Counter by reason), unreadable, other_claude_dirs_not_read, not_read
 ```
 
@@ -461,8 +477,12 @@ class CollectResult:   # sessions, read (per source), skipped (Counter by reason
 1. Build the enabled readers and their roots: flags first, then environment, then defaults.
 2. Gather all candidates and sort them by `last_activity` descending.
 3. Open candidates in order. Count a skip reason for each rejected session (`sdk`, `subagent`,
-   `non_interactive`, `excluded`, `outside_project`, `no_prompts`, `outside_window`). Stop when
-   `max_sessions` are kept, or after opening `3 × max_sessions` candidates.
+   `automation`, `non_interactive`, `current_session`, `excluded`, `outside_project`,
+   `no_prompts`, `outside_window`, `unreadable`). Stop when `max_sessions` are kept, or after
+   opening `3 × max_sessions` candidates; the rest are counted as `not_opened_cap`.
+   - Window rule: a session is kept when any prompt is at or after `since`, and all its turns are
+     kept, so a long session that started before the window is not cut in half.
+   - Reader notes (such as an unreadable database) are collected into `read.notes`.
 4. Detect `other_claude_dirs_not_read`: `~/.claude*` folders with `projects/` that are not read.
    Detect `not_read`: `~/.cursor/chats`, `~/.copilot/session-state`, and the VS Code globalStorage
    folders of Cline, Roo Code, and Kilo Code.
@@ -528,6 +548,11 @@ class SignalDetector:
    - prefer one example per session, the most recent first;
    - for `correction` and `restated`, prefer hits whose previous prompt is under 25 words, because
      those are the clearest cases of an underspecified ask.
+4. **Saved templates.** `TemplateIndex` fingerprints every prompt of 1,000 characters or more by
+   its lower-cased, whitespace-collapsed first 300 characters. A fingerprint used 3 or more times
+   is a saved template (a slash command, a pasted template, or a scheduled job). A template's hits
+   collapse into one hit that carries its use and session counts, so one template used 19 times is
+   one habit with 19 uses, not 19 separate examples.
 
 #### Edge Cases & Error Handling
 - Matchers lower-case the text and look only at the leading 100 or 400 characters, where it
@@ -535,7 +560,11 @@ class SignalDetector:
 - Code fences and quoted text are stripped before the emphasis and negative checks, so an error
   message in capitals does not count as shouting.
 - Acronyms (`API`, `JSON`, `HTTP`, `TODO`, `README`, `CLI`, `PR`, `URL`, `SQL`, `CSS`, `HTML`,
-  `AWS`, `GPU`, …) and tokens with digits or underscores are not shouting.
+  `AWS`, `GPU`, …) and tokens with digits or underscores are not shouting. Placeholders such as
+  `<INSERT PR NUMBER HERE>` or `{repo}` are stripped first.
+- `stop` is a correction only when it is followed by punctuation or by `doing`, `it`, or `that`,
+  so `stop the runner and merge` is an instruction. `negative_only` ignores prompts over 300 words,
+  which are specs and templates, not quick asks.
 
 ### 6.7 Digest writer
 
@@ -550,12 +579,13 @@ class SignalDetector:
 ```python
 class DigestWriter:
     def __init__(self, out_dir: Path, redactor: Redactor, max_chars: int, rubric_path: Path) -> None: ...
-    def write(self, sessions: list, signals: list, overall: dict, window: dict, read_summary: dict) -> dict: ...  # summary for stdout
+    def write(self, sessions: list, signals: list, overall: dict, window: dict, read_summary: dict, templates: TemplateIndex = None) -> dict: ...  # summary for stdout
 ```
 
 #### Logic / Algorithm
-1. **Budget.** The header and overall numbers take about 4,000 characters. Signal sections get
-   60% of the rest and session samples 40%. Every example is redacted before it is measured.
+1. **Budget.** The header and overall numbers take about 4,000 characters. Signal sections and
+   saved templates share up to 45% of the rest, recent openers get up to 20%, and session samples
+   get whatever is left, so unused space flows on. Every example is redacted before it is measured.
 2. **Signal sections, in rank order.** Each section has a heading
    `### [sig-<id>] <title> - <n> prompts in <m> sessions (rubric <ids>)`, one line on how it was
    measured, and up to 4 examples. An example has:
@@ -563,24 +593,30 @@ class DigestWriter:
    - `Asked:` the earlier prompt, where relevant, up to 400 characters;
    - `Agent:` the agent's last text before the prompt, up to 220 characters;
    - `Prompt:` the prompt itself, up to 500 characters (a huge paste shows its length and its
-     first 200 characters).
+     first 200 characters);
+   - `Next:` the prompt that followed an interrupted turn, up to 300 characters;
+   - for a template hit, `Saved template "<title>": used <n> times in <m> sessions`.
 
    When the budget runs short, examples are dropped from the lowest-ranked signal first, and every
    signal keeps at least 1 example.
-3. **Session samples.** Up to 10 sessions: the 6 with the most signal hits per prompt, plus up to 4
-   typical sessions (median prompt count, most recent) for balance. Each sample shows a header line
-   (tag, harness, project, date, prompt count, model, and its signal counts), then up to 12 prompts
-   of up to 350 characters, each with markers (`[corrected next]`, `[interrupted]`,
-   `[go-ahead]`), and the agent's final reply excerpt.
-4. **Tags.** `[S#]` is assigned in order of first appearance, and `[P#]` the same way. Only tagged
+3. **Saved templates and recent openers.** Up to 5 templates, each one line with its title, use
+   count, and an example tag. Up to 30 recent openers (300 characters each), taken round-robin
+   across harnesses so one harness cannot crowd out the rest, with templates left out.
+4. **Session samples.** Up to 16 sessions with 2 or more prompts: the 8 with the most signal hits
+   per prompt, then typical sessions nearest the median prompt count, most recent first. Each
+   sample shows a header line (tag, harness, project, date, prompt count, how it ended, and its
+   signal counts), then up to 12 prompts (shrinking to 3 to fit) of up to 350 characters, each with
+   markers (`[correction]`, `[corrected next]`, `[interrupted]`, `[go-ahead]`), and the agent's
+   final reply excerpt.
+5. **Tags.** `[S#]` is assigned in order of first appearance, and `[P#]` the same way. Only tagged
    items appear in `sessions.json`.
-5. **`sessions.json`**, local only:
+6. **`sessions.json`**, local only:
    - window, read summary, and overall numbers;
    - `sessions[]` entries: `tag`, `harness`, `session_id`, `source`, `cwd`, `project`, `title`,
-     `first`, `last`, `prompts`, `models`;
+     `first`, `last`, `prompts`, `models`, `end_state`;
    - `prompts[]` entries: `tag`, `session`, `index`, `ts`, `text` (redacted, up to 4,000
      characters), `signals`.
-6. **`inputs.json`:**
+7. **`inputs.json`:**
    - `goal`: a template of at most 700 characters, naming the session count and harnesses.
    - `outcomes`: up to 5 `[all]` values with the overall rates.
    - `mistakes`: one value per top signal, at most 8, each starting with up to 3 example `[P#]`
@@ -589,7 +625,7 @@ class DigestWriter:
    - `capability`: what the user can change: their prompts, reusable prompt templates and slash
      commands, `CLAUDE.md`/`AGENTS.md`, session hygiene, and model/effort settings.
    - `success`, `constraint`, and `avoid` start empty, and `project` is `null`.
-7. **Rubric copy.** Copy the rubric byte for byte, and refuse (exit 2) if it is over 20,000 bytes.
+8. **Rubric copy.** Copy the rubric byte for byte, and refuse (exit 2) if it is over 20,000 bytes.
 
 #### Edge Cases & Error Handling
 - Sessions with zero signals still appear as typical samples, so a user with clean habits gets a
@@ -785,10 +821,10 @@ not edit the same lines.
 ```json
 {
   "schema": 1,
-  "window": {"since": "ISO|null", "until": "ISO", "max_sessions": 500},
-  "read": [{"harness": "opencode", "root": "~/.local/share/opencode", "backend": "sqlite-v2", "candidates": 0, "sessions": 0, "error": null}],
+  "window": {"since": "ISO|null", "until": "ISO", "max_sessions": 500, "first_day": "YYYY-MM-DD", "last_day": "YYYY-MM-DD"},
+  "read": [{"harness": "opencode", "root": "~/.local/share/opencode", "status": "read|missing|error", "candidates": 0, "kept": 0, "error": "only when status is error"}],
   "overall": {"sessions": 0, "prompts": 0, "by_harness": {}, "models": {}, "rates": {}},
-  "sessions": [{"tag": "S1", "harness": "claude-code", "session_id": "...", "source": "path or db#id", "cwd": "...", "project": "...", "title": "...", "first": "ISO", "last": "ISO", "prompts": 12, "models": ["..."]}],
+  "sessions": [{"tag": "S1", "harness": "claude-code", "session_id": "...", "source": "path or db#id", "cwd": "...", "project": "...", "title": "...", "first": "ISO", "last": "ISO", "prompts": 12, "models": ["..."], "end_state": "..."}],
   "prompts": [{"tag": "P1", "session": "S1", "index": 0, "ts": "ISO", "text": "redacted", "signals": ["vague_opener"]}]
 }
 ```
@@ -831,6 +867,7 @@ exist in `contracts/cli-commands.json`. The script's own command-line interface 
 | CREATE | `skills/improve-my-prompting/scripts/sessionkit/codex.py` | Codex reader |
 | CREATE | `skills/improve-my-prompting/scripts/sessionkit/opencode.py` | OpenCode reader (SQLite v2/v1 + JSON) |
 | CREATE | `skills/improve-my-prompting/scripts/sessionkit/gemini.py` | Gemini CLI / Qwen Code reader |
+| CREATE | `skills/improve-my-prompting/scripts/sessionkit/message_logs.py` | Factory Droid / Pi reader |
 | CREATE | `skills/improve-my-prompting/scripts/sessionkit/collector.py` | Merge, cap, filter, report sources; shared argparse flags |
 | CREATE | `skills/improve-my-prompting/scripts/sessionkit/runner.py` | Generic inputs validation, CLI invocation, paid-run guard, cost |
 | CREATE | `skills/improve-my-prompting/scripts/prompting/__init__.py` | Package marker |
@@ -875,6 +912,10 @@ the local Python 3.8.20.
 - `OpenCodeReader` → a non-SQLite file named `opencode.db` is reported in `read[].error` and other harnesses still run — [Hidden Failure]
 - `GeminiReader` → a list-of-parts user content is flattened; `Request cancelled.` marks an interrupt; `/help` is not a prompt; a Qwen root yields harness `qwen-code` — [Edge Case]
 - `GeminiReader` → a truncated JSON file is counted as unreadable and skipped — [Hidden Failure]
+- `ClaudeCodeReader("openclaude")` → `~/.openclaude` is read by default, labeled `openclaude` — [Silent Failure]
+- `FactoryReader` → `llm_only`/`user_only` messages and reminder parts are not prompts; "New Session" is not a title — [Silent Failure]
+- `PiReader` → a failed `toolResult` counts, `aborted` interrupts, thinking stays out of replies, `<skill>` becomes `/name text` — [Silent Failure]
+- `CollectOptions` → `--only codex --only pi` wins over `--no-pi`; `--only cursor` exits 2 — [Edge Case]
 - `SessionCollector` → with 7 sessions and `max_sessions=5`, keeps the 5 newest across harnesses, in newest-first order — [Silent Failure]
 - `SessionCollector` → skipped sessions do not count toward the cap — [Silent Failure]
 - `SessionCollector` → `max_sessions=0` or `501` is a usage error — [Edge Case]
@@ -902,7 +943,7 @@ the local Python 3.8.20.
 - `IdeaReporter` → resolves `[P2]` and `RC3` in a summary; flags an idea with no tags as `grounded: false`; lists an unknown `[P99]` — [Silent Failure]
 
 ### Integration Tests
-- `gather` end to end over fixtures from all five harnesses (Claude in two config folders, one passed with `--claude-dir`): exit 0; the summary counts match the fixtures; `other_claude_dirs_not_read` lists an unpassed `~/.claude-work`; `not_read` lists a fake `~/.cursor/chats`.
+- `gather` end to end over fixtures from all eight harnesses (Claude in two config folders, one passed with `--claude-dir`): exit 0; the summary counts match the fixtures; `other_claude_dirs_not_read` lists an unpassed `~/.claude-work`; `not_read` lists a fake `~/.cursor/chats`.
 - `gather` with every harness disabled exits 3, and its summary names the folders read.
 - `suggest --dry-run` with the recording fake: exit 0; the recorded argv equals the expected argv; the cwd is the output folder; `--instructions` and `--files` are relative; no `paid-run.txt` is written.
 - `suggest --paid` with the fake: writes `paid-run.txt`, then `result.json`; a second `--paid` in the same folder exits 2, and the fake records no second call. This catches a silent double charge.
@@ -950,8 +991,7 @@ the local Python 3.8.20.
 - [ ] `min-cli-version` says `0.3.0` to match every sibling suggestion skill. `--instructions` is in
   0.3.0's tree, but the usage-billed flow landed in 0.3.1, and the first PyPI release will be 0.3.2.
   Should all suggestion skills move to `0.3.2` together (Vidbyte#691's scope)?
-- [ ] Should a follow-up add readers for Cline, Roo Code, Kilo Code, and Copilot CLI once fixtures
-  from real installs are available?
+- [ ] Add readers for Cline, Roo Code, Kilo Code, Copilot CLI, and Grok CLI once real fixtures exist?
 - [ ] English-only keyword signals: add other languages later, or rely on the session samples?
 - [ ] Should the website add a `prompting` topic, instead of reusing `planning`?
 
@@ -967,13 +1007,12 @@ the local Python 3.8.20.
 
 ### Alternative 2: Send raw transcripts (or a large slice of them)
 - What: pass full prompt histories and let the model find the patterns.
-- Why rejected: 500 sessions are millions of tokens, far over the 400,000-token cap and the
-  context window. They would also carry secrets, and a model scanning raw data is less reliable
-  than local counting.
+- Why rejected: 500 sessions are millions of tokens, far over the 400,000-token cap. They would
+  also carry secrets, and local counting is more reliable.
 
 ### Alternative 3: One self-contained script like the siblings
 - What: a single 2,500-line `prompt_review.py`.
-- Why rejected: the five harness readers alone are about 1,200 lines. A package with one module
+- Why rejected: the harness readers alone are about 1,200 lines. A package with one module
   per concern keeps files under 1,000 lines and lets the tests import each reader directly.
 
 ### Alternative 4: Use the MCP server
