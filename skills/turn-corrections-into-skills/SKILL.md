@@ -56,7 +56,7 @@ Code, OpenClaude, Factory Droid, and Pi. For every prompt it decides whether the
 wrong", "I meant", "why did you"), an undo or revert, "don't ..., instead ...", "you didn't",
 an interrupted turn followed by a redirect, or a short fix supplied right after the agent's tool
 calls failed. It pairs each correction with what the agent had just done (its tool calls, failed
-calls, interruption, and last words), groups corrections in a row into one episode, sorts episodes
+calls, interruption, its reply, and its last words), groups corrections in a row into one episode, sorts episodes
 into kinds of mistake, and clusters them into scenarios ranked by sessions affected, corrections,
 prompts spent correcting, and tool calls in the corrected turns. It lists the skills the user
 already has, removes secrets, email addresses, and home-folder paths, and writes one tagged digest

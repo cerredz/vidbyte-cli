@@ -3,11 +3,13 @@
 ## The situation
 
 The user ran a local script over their own recent coding-agent sessions (Claude Code, Codex,
-OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory Droid, Pi). The attached `digest.md` lists the prompts where the user had to
-correct what the agent had just done, grouped into scenarios `[C1]`, `[C2]`, ... ranked by how often
-and how costly they were. `[S#]` is one session and `[P#]` is one prompt the user typed. In each
-example, "Asked" is the task the agent was doing, "Agent did" its tool calls, "Agent said" the end of
-its reply, "Correction" what the user typed next, and "Then" what the agent did after it.
+OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory Droid, Pi). The attached `digest.md` lists the
+prompts where the user had to correct what the agent had just done, grouped into scenarios `[C1]`,
+`[C2]`, ... ranked by how often and how costly they were. `[S#]` is one session and `[P#]` is one
+prompt the user typed. In each example, "Asked" is the task the agent was doing, "Agent did" its
+tool calls, "Agent began" the start of its reply when that differs from the end (often its plan),
+"Agent said" the end of its reply, "Correction" what the user typed next, and "Then" what the agent
+did after it.
 
 The user's question: for each scenario, which agent skill would have prevented the mistake? A skill
 is a folder with a `SKILL.md`: YAML frontmatter with a `name` and a `description`, then instructions.

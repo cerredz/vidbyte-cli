@@ -413,7 +413,7 @@ class SessionBuilder:
 
     @staticmethod
     def make(steps: list, harness: str = "claude-code", sid: str = "s", cwd: str = "/work/app", minutes: float = 0) -> Session:
-        # Each step is a prompt string or {"text", "actions", "failed", "interrupt", "say"}; "say" ending in "?" makes the next turn follow a question.
+        # Each step is a prompt string or {"text", "actions", "failed", "interrupt", "say"}; "say" is one text or a list; a last text ending in "?" makes the next turn follow a question.
         session = Session(harness, sid, "mem:%s" % sid)
         session.add_cwd(cwd)
         for index, step in enumerate(steps):
@@ -426,7 +426,9 @@ class SessionBuilder:
             if step.get("interrupt"):
                 session.note_interrupt()
                 continue
-            session.note_agent_text(step.get("say", "Done."))
+            says = step.get("say", "Done.")
+            for said in (says if isinstance(says, list) else [says]):
+                session.note_agent_text(said)
             session.note_turn_end("finished")
         return session.finish()
 
@@ -672,6 +674,20 @@ class UnitTests:
         Check.true(0 < len(inputs["mistakes"]) <= 8, "mistakes count %d" % len(inputs["mistakes"]))
         Check.true(all(v.startswith("[C") for v in inputs["mistakes"]), "untagged mistakes value")
         Check.equal((out / FOCUS.name).read_bytes(), FOCUS.read_bytes(), "focus copy")
+
+    def digest_reply_start(self) -> None:
+        # The start of the corrected reply is shown as "Agent began" and kept in corrections.json; a reply equal to "Agent said" is not repeated.
+        planned = {"text": "update the docs", "actions": ["Edit config.yaml"], "say": ["I'll switch the config to YAML first, then update the docs.", "Converted config.yaml."]}
+        plain = {"text": "add a test", "actions": ["Edit test_a.py"], "say": "Added the test for the parser."}
+        sessions = [SessionBuilder.make([planned, "no, I meant the docs page"], sid="r1"), SessionBuilder.make([plain, "no, that's the wrong file"], sid="r2", minutes=30)]
+        out, _written, _ = self.write_digest("digest-reply", sessions, 60000)
+        digest = (out / "digest.md").read_text(encoding="utf-8")
+        Check.true("Agent began: \"I'll switch the config to YAML first" in digest, "no Agent began line")
+        Check.true("Agent said: \"Converted config.yaml.\"" in digest, "Agent said changed")
+        Check.equal(digest.count("Agent began:"), 1, "Agent began repeated what Agent said")
+        index = json.loads((out / "corrections.json").read_text(encoding="utf-8"))
+        reply = next(p["agent_reply"] for p in index["prompts"] if p["text"].startswith("no, I meant"))
+        Check.true("switch the config to YAML" in reply and "Converted config.yaml." in reply, "agent_reply: %r" % reply)
 
     def digest_bounds(self) -> None:
         # max_chars below 20,000 and a focus file over 20,000 bytes are refused; the real focus file fits.
@@ -1028,7 +1044,7 @@ class Suite:
             ("detector_actions_from_previous", "Silent Failure"), ("detector_ask_lookback", "Hidden Assumption"), ("detector_empty", "Edge Case"),
             ("kinds_table", "Silent Failure"), ("builder_clusters", "Silent Failure"), ("builder_kinds_separate", "Hidden Assumption"),
             ("builder_ranking", "Silent Failure"), ("inventory", "Hidden Failure"), ("digest_budget", "Silent Failure"),
-            ("digest_secrets_and_tags", "Hidden Failure"), ("digest_bounds", "Edge Case"), ("config_count_argv", "Silent Failure"),
+            ("digest_secrets_and_tags", "Hidden Failure"), ("digest_reply_start", "Silent Failure"), ("digest_bounds", "Edge Case"), ("config_count_argv", "Silent Failure"),
             ("config_validator", "Edge Case"), ("parser_cases", "Silent Failure"),
         ]
 

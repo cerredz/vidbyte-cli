@@ -259,6 +259,9 @@ class DigestWriter:
             "  Asked [%s]: \"%s\"" % (ask_tag, self.clip(episode.ask_turn.text, 300)),
             "  Agent did: %s | tool calls: %d | failed calls: %d | interrupted: %s" % (did, previous.tool_calls, previous.failed_actions, "yes" if previous.interrupted else "no"),
         ]
+        began = self.reply_start(previous.reply_text, first.turn.before_agent_text)
+        if began:
+            lines.append("  Agent began: \"%s\"" % began)
         if first.turn.before_agent_text:
             lines.append("  Agent said: \"%s\"" % self.clip(first.turn.before_agent_text, 220))
         signals = ", ".join(first.signals)
@@ -303,6 +306,13 @@ class DigestWriter:
     def project(self, session) -> str:
         # The session's project folder name, redacted, or "?".
         return self.redact(session.project_name()) or "?"
+
+    def reply_start(self, reply: str, said: str) -> str:
+        # The start of the corrected turn's reply (often the agent's plan), or "" when it is short or "Agent said" already shows it.
+        head = " ".join(str(reply or "").split())
+        if len(head) < 20 or head[:60] in " ".join(str(said or "").split()):
+            return ""
+        return self.clip(head, 160)
 
     def clip(self, text: str, limit: int) -> str:
         # Redacts, then collapses whitespace and cuts to limit characters; a huge paste shows its length.
@@ -371,7 +381,8 @@ class DigestWriter:
             entry.update({"signals": list(correction.signals), "strength": correction.strength,
                           "corrected_actions": [self.redact(a) for a in correction.previous.actions],
                           "failed_actions": correction.previous.failed_actions, "interrupted": correction.previous.interrupted,
-                          "agent_said": self.redact(correction.turn.before_agent_text), "after_actions": [self.redact(a) for a in correction.after]})
+                          "agent_said": self.redact(correction.turn.before_agent_text), "agent_reply": self.redact(correction.previous.reply_text),
+                          "after_actions": [self.redact(a) for a in correction.after]})
         return entry
 
     def build_inputs(self, plan: DigestPlan, book: TagBook, overall: dict, skills: list, summary: dict) -> dict:

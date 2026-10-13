@@ -16,8 +16,8 @@ from Claude Code, Codex, OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory Dr
 the shared `sessionkit` package. It detects corrections locally and for free: a prompt that pushes back on what the agent
 just did ("no, the other file", "why did you delete that", "undo that"), an interrupted turn
 followed by a redirect, and a prompt that supplies the fix after the agent's tool calls failed. For
-each correction it records what the agent did (its tool actions, its last words, failed calls,
-interruption) and what the user wanted instead (the correction text). It clusters the corrections
+each correction it records what the agent did (its tool actions, its reply, its last words, failed
+calls, interruption) and what the user wanted instead (the correction text). It clusters the corrections
 into scenarios (the same kind of mistake in the same kind of task, tool, or project), ranks them by
 how often and how costly they were, and writes a redacted digest with tagged evidence: `[C#]`
 scenarios, `[S#]` sessions, `[P#]` prompts. One usage-billed `vidbyte-cli agents suggest run`
@@ -157,8 +157,8 @@ listed on `/agents/skills` as a `coming-soon` entry, like every skill that needs
 2. For every turn with index ≥ 1, the detector decides whether the prompt corrects the agent's
    previous turn, using the signals and suppressions in section 6.2, and records the signal names,
    a strength (`strong`, `medium`, `weak`), the corrected turn's prompt, actions, failed-action
-   count, interruption, and tool-call count, the agent's last words before the correction, and the
-   agent's first actions after it.
+   count, interruption, and tool-call count, the corrected turn's reply (`reply_text`), the agent's
+   last words before the correction, and the agent's first actions after it.
 3. Consecutive correction turns in one session form one episode. Each episode gets one mistake kind
    from section 6.3 and cost figures: correction prompts, tool calls in the corrected turns, failed
    calls, interruption.
@@ -255,7 +255,8 @@ inventory, the digest writer, the suggest configuration, the idea report, and th
 Key decisions:
 - **The corrected turn is the previous turn.** `sessionkit` stores on each `Turn` what the agent did
   *after* that prompt. A correction at turn t is about turn t-1: its `actions`, `failed_actions`,
-  `interrupted`, `tool_calls`, and the agent's last words (`turns[t].before_agent_text`). The
+  `interrupted`, `tool_calls`, its reply (`turns[t-1].reply_text`, whose start often shows the
+  agent's plan), and the agent's last words (`turns[t].before_agent_text`). The
   correction text is turn t's prompt, and turn t's own `actions` show what the agent did after being
   corrected. This pairing is what lets the digest say "the agent ran `npm install`; the user said
   'use pnpm'".
@@ -559,6 +560,7 @@ class DigestWriter:
    - [P4] [S2] claude-code · app · Oct 09
      Asked [P3]: <the ask turn's prompt, <= 300 chars>
      Agent did: Bash: npm install; Edit package.json (+3 more) | failed calls: 2 | interrupted: no
+     Agent began: <start of the corrected turn's reply_text, <= 160 chars; only when Agent said does not already show it>
      Agent said: <before_agent_text, <= 220 chars>
      Correction [P4]: <correction, <= 500 chars>   (signals: pushback, strong)
      Then: <first 3 actions after the correction, or "no tool call">
@@ -865,7 +867,8 @@ in the alphabetical block and one `ENTRIES` line right after `STOP_REPEATING_YOU
                 "project": "app", "title": "...", "first": "ISO", "last": "ISO", "prompts": 12, "models": ["..."]}],
   "prompts": [{"tag": "P4", "session": "S1", "index": 4, "ts": "ISO", "role": "correction", "scenario": "C1",
                "text": "redacted", "signals": ["pushback"], "strength": "strong", "corrected_actions": ["Bash: npm install"],
-               "failed_actions": 2, "interrupted": false}],
+               "failed_actions": 2, "interrupted": false, "agent_said": "redacted", "agent_reply": "redacted",
+               "after_actions": ["Bash: pnpm add lodash"]}],
   "skills_found": [{"name": "...", "scope": "claude personal", "path": "~/.claude/skills/x/SKILL.md", "description": "..."}]
 }
 ```
@@ -958,6 +961,7 @@ the local Python 3.8.20.
 - `DigestWriter` → every tag in `digest.md` and `inputs.json` exists in `corrections.json`, and tags are unique — [Hidden Failure]
 - `DigestWriter` → `max_chars` below 20,000 is a usage error; the focus copy is byte-identical and ≤ 20,000 bytes — [Edge Case]
 - `DigestWriter` → `inputs.json` `mistakes` values all start with a tag and number ≤ 8 — [Hidden Assumption]
+- `DigestWriter` → a reply that starts with a plan and ends with a claim shows both as "Agent began" and "Agent said" and is kept whole as `agent_reply`; a reply equal to "Agent said" is not repeated (`digest_reply_start`) — [Silent Failure]
 - `CorrectionSuggestConfig` → `count` is 2 for 1 scenario and 12 for 15; argv has root options first, the 4 categories, `--horizon any`, `--files digest.md`, `--instructions skills-from-corrections.md`, `--max-total-tokens 400000`, `--dry-run` only when asked, `--project` only when set — [Silent Failure]
 - `CorrectionSuggestConfig` → a `[C99]` tag and an untagged `mistakes` value are problems; `[setup]` and `[all]` are accepted — [Edge Case]
 - `SkillIdeaParser` → parses slug, description, got-wrong, correct, rules, steps from a well-formed idea; derives a slug and lists a problem when the title has none — [Silent Failure]
