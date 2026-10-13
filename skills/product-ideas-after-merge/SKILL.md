@@ -449,7 +449,9 @@ charge is on <https://vidbyte.pro/usage>.
    - Pull requests from forks, and merges Dependabot performs itself, get no ideas: GitHub gives
      those runs no secrets, so the job fails with exit 4 before any charge, and a re-run fails the
      same way. A Dependabot pull request that a person merges is a paid run that most likely
-     returns no ideas.
+     returns no ideas. Its description quotes the dependency's release notes, which people outside
+     the team wrote, so instructions hidden there reach the model and can put misleading text in
+     the Slack message.
    - Empty or oversized diffs are skipped with a notice.
    - A pull request merged into another branch, such as a stacked pull request, runs too, so its
      changes can be posted twice: once then, and again when its parent merges.
