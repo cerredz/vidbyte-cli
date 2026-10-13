@@ -97,9 +97,9 @@ Everything in this section is free and local, and it changes nothing in the repo
    ls .github/workflows/product-ideas.yml .github/product-ideas-lens.md 2>/dev/null   # must print nothing
    ```
 
-   When neither file exists, it prints nothing and exits 2; that is the expected result. If either
-   file exists, stop before Cost and consent and ask the user what to do. Never overwrite either
-   file.
+   When neither file exists, it prints nothing and exits non-zero (2 with GNU `ls`, 1 on macOS);
+   that is the expected result. If either file exists, stop before Cost and consent and ask the
+   user what to do. Never overwrite either file.
 
 2. **Write the product paragraph**: two to four sentences that say what the product does, who uses
    it, and what they come to it for. Take it from `README.md` and the description in the package
