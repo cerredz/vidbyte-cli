@@ -101,6 +101,7 @@ class OpenCodeReader:
         self.roots = [self.data_dir]
         self.database = OpenCodeDatabase(self.data_dir / "opencode.db")
         self.notes: list = []
+        self.root_errors: dict = {}
         self._connected = None
         self._row_model = None
 
@@ -147,6 +148,7 @@ class OpenCodeReader:
                 self._connected = self.database.connect()
                 if not self._connected:
                     self.notes.append("opencode.db not read: %s" % self.database.error)
+                    self.root_errors[str(self.data_dir)] = "opencode.db not read: %s" % self.database.error
         return self._connected
 
     def _drop_v2_without_messages(self, found: dict) -> None:
