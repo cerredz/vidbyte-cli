@@ -410,8 +410,11 @@ charge is on <https://vidbyte.pro/usage>.
   `0 of 3 ideas (needs_input)` followed by a question from the agent, was billed and needs no
   action. Nobody can answer the question from Slack, and a re-run of the job is a new charge.
 - `(partial)` after the count, as in `2 of 3 ideas (partial)`, means fewer ideas survived review,
-  or the run stopped at the 400,000-token cap or a call's output cap; in the cap case the slate may
-  be unreviewed. It was billed and needs no action.
+  or the run stopped at the 400,000-token cap or a call's output cap (the slate may then be
+  unreviewed), or Vidbyte stopped further calls because the balance, the daily model-spend cap,
+  or the request rate ran out (`stop_reason` `gateway_limit`, see Troubleshooting). It was billed.
+  The job log does not say which case it was, so the user checks the balance at
+  <https://vidbyte.pro/usage> and adds balance there if it ran out; otherwise it needs no action.
 - A green job with one `::notice::` line and no message was skipped with no Vidbyte charge.
   `its diff is empty after exclusions` means no changed lines were left to send: the install merge,
   or a pull request that changed only lockfiles, binary files, the two installed files, or excluded
