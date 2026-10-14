@@ -14,7 +14,7 @@ in a fresh coding-agent session, on a cadence (a monthly budget cleanup, invoice
 expense categorization, quarterly tax questions, a weekly report, a dependency bump, release notes,
 log triage) and turns each one into a scheduled routine. A bundled, standard-library Python script
 reads the user's most recent sessions (at most 500) from Claude Code, Codex, OpenCode, Gemini CLI,
-and Qwen Code through the shared `sessionkit` package. It groups session openers by wording, folder,
+Qwen Code, OpenClaude, Factory Droid, and Pi through the shared `sessionkit` package. It groups session openers by wording, folder,
 files, data sources, and commands, keeps groups with at least three runs in distinct sessions,
 measures the intervals between runs, and names the cadence the dates show (daily, weekdays, weekly,
 every two weeks, monthly with "first business day" and "end of month" patterns, or quarterly), with
@@ -37,8 +37,9 @@ listed on `/agents/skills` as a `coming-soon` entry, like every other skill that
 ### Goals
 - Add `skills/automate-recurring-chores/` to cerredz/vidbyte-cli, meeting the `write-agent-skill`
   contract: frontmatter, fixed section order, consent, exact commands, shared references.
-- Read sessions only through a byte-for-byte copy of the shared `sessionkit` package (Claude Code,
-  Codex, OpenCode, Gemini CLI, Qwen Code; the most recent 500 interactive sessions by default).
+- Read sessions only through a byte-for-byte copy of the shared `sessionkit` package (version 4:
+  Claude Code, Codex, OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory Droid, and Pi; the most
+  recent 500 interactive sessions by default).
 - Detect recurring chores locally and for free: cluster openers and early prompts by stemmed-term
   similarity weighted by rarity, boosted by the same folder and the same files, data sources, and
   commands from `Turn.actions`; require at least 3 runs in distinct sessions; classify the cadence
@@ -135,6 +136,10 @@ listed on `/agents/skills` as a `coming-soon` entry, like every other skill that
     the skill suggests `--project-dir` (500 sessions of one folder reach further back).
   - Shared references must be byte-identical to the canonical copies: `setup.md` blob `8fb4e3cf`,
     `troubleshooting.md` blob `cb9656bc`.
+  - `sessionkit` is the parent branch's package, copied byte for byte and never edited here. It is
+    at version 4 (`b72fe18`): eight harnesses, `--only <harness>`, and a `read[]` entry with
+    `"status": "error"` and a redacted `error` when a store cannot be opened (such as a locked or
+    non-SQLite `opencode.db`).
 
 ---
 
@@ -143,13 +148,18 @@ listed on `/agents/skills` as a `coming-soon` entry, like every other skill that
 ### Functional Requirements
 1. `recurring_chores.py gather` reads sessions through `sessionkit` (`CollectOptions` flags:
    `--max-sessions` 1-500 default 500, `--days`, `--since`, `--project-dir`, `--claude-dir`,
-   `--codex-home`, `--opencode-dir`, `--gemini-dir`, `--qwen-dir`, `--no-*`, `--exclude-session`,
-   `--include-current`) plus its own `--min-runs` (3-10, default 3), `--max-chores` (1-10, default
+   `--codex-home`, `--opencode-dir`, `--gemini-dir`, `--qwen-dir`, `--openclaude-dir`,
+   `--factory-dir`, `--pi-dir`, `--no-*`, `--only` (repeatable, overrides `--no-*`),
+   `--exclude-session`, `--include-current`) plus its own `--min-runs` (3-10, default 3), `--max-chores` (1-10, default
    10), `--max-chars` (20,000-100,000, default 60,000), and `--out`.
 2. For each session the detector picks the opener: the first of the first three prompts with at
    least 3 content terms, else the first prompt. Sessions whose opener is a continuation ("continue",
    "pick up where", "resume", "keep going", "where we left off", "next step") or a bare go-ahead are
-   not chore candidates, because they continue earlier work instead of starting a run fresh.
+   not chore candidates, because they continue earlier work instead of starting a run fresh. Two
+   kinds of pasted text are not the task: a long template (a prefix of at least 200 characters that
+   at least three different openers share) is stripped before comparing, and a prompt that carries
+   a skill's body (`Base directory for this skill:`, which OpenCode sends as a user prompt) counts as
+   the skill's `/name`, so the typed request after it becomes the opener.
 3. Terms: lower-cased words, stop words removed, light stemming (`-ing`, `-ies`, `-ed`, `-s`), with
    period values removed (month names and abbreviations, years, dates, quarter labels, day numbers)
    so "the September invoices" and "the October invoices" match. The opener's first 600 characters
@@ -174,7 +184,14 @@ listed on `/agents/skills` as a `coming-soon` entry, like every other skill that
    Regularity is the share of intervals on schedule (one skipped period counts half). Below 0.6 the
    cluster is `irregular`: listed locally, never sent. Each chore reports the median interval, the
    spread (median absolute deviation, in days), the usual start time, and the next expected date
-   (marked overdue when it is already past).
+   (marked overdue when a whole period was missed: the date is past and today is outside that
+   period's catch-up window).
+   Repeats that a scheduled job most likely runs already are reported as `already_automated`, with
+   their evidence, and never sent or given a routine. The evidence is checked before the run count,
+   because an hourly job over two days is only two runs: the identical normalized first prompt
+   (at least 150 characters, not a skill body) in at least max(3, 80%) of the group's sessions,
+   together with sessions that start at a fixed spacing under a day, or every run starting within 3
+   minutes of the same clock time.
 8. Each chore records, with the number of runs each appeared in: files and folders read, data
    sources (web domains, MCP servers, data-file types such as `.csv`, `.xlsx`, `.pdf`, `.ofx`, data
    CLIs such as `gh`, `stripe`, `aws`, `psql`), commands, credentials named (environment-variable
@@ -186,8 +203,8 @@ listed on `/agents/skills` as a `coming-soon` entry, like every other skill that
 9. `gather` writes into the output folder: `digest.md` (redacted, at most `--max-chars`),
    `chores.json` (the local index, never sent), `inputs.json` (typed inputs pre-filled from the
    numbers), and `chore-routines.md` (a byte copy of the focus file, refused above 20,000 bytes). It
-   prints a JSON summary with the window, span, detectable cadences, chore table, irregular repeats,
-   redaction counts, and folders not read. It exits 3 with `reason: no_sessions` or `no_chores`.
+   prints a JSON summary with the window, span, detectable cadences, chore table, already-automated
+   and irregular repeats, shared templates, redaction counts, and folders not read. It exits 3 with `reason: no_sessions` or `no_chores`.
 10. `recurring_chores.py suggest --dry-run|--paid` validates `inputs.json` through
     `sessionkit.runner.InputsValidator` (allowed keys, counts, lengths, tags known to `chores.json`,
     redaction, at least one `outcomes` value) and runs, from inside the output folder,
@@ -210,8 +227,8 @@ listed on `/agents/skills` as a `coming-soon` entry, like every other skill that
     `routine-prompt.md` (standing safety rules plus the idea's routine prompt), `routine.json`
     (cadence, harness and its absolute path, working folder, mode `dry-run`, allowed commands,
     time), `run_routine.py` (a byte copy of the shipped runner), `SCHEDULE.md` (the exact register,
-    test, and remove commands), and `<label>.plist` for launchd. It prints JSON with the files and
-    commands. It never runs a scheduler, a harness, or `vidbyte-cli`.
+    test, and remove commands), and `crontab.txt` for cron or `<label>.plist` for launchd. It
+    prints JSON with the files and commands. It never runs a scheduler, a harness, or `vidbyte-cli`.
 13. The runner (`run_routine.py`) runs the routine headless in the chore's folder: by default a dry
     run (Claude Code `--permission-mode plan`, Codex `--sandbox read-only`) whose output is only a
     log; `--live`, or `"mode": "live"` in `routine.json`, allows edits with the listed tools.
@@ -260,7 +277,7 @@ the routine the user picks. The new parts are the chore detector, the cadence an
 routine writer with its runner.
 
 ```
- sessionkit.SessionCollector (5 harnesses, newest 500)            [free, local]
+ sessionkit.SessionCollector (8 harnesses, newest 500)            [free, local]
         │ sessions (turns, actions, folders, times)
         ▼
  SessionSignature ─▶ ChoreDetector (similarity, average linkage, runs) ─▶ CadenceAnalyzer
@@ -388,12 +405,23 @@ class SessionSignature:
 6. Credentials: names matching `\b[A-Z][A-Z0-9_]*(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD|PASS|CREDENTIALS?)\b`
    in prompts and commands, plus `.env`, `credentials.json`, `*.pem`, `keychain`, `1password`/`op
    read`, `bitwarden`, `gh auth`, `aws configure`, `gcloud auth` mentions. Only the name is stored.
+   Secrets and emails are masked before terms are extracted, so a value never becomes a term.
+7. Templates (`TemplatePrefixes`): openers of at least 200 characters are grouped by their first 120
+   characters; a group of at least 3 openers with at least 2 distinct texts and a common prefix of at
+   least 200 characters (cut to a word boundary) defines a template. `task_text` is the opener
+   without it, and the digest notes "(after a shared N-character template)". Openers identical in
+   full are left alone, so a saved prompt typed each month still matches itself.
+8. Skill bodies: a prompt containing `Base directory for this skill:` is reduced to `/name` (from its
+   first `# heading`, else `/skill`); such prompts are skipped when reading outside actions and
+   follow-ups.
 
 #### Edge Cases & Error Handling
 - An action string with an unexpected shape is `other` and adds nothing.
 - Paths outside the session folder keep their normalized absolute form (the redactor later replaces
   the home folder).
 - A Windows drive path and a POSIX path normalize to the same lower-case, forward-slash form.
+- A path that `sessionkit` cut at its 160-character action limit (it ends in `…`) names no real
+  file and is dropped.
 
 ### 6.3 Chore detector
 
@@ -422,15 +450,16 @@ class ChoreDetector:
 4. Average linkage: every signature starts alone; a heap orders cluster pairs by mean pairwise score
    (missing edges count 0); merge while the best mean is at least 0.5; stale heap entries are
    skipped.
-5. For each cluster of at least `min_runs` signatures, group runs (FR 6), skip clusters with fewer
-   than `min_runs` runs, and call `CadenceAnalyzer.analyze`.
+5. For each cluster, check the automation evidence (FR 7) first; then group runs (FR 6), skip
+   clusters with fewer than `min_runs` runs unless they look automated, and call
+   `CadenceAnalyzer.analyze`. Automated clusters go to `automated`.
 6. Aggregate per chore: each resource counted once per run; keep items seen in at least 2 runs or
    half the runs, top 8 per kind; external actions and credentials keep every distinct name with
    its run count and evidence tags.
 7. Recurring follow-ups: the cluster's non-opener prompts from the first 6 turns, grouped by term
    Jaccard >= 0.4, kept when a group spans at least 2 runs.
-8. Label: the opener with the highest mean similarity to the rest (redacted later, cut to 90
-   characters). Key terms: the top 6 terms by in-cluster frequency × IDF, shown in their most common
+8. Label: the opener with the highest mean similarity to the rest, the latest one on a tie
+   (redacted later, cut to 90 characters). Key terms: the top 6 terms by in-cluster frequency × IDF, shown in their most common
    surface form.
 9. Score: `runs × regularity × log(2 + median session minutes)`; chores sorted by score, then most
    recent run. Irregular clusters go to `irregular`.
@@ -486,7 +515,9 @@ class RunWindow:    # in run_routine.py; config dict {kind, pattern, weekday, da
    (FR 6), the cadence is `irregular`.
 4. Spread: median absolute deviation of the gaps (days); monthly adds the day-of-month spread.
 5. Usual time: the median local start time, rounded to 5 minutes.
-6. Next expected: `RunWindow.next_run(last run)`; `overdue` when it is before today.
+6. Next expected: `RunWindow.next_run(last run)`; `overdue` when it is before today and today is
+   not inside that same period's window (a run due Monday is not overdue on Tuesday, inside its
+   catch-up window).
 7. Windows (catch-up inside each):
 
    | Kind / pattern | Period | In window | Triggers |
@@ -495,7 +526,7 @@ class RunWindow:    # in run_routine.py; config dict {kind, pattern, weekday, da
    | weekdays | day | Monday-Friday | weekly Mon-Fri |
    | weekly (weekday D) | ISO week | weekday D to D+2 (not past Sunday) | weekly D..D+2 |
    | biweekly (D, anchor) | 14-day block from the anchor's Monday | "on" week and weekday D to D+2 | weekly D..D+2 |
-   | monthly first_business_day | month | business day 1-3 of the month | monthly days 1-7 |
+   | monthly first_business_day | month | business day 1-3 of the month | monthly days 1-5 |
    | monthly last_business_day | month | on or after the month's last business day | monthly days 24-31 |
    | monthly end_of_month | month | the last 3 calendar days | monthly days 26-31 |
    | monthly day_of_month (N) | month | day N (clamped to the month's length) to N+3 | monthly days N..N+3 (clamped) |
@@ -620,7 +651,9 @@ class RoutineReporter:
 
 #### Logic / Algorithm
 1. Text per idea: title, summary, first action, why now, expected benefit, completion criteria,
-   suggested actions, decision points, considerations, and each `handoff.evidence[].content`.
+   suggested actions, decision points, and considerations. `handoff.evidence[].content` is not
+   read: the CLI fills it with the first 4,096 characters of the cited context item (the top of the
+   digest), which would make every idea look grounded.
 2. Tags `[C#]`, `[S#]`, `[P#]` (several per bracket allowed) resolved in `chores.json`; a session or
    prompt tag maps to the chore whose runs contain it.
 3. Flags (FR 11): cadence words (`daily`, `every day`, `weekday`, `weekly`, `every week`,
@@ -671,10 +704,13 @@ class RoutineWriter:
    external and destructive ones), timeout 45 minutes, created date, source idea id and title.
 4. `run_routine.py`: a byte copy of `chores/run_routine.py`.
 5. Scheduler files and commands (with the Python that ran `routine`, `sys.executable`):
-   - `cron`: the crontab line and `crontab -e` plus the one-line append command; remove by deleting
-     the line.
+   - `cron`: the crontab line in `crontab.txt`, the append command
+     `(crontab -l 2>/dev/null; cat crontab.txt) | crontab -`, a `grep -F` check, and a `grep -vF`
+     remove command.
    - `launchd`: `com.vidbyte.routine.<slug>.plist` with `StartCalendarInterval`, plus the copy and
-     `launchctl bootstrap gui/$(id -u) ...` command; remove with `launchctl bootout`.
+     `launchctl bootstrap gui/$(id -u) ...` command; remove with `launchctl bootout`. Apple's
+     current `launchctl` man page could not be fetched, so `SCHEDULE.md` points to `man launchctl`
+     for the loading syntax.
    - `task-scheduler`: a PowerShell `Register-ScheduledTask` command with
      `New-ScheduledTaskSettingsSet -StartWhenAvailable` (daily or weekly trigger; monthly and
      quarterly cadences use a daily trigger plus the date guard), the `schtasks /Create` equivalent,
@@ -715,8 +751,12 @@ python run_routine.py --check-date    # prints whether today is a run day and ex
 2. `--scheduled`: `RunWindow.in_window(today)` and the period not yet done (from `state.json`);
    otherwise log "not a run day" and exit 0.
 3. Build the harness argv (verified flags, section 11):
-   - Claude Code: `claude -p --output-format text` with `--permission-mode plan` (dry) or
-     `--permission-mode acceptEdits --allowedTools <list>` (live); the prompt on stdin.
+   - Claude Code: `claude -p "<fixed query>" --output-format text` with `--permission-mode plan`
+     (dry) or `--permission-mode dontAsk --allowedTools <list>` (live), and the routine prompt piped
+     on stdin. The fixed query tells Claude to carry out the instructions on standard input (the
+     documented form is `cat file | claude -p "query"`; a bare `claude -p` with only stdin is not
+     documented). `dontAsk` denies anything that would prompt, so a live run can use only the listed
+     tools; `acceptEdits` would allow every edit.
    - Codex: `codex exec --skip-git-repo-check --cd <folder>` with `--sandbox read-only` (dry) or
      `--sandbox workspace-write` (live); the prompt on stdin (`-`).
 4. Prefix the prompt with the run's mode and date; run in the working folder with the timeout;
@@ -751,8 +791,9 @@ The developer instructions appended to the generator's and every critic's system
 2. One idea per `[C#]`, title `[C#] <chore name>: <cadence> routine`, and the field map: `summary`
    (chore, cadence with run dates and tags, inputs and their sources, outputs and their
    destinations); `first_action` (the first dry run); `suggested_actions` in order: `ROUTINE
-   PROMPT:` (ready to paste, at most about 1,500 characters), `SCHEDULE:` (the platform option and
-   its exact command), `HUMAN STEPS:`, `DRY RUN:`, `GO LIVE:`, `TURN OFF:`; `decision_points`
+   PROMPT:` (ready to paste, at most about 1,500 characters), `SCHEDULE:` (the main platform option
+   with its exact command, then the other verified options that fit, one sentence each),
+   `HUMAN STEPS:`, `DRY RUN:`, `GO LIVE:`, `TURN OFF:`; `decision_points`
    (what the user must decide); `considerations` (8-10: inputs, credentials by name, outputs,
    failure handling, logs, permissions, scheduler caveats, the user's own harness usage, how to
    pause); `completion_criteria` (observable dry-run and first-live-run checks).
@@ -777,7 +818,7 @@ It stays under 20,000 bytes (target about 12 KB).
 
 ```yaml
 name: automate-recurring-chores
-description: Use when the user keeps redoing the same chore by hand in a fresh coding-agent session every week, month, or quarter and wants it to run on a schedule - ... Drives the Vidbyte Suggestion Agent through vidbyte-cli.
+description: Use when the user keeps redoing the same chore by hand in a fresh coding-agent session every week, month, or quarter and wants it to run on a schedule - "I do my budget cleanup with Claude every month, automate it", "what do I keep doing in Codex every Monday that could be a cron job?", "turn my recurring agent tasks into scheduled routines". Reads the user's most recent 500 Claude Code, Codex, OpenCode, Gemini CLI, Qwen Code, OpenClaude, Factory Droid, and Pi sessions with a bundled script, finds tasks started fresh at least three times on a steady cadence, names the cadence their run dates show and the next due date, and records each chore's inputs, outputs, and outside actions. The Suggestion Agent turns each chore into one scheduled routine with a ready routine prompt, a schedule for the user's platform, the steps that stay with the user, and a dry run first. On the user's yes the script writes the routine files; the user registers the schedule. Drives the Vidbyte Suggestion Agent through vidbyte-cli.
 metadata:
   agent: "suggestion-agent"
   commands: "agents suggest project list, agents suggest run, agents suggest handoff, agents suggest project create, agents suggest feedback accept, agents suggest feedback reject"
@@ -842,7 +883,8 @@ immediately after `TOO_MANY_MEETINGS`.
 **Change type:** New. `routine-prompt.md`, `routine.json` (`{"schema": 1, "chore": "C1", "label",
 "cadence": {...}, "time": "HH:MM", "harness": "claude-code", "harness_path", "workdir", "mode":
 "dry-run", "allowed_commands": [], "timeout_minutes": 45, "created", "idea": {"id", "title"}}`),
-`run_routine.py`, `SCHEDULE.md`, optional `.plist`, and later `logs/` and `state.json`.
+`run_routine.py`, `SCHEDULE.md`, `crontab.txt` (cron) or `<label>.plist` (launchd), and later
+`logs/` and `state.json`.
 
 ### 7.4 Website entry
 **Change type:** New. A frozen `defineAgentSkill` object (section 6.13). Migration: N/A, static data
@@ -869,7 +911,7 @@ runner's in 6.9.
 | CREATE | `skills/automate-recurring-chores/references/troubleshooting.md` | Canonical copy (blob cb9656bc) |
 | CREATE | `skills/automate-recurring-chores/references/chore-routines.md` | Focus file sent with `--instructions` |
 | CREATE | `skills/automate-recurring-chores/scripts/recurring_chores.py` | Entry point and command classes |
-| CREATE | `skills/automate-recurring-chores/scripts/sessionkit/*` (9 files) | Byte copy of the shared package from parent commit `c6be510` |
+| CREATE | `skills/automate-recurring-chores/scripts/sessionkit/*` (10 files) | Byte copy of the shared package, version 4, from parent commit `b72fe18` |
 | CREATE | `skills/automate-recurring-chores/scripts/chores/__init__.py` | Package marker |
 | CREATE | `skills/automate-recurring-chores/scripts/chores/signatures.py` | Openers, terms, resources, credentials, external actions |
 | CREATE | `skills/automate-recurring-chores/scripts/chores/detector.py` | Similarity, clustering, runs, aggregation, ranking |
@@ -907,7 +949,8 @@ way. The script runs under the current Python and Python 3.8.20.
 - `ActionParser` → `Bash: ...`, `Edit x`, `Read y`, `WebFetch https://bank.example/x`, and `mcp__gmail__send_message a@b.c` map to command, write, read, web (domain only), and mcp with an external action; an unknown shape is `other` — [Hidden Assumption]
 - `SessionSignature` → credential names (`STRIPE_API_KEY`, `.env`) are captured without values: the value in `export STRIPE_API_KEY=sk_live_...` never appears in any field — [Silent Failure]
 - `SessionSignature` → an opener `continue where we left off` is a continuation; `hi` followed by a real request uses the second prompt as opener — [Edge Case]
-- `CadenceAnalyzer` → Jun 2, Jul 1, Aug 1, Sep 1, Oct 1 2026 (each the first business day) is `monthly`/`first_business_day` with next expected Nov 2 2026 — [Silent Failure]
+- `CadenceAnalyzer` → Jun 1, Jul 1, Aug 3, Sep 1, Oct 1 2026 (each the first business day) is `monthly`/`first_business_day` with next expected Nov 2 2026, not overdue on Oct 13 — [Silent Failure]
+- `CadenceAnalyzer` → weekly Mondays: not overdue on the Tuesday after the expected Monday (inside the catch-up window), overdue a full week later — [Silent Failure]
 - `CadenceAnalyzer` → four Mondays in a row is `weekly`, weekday Monday, regularity 1.0; one skipped week still `weekly` with regularity below 1 — [Edge Case]
 - `CadenceAnalyzer` → ten consecutive weekdays over two weeks is `weekdays`, not `daily` — [Silent Failure]
 - `CadenceAnalyzer` → days 1, 3, 20, 21, 40 is `irregular` — [Silent Failure]
@@ -930,15 +973,32 @@ way. The script runs under the current Python and Python 3.8.20.
 - Suggest argv → root options first; the three categories, `--horizon any`, `--files digest.md`, `--instructions chore-routines.md`, `--max-total-tokens 400000`; `--dry-run` only when asked; `--project` only when set — [Silent Failure]
 - Validator → an unknown key, an 11th `outcomes`, a value over 500 characters, an untagged `risks` value, and an unknown `[C9]` each give a problem; `avoid` is accepted without tags — [Edge Case]
 - `RoutineReporter` → resolves `[C1]` and `[S3]`; flags an idea with no tags; flags "weekly" on a monthly chore; flags a send-chore idea with no confirmation; lists an uncovered chore — [Silent Failure]
-- `ScheduleBuilder` → first_business_day at 09:10 gives `10 9 1-7 * *`, a launchd array with Day 1-7, and a daily Windows trigger; weekly Monday gives `10 9 * * 1,2,3` — [Silent Failure]
+- `ScheduleBuilder` → first_business_day at 09:10 gives `10 9 1-5 * *`, a launchd array with Day 1-5, and a daily Windows trigger with `-StartWhenAvailable` (`/SC DAILY` for schtasks); weekly Monday gives `10 9 * * 1-3`, `-Weekly -DaysOfWeek Monday,Tuesday,Wednesday`, and launchd Weekday 1; quarterly day 15 gives `0 8 15-21 1,4,7,10 *`; weekly Sunday gives cron weekday 0 — [Silent Failure]
 - `RoutineWriter` → writes the five files, `mode` is `dry-run`, the standing rules precede the prompt, `run_routine.py` is byte-identical to the shipped runner, and nothing is written outside `--dest` — [Hidden Failure]
 - `RoutineWriter` → a non-empty `--dest` without `--force` exits 2; an idea citing two chores without `--chore` exits 2; a missing harness exits 2 — [Edge Case]
 - `RoutineWriter` → `allowed_commands` excludes `git push` and other external commands — [Silent Failure]
-- Runner → dry run builds `claude -p ... --permission-mode plan` (and `codex exec --sandbox read-only ...`), sends the prompt on stdin, writes a log, records the dry-run period; `--scheduled` outside the window exits 0 without calling the harness; a second `--scheduled` in the same period does not run again — [Hidden Failure]
+- Runner → dry run builds `claude -p <query> --output-format text --permission-mode plan` (and `codex exec --skip-git-repo-check --cd <folder> --sandbox read-only -`), sends the prompt on stdin after a `Routine run on <date>. Mode: DRY RUN.` header, writes a log, records the dry-run period; `--scheduled` outside the window exits 0 without calling the harness; a second `--scheduled` in the same period does not run again — [Hidden Failure]
+- Runner → a live Claude run uses `--permission-mode dontAsk --allowedTools` with the listed commands and never `git push` — [Silent Failure]
+- Runner → a missing harness exits 127, a missing working folder exits 2, a broken `routine.json` exits 2, and a run past its timeout exits 124 — [Edge Case]
+- `TemplatePrefixes` → a 200+ character template pasted before four different tasks is stripped; four identical long prompts are not — [Silent Failure]
+- `SessionSignature` → a prompt holding a skill body becomes `/name`; followed by a typed request, the request is the opener and no wrapper words become terms — [Hidden Assumption]
+- `PathNormalizer` → a path cut by `sessionkit` (ending in `…`) gives no file — [Silent Failure]
+- `ChoreDetector` → sessions that share only a pasted template, with different tasks, are no chore, and the template is reported — [Silent Failure]
+- `ChoreDetector` → the same long first prompt every hour over two days is `already_automated` with "word for word" and "every 60 minutes" evidence, not a chore — [Hidden Assumption]
+- `ChoreDetector` → a short saved prompt typed by hand each month at varied times stays a chore — [Edge Case]
+- `ChoreDetector` → the label comes from the latest run when openers tie — [Silent Failure]
+- `ChoreDigestWriter` → a key term that redaction would change (the login name) never reaches `digest.md` or `inputs.json` — [Silent Failure]
+- `RoutineReporter` → `handoff.evidence[].content` (the digest's top) is never read for tags; an "(alternative)" idea for the same chore is not a duplicate — [Hidden Assumption]
+- `SessionCollector` → a non-SQLite `opencode.db` gives the OpenCode `read[]` entry `"status": "error"` with an `error`, and Codex is still read — [Hidden Failure]
 
 ### Integration Tests
 - `gather` end to end over fixtures (a monthly first-business-day chore in Claude Code, a weekly Monday chore in Codex, an irregular repeat, and unrelated sessions): exit 0; two chores with the right cadences and next dates; the irregular repeat listed locally and absent from `digest.md`.
-- `gather` with every harness disabled exits 3 with `reason: no_sessions`; with sessions but no chores, exit 3 with `reason: no_chores`.
+- `gather` with all eight harnesses disabled (`--no-claude` ... `--no-pi`) exits 3 with `reason: no_sessions`; with sessions but no chores, exit 3 with `reason: no_chores`.
+- The fixture home also holds one OpenClaude, one Factory Droid, and one Pi session (sessionkit v4 readers) and an hourly Codex job with an identical prompt: `gather` keeps one session per new harness, and lists the job under `already_automated`, never in `digest.md`.
+- `gather --only codex --no-codex` reads Codex alone and finds only the weekly chore.
+- `gather --opencode-dir <non-SQLite db>`: exit 0, the OpenCode `read.read` entry has `"status": "error"` and an `error` without the temp path, and both chores are still found.
+- `gather --max-chars 1000` and `--min-runs 2` exit 2.
+- `suggest` with an untagged `risks` value exits 2 before any CLI call.
 - `suggest --dry-run` with the recording fake: exit 0; the recorded argv equals the expected argv; cwd is the output folder; `--files` and `--instructions` are relative; no `paid-run.txt`.
 - `suggest --paid` with the fake: writes `paid-run.txt`, then `result.json`; a second `--paid` exits 2 and the fake records no second call.
 - `suggest --paid` where the fake exits 5 with an error JSON: the summary carries `error.code`, exit 5.
@@ -962,7 +1022,7 @@ way. The script runs under the current Python and Python 3.8.20.
 |------------|--------------------|---------|------|
 | `vidbyte-cli` | 0.3.0+ (PyPI has 0.2.0) | `agents suggest run`, `handoff`, `project`, `feedback` | Listed `coming-soon` until 0.3.x is on PyPI |
 | Vidbyte model gateway / gpt-6-sol | via `agents suggest run` | Generator + critics | Usage-billed, capped at 400,000 tokens |
-| `sessionkit` | parent branch `skill/improve-my-prompting`, commit `c6be5101575f15249de63216e6e6684dee759937` (`sessionkit` version 1, 9 files) | Session reading, redaction, suggest plumbing | Copied byte for byte and verified with `git hash-object`; bugs reported to the parent, never patched here |
+| `sessionkit` | parent branch `skill/improve-my-prompting`, commit `b72fe1873b58cee63de27fad952c35bbfb0cb88c` (`sessionkit` version 4, 10 files) | Session reading for eight harnesses, redaction, suggest plumbing | Copied byte for byte and verified with `git hash-object`; bugs reported to the parent, never patched here |
 | Python | 3.8+ standard library | Scripts and runner | none beyond `sessionkit`'s optional `sqlite3` |
 | Claude Code / Codex CLIs | user-installed | Headless routine runs | Flags verified against the official docs below; usage is the user's own plan or API |
 | cron / launchd / Task Scheduler | OS | Schedules the runner | Registered only by the user |
@@ -995,6 +1055,9 @@ the appendix at the end of this document.
 - [ ] Should the `routine` writer also emit GitHub Actions workflows for chores with a GitHub remote?
 - [ ] Should a later version re-run `gather` on the next expected date and report whether a written
   routine replaced the manual runs (as `stop-repeating-yourself` does with its state file)?
+- [ ] `sessionkit` drops Claude Code's skill-body prompts ("Base directory for this skill:") but not
+  OpenCode's, where they arrive as ordinary user prompts. This skill reduces them to `/name`
+  locally; should `sessionkit` do it for every harness, as v4 does for Pi's `<skill>` blocks?
 
 ---
 
@@ -1031,4 +1094,81 @@ the appendix at the end of this document.
 
 ## Appendix: verified facts and sources
 
-Filled in from official documentation fetched on 2026-10-13 (see the next commit).
+Checked against first-party pages on 2026-10-13. The focus file's "Verified scheduling facts" and
+the runner's flags come from these.
+
+**Claude Code**
+- Headless: `claude -p "query"`; "Non-interactive mode reads stdin" (`cat file | claude -p "query"`);
+  `--output-format text|json|stream-json`; `--max-turns`; `--max-budget-usd`;
+  `--allowedTools "Bash(git diff *)"` rule syntax.
+  <https://code.claude.com/docs/en/headless>, <https://code.claude.com/docs/en/cli-reference>
+- `--permission-mode` accepts `default`, `acceptEdits`, `plan`, `auto`, `dontAsk`,
+  `bypassPermissions`; `dontAsk`: "anything that would prompt is denied … Locked-down CI and
+  scripts". <https://code.claude.com/docs/en/permission-modes>
+- Cloud routines: research preview, Pro, Max, Team, and Enterprise, `/schedule` in the CLI, "Each
+  repository is cloned at the start of a run", minimum interval 1 hour. Desktop scheduled tasks run
+  "only … while the desktop app is running and your computer is awake", with "exactly one catch-up
+  run for the most recently missed time" within seven days. `/loop` tasks expire after 7 days.
+  <https://code.claude.com/docs/en/routines>, <https://code.claude.com/docs/en/desktop-scheduled-tasks>,
+  <https://code.claude.com/docs/en/scheduled-tasks>
+
+**Codex** (the developers.openai.com Codex pages redirect to learn.chatgpt.com)
+- "By default, `codex exec` runs in a read-only sandbox"; `--sandbox workspace-write` allows edits;
+  "`--full-auto` is no longer supported"; `codex exec -` reads the prompt from stdin;
+  `--skip-git-repo-check`; `--cd`; `-o/--output-last-message`; `--json`.
+  <https://learn.chatgpt.com/docs/non-interactive-mode>,
+  <https://learn.chatgpt.com/docs/developer-commands?surface=cli>
+- App scheduled tasks (formerly automations) "can work with local projects", need "the computer on
+  and the app running", and "run unattended with your default sandbox settings".
+  <https://learn.chatgpt.com/docs/automations?surface=app>
+
+**Other harnesses**
+- OpenCode `opencode run [message..]` <https://opencode.ai/docs/cli/>; Gemini CLI `-p` and
+  `--approval-mode default|auto_edit|yolo|plan`, and "Gemini CLI was replaced by Antigravity CLI on
+  June 18th, 2026" for unpaid and Google One users <https://geminicli.com/docs/cli/cli-reference/>;
+  Qwen Code `qwen -p` <https://qwenlm.github.io/qwen-code-docs/en/users/features/headless/>.
+
+**GitHub Actions**
+- "By default, scheduled workflows run in UTC", optional IANA `timezone`; shortest interval every 5
+  minutes; runs on the default branch; queued jobs "may be dropped" under high load; disabled after
+  60 days without activity in a public repository; `workflow_dispatch` for manual runs.
+  <https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows>
+- `anthropics/claude-code-action@v1` inputs `prompt`, `claude_args`, `anthropic_api_key`,
+  `claude_code_oauth_token`, with an official scheduled example
+  <https://github.com/anthropics/claude-code-action/blob/main/docs/solutions.md>;
+  `openai/codex-action@v1` inputs `prompt`, `prompt-file`, `openai-api-key`, `sandbox`,
+  `codex-args`.
+
+**Local schedulers**
+- launchd `StartCalendarInterval` keys `Minute`, `Hour`, `Day`, `Weekday` ("0 and 7 are Sunday"),
+  `Month`; missing keys are wildcards
+  <https://github.com/apple-oss-distributions/launchd/blob/main/man/launchd.plist.5>. A job missed
+  during sleep runs at wake; "if the machine is off when the job should have run, the job does not
+  execute until the next designated time occurs"
+  <https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/ScheduledJobs.html>.
+  `launchctl bootstrap`/`bootout` syntax could not be verified on a reachable Apple page.
+- Windows: `schtasks /create` `/sc DAILY|WEEKLY|MONTHLY`, `/d MON,FRI` or `1-31`, `/mo LASTDAY /m *`,
+  `/mo FIRST /d MON`, `/st HH:mm`; `schtasks /delete /tn <name> /f`
+  <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/schtasks-create>,
+  <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/schtasks-delete>.
+  `New-ScheduledTaskSettingsSet -StartWhenAvailable` "can start the task at any time after its
+  scheduled time has passed"; `schtasks /create` has no such flag
+  <https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasksettingsset>.
+  `New-ScheduledTaskTrigger` has no monthly trigger, so monthly and quarterly routines use a daily
+  trigger plus the runner's date guard. `Unregister-ScheduledTask` and `Start-ScheduledTask` take
+  `-TaskName` (checked locally).
+- cron: five fields, no business-day or last-day syntax, and when both day fields are set the job
+  runs when "either field matches" <https://man7.org/linux/man-pages/man5/crontab.5.html>; anacron
+  exists because, "Unlike cron(8), it does not assume that the machine is running continuously"
+  <https://man7.org/linux/man-pages/man8/anacron.8.html>.
+
+**Evidence that recurring manual work is a broad, costly problem** (cited in "The problem")
+- Smartsheet, 2017, about 1,000 US information workers: "More than 40% of respondents said they spend
+  at least a quarter of their work week on manual, repetitive tasks"
+  <https://smartsheet.com/sites/default/files/smartsheet-automation-workplace.pdf>.
+- Zapier, 2021, 2,000 US knowledge workers at businesses under 250 employees: "94% say they perform
+  repetitive, time-consuming tasks in their role"
+  <https://zapier.com/blog/state-of-business-automation-2021/>.
+- Asana Anatomy of Work Index 2021, over 13,000 knowledge workers: "60% of their day on work about
+  work" <https://asana.com/resources/anatomy-of-work-index>. A 2023 figure of 58% could not be
+  verified and is not cited.
