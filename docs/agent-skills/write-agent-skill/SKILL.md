@@ -164,6 +164,21 @@ These rules are not optional and every skill restates them in its Guardrails sec
 5. Give every priced run one idempotency key and reuse it only to recover that same admission.
    `agents suggest run` buys no admission and takes no key; its model calls are billed one by one.
 
+A skill may install a CI workflow that starts a paid run each time an event fires, with nobody
+there to ask, but only when what starts the paid run (the event plus any condition the workflow
+checks before it) is something only the user or people with write access to the repository can
+cause, such as a merged pull request. Never let something an outside contributor can cause start
+a paid run, such as opening an issue, posting a comment, or opening or pushing to a pull request.
+Rule 1 then applies once, at install: before writing any file, tell the user which event starts
+a run and that nobody will be asked again, the most one run can cost and the cap the workflow
+passes to hold it there (`--max-total-tokens` for a usage-billed agent), what leaves the
+repository on each run and where the result goes, and how to stop the workflow; then wait for a
+yes. That yes covers every run of the workflow as installed; a change to what it runs, its cap,
+its trigger, or the CLI version it installs needs a new yes. The user stores every credential
+the workflow needs in the CI system's secret store themselves; the skill never asks for, reads,
+or writes one (rule 3), and the workflow never runs `billing top-up`. A skill that installs such
+a workflow restates this paragraph in its Guardrails section.
+
 ## 6. Commands are exact
 
 - Always call the binary by its full name, `vidbyte-cli`. The separate Vidbyte-Skills package
@@ -216,6 +231,11 @@ Never fix one public copy by hand.
 - [ ] Every `vidbyte-cli` line uses the full binary name with root options first, and every
       command path and long option exists in `contracts/cli-commands.json` and in `min-cli-version`.
 - [ ] The cost is stated before the run, and the skill waits for consent.
+- [ ] A skill that installs a CI workflow that starts paid runs uses a trigger (the event plus
+      any condition checked before the paid run) that only people with write access can cause,
+      never one an outside contributor can cause, asks once, at install, naming the event, the
+      most one run can cost and the per-run cap the workflow passes, what leaves the repository,
+      and how to stop it, and leaves every credential to the user's CI secret store.
 - [ ] Exit 5 stops and asks; `billing top-up --confirm` appears only behind explicit approval.
 - [ ] No step asks for a key in the chat.
 - [ ] `references/setup.md` and `references/troubleshooting.md` are byte-identical to the canonical copies.
