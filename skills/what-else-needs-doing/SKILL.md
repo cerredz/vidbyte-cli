@@ -89,7 +89,7 @@ vidbyte-cli --json whoami              # exit 4 means no Vidbyte key is stored
   too. `whoami` does not show permissions, so a key without it fails at the run's first model call
   with exit 4 and `The stored Vidbyte API key is missing the models:invoke permission.`, before
   anything is billed. The user then creates a key with that permission at
-  <https://vidbyte.pro/settings/api> and runs `vidbyte-cli login` with it.
+  <https://vidbyte.pro/settings/api> and stores it as `references/setup.md` step 2 describes.
 - Versions before 0.3.2 bill the Suggestion Agent differently and run it on Codex, so the cost in
   this file would be wrong. Upgrade with `references/setup.md` step 1.
 - `<out_dir>` below means the folder made in Gather inputs, step 3. On Windows, run this file's
