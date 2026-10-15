@@ -110,6 +110,8 @@ flowchart TD
     handoff cannot read.
   - Missing permission message: `The stored Vidbyte API key is missing the models:invoke
     permission.` (exit 4, before anything is billed).
+  - With `--json`, a result goes to stdout and an error document (`kind: "error"`) goes to
+    stderr; stdout stays empty on failure (verified live with 0.3.2 on 2026-10-14).
 - **Constraints.** No root `--output` option exists, so the result must be redirected to a file;
   the host's tool output would truncate a result with eight handoff packets.
 

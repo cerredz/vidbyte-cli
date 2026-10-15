@@ -371,8 +371,9 @@ already billed. Do not stop it early for the same reason.
 ## Read the result
 
 On exit 0, `<out_dir>/result.json` is one JSON document,
-`{"schema_version": 1, "kind": "suggestions.result", "data": {...}}`. On any other exit, the error
-document is in `result.json` and the progress lines are in `result.stderr.txt` (Troubleshooting).
+`{"schema_version": 1, "kind": "suggestions.result", "data": {...}}`. On any other exit,
+`result.json` is empty: the error document is the line of `result.stderr.txt` whose `kind` is
+`"error"`, after any progress lines. Read its `code`, `message`, and `hint` (Troubleshooting).
 
 | Field | Use it for |
 |---|---|
