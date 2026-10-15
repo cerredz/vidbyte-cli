@@ -4,7 +4,8 @@
 Checks the public SKILL.md against the write-agent-skill contract, every vidbyte-cli command in it
 against the CLI's exported command contract on the internal repository's origin/main, and,
 optionally, the Vidbyte website catalog entry against the frontmatter. Negative tests feed mutated
-copies of the skill through the same checks to prove each check can fail. Standard library only:
+copies of the skill through the same checks to prove each check can fail. Standard library only;
+needs Python 3.10 or newer, git, and (for --website-repo) node:
 
     python scripts/test-what-else-needs-doing.py
     python scripts/test-what-else-needs-doing.py --cli-repo ../vidbyte-cli --website-repo ../vidbyte
@@ -65,7 +66,7 @@ class SkillDocument:
     inline_spans: list[str] = field(default_factory=list)
 
     @classmethod
-    def from_text(cls, text: str) -> "SkillDocument":
+    def from_text(cls, text: str) -> SkillDocument:
         # Splits the file into frontmatter, sections, fenced blocks, and inline code spans.
         text = text.replace("\r\n", "\n")
         document = cls(text=text)
@@ -113,7 +114,7 @@ class SkillDocument:
         unfenced = re.sub(r"^\s*```.*?^\s*```", lambda m: re.sub(r"[^\n]", " ", m.group(0)), body, flags=re.M | re.S)
         starts = [(m.start(), m.group(1).strip()) for m in re.finditer(r"^## (.+)$", unfenced, flags=re.M)]
         ends = [start for start, _ in starts[1:]] + [len(body)]
-        return [(title, body[start:end]) for (start, title), end in zip(starts, ends)]
+        return [(title, body[start:end]) for (start, title), end in zip(starts, ends, strict=True)]
 
     def _parse_inline_spans(self, body: str) -> list[str]:
         # Collects inline code spans outside fences; a span may wrap across one line break.
@@ -400,8 +401,10 @@ class MutationSuite:
     MUTATIONS = (
         ("section order check rejects swapped sections", "section_order", ("## Steps\n", "## Steps-moved\n")),
         ("forbidden-flag check rejects --horizon on the run", "no_forbidden_run_flags", ("--count 8 \\\n", "--count 8 --horizon now \\\n")),
-        ("contract check rejects an option the CLI lacks", "commands_exist_in_contract", ("--files work.md --max-total-tokens 300000 --dry-run", "--files work.md --max-total-tokens 300000 --dry-run --bogus-flag")),
-        ("dry-run check rejects a dry run that differs from the paid run", "dry_run_matches_paid_run", ("--count 8 --files work.md --max-total-tokens 300000 --dry-run", "--count 9 --files work.md --max-total-tokens 300000 --dry-run")),
+        ("contract check rejects an option the CLI lacks", "commands_exist_in_contract",
+         ("--max-total-tokens 300000 --dry-run", "--max-total-tokens 300000 --dry-run --bogus-flag")),
+        ("dry-run check rejects a dry run that differs from the paid run", "dry_run_matches_paid_run",
+         ("--count 8 --files work.md --max-total-tokens 300000 --dry-run", "--count 9 --files work.md --max-total-tokens 300000 --dry-run")),
         ("category check rejects an unknown category", "categories_are_registry_ids", ("--category adjacent_opportunity \\\n", "--category adjacent_work \\\n")),
         ("goal check rejects a goal holding a $", "goal_is_shell_inert", ("Leave the change for <the request", "Leave the change for $HOME <the request")),
         ("token-cap check rejects a cost line naming another cap", "token_cap_agrees", ("capped at 300,000 tokens per run", "capped at 400,000 tokens per run")),
