@@ -75,8 +75,8 @@ with the files it changed.
 
 ## Preflight
 
-Run these in order. If either fails, read `references/setup.md`, fix only what failed, and run the
-preflight again.
+Run these in order. If any fails, or a lens is missing from the categories, read
+`references/setup.md`, fix only what failed, and run the preflight again.
 
 ```bash
 vidbyte-cli --version                  # must be 0.3.2 or newer
