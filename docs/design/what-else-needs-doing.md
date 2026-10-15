@@ -27,7 +27,7 @@ flowchart TD
     A["User: what else needs doing? / extrapolate the rest and give me subagents"] --> W{"Did this conversation<br/>finish some work?"}
     W -->|"new work in the same message"| D["Do the work first; give the normal answer"] --> B
     W -->|no| X["Ask what they are about to do,<br/>or offer turn-my-request-into-a-checklist"]
-    W -->|yes| B["Preflight: vidbyte-cli --version, --json whoami"]
+    W -->|yes| B["Preflight: vidbyte-cli --version, --json whoami,<br/>--json agents suggest categories"]
     B -->|a check fails| S["references/setup.md"] --> B
     B --> G["Read git status, diff --stat, log (names only)"]
     G --> M["New temp out_dir; agent writes work.md with its file tool<br/>(request, what was done, files, checks, still open, limits)"]
@@ -122,7 +122,8 @@ flowchart TD
    it is extrapolating from; new work in the same message is done first.
 2. With no finished work in the conversation, the skill asks what the user is about to do or
    offers `turn-my-request-into-a-checklist`, and runs nothing.
-3. Preflight checks `vidbyte-cli --version` (0.3.2 or newer) and `vidbyte-cli --json whoami`, and
+3. Preflight checks `vidbyte-cli --version` (0.3.2 or newer), `vidbyte-cli --json whoami`, and
+   `vidbyte-cli --json agents suggest categories` (the five lenses exist in the installed CLI), and
    names the models:invoke permission and the exact message a missing one produces.
 4. The coding agent writes `work.md` in a new temp folder outside every repository, with fixed
    headings, names only (no file contents, diffs, or logs), secrets replaced by `[REDACTED]`, at
@@ -198,7 +199,7 @@ Teaches a coding agent the whole flow from the request to started subagents.
 
 #### Interface / API
 Frontmatter: `name: what-else-needs-doing`; `metadata.agent: "suggestion-agent"`;
-`metadata.commands: "agents suggest run, agents suggest handoff"`; `metadata.cost` states the model,
+`metadata.commands: "agents suggest categories, agents suggest run, agents suggest handoff"`; `metadata.cost` states the model,
 rates, about five calls, and the 300,000-token cap; `metadata.writes-files: "true"` (picked
 subagents may edit the workspace); `metadata.min-cli-version: "0.3.2"`; `status: stable`.
 Sections in the contract order: The problem, How vidbyte-cli solves it, Goal and done-when,
@@ -242,7 +243,7 @@ the CLI contract, and (optionally) the Vidbyte catalog entry.
 `TURN_MY_REQUEST_INTO_A_CHECKLIST`).
 `status: "coming-soon"`, `minCliVersion: "0.3.2"`, `writesFiles: true`, `agents:
 ["suggestion-agent"]`, `topics: ["planning", "project-management"]`, commands `vidbyte-cli agents
-suggest run` and `vidbyte-cli agents suggest handoff`. Highlights state the cost as a token cap
+suggest categories`, `vidbyte-cli agents suggest run`, and `vidbyte-cli agents suggest handoff`. Highlights state the cost as a token cap
 without dollar figures, because N038 does not check skill entries.
 
 ---

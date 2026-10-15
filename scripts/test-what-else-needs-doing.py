@@ -260,11 +260,13 @@ class SkillChecks:
             assert self.contract.has_path(path), f"metadata.commands names unknown path {path!r}"
 
     def categories_are_registry_ids(self) -> None:
-        # Every --category value is one of the CLI's registered suggestion categories.
+        # Every --category is a registered id, and Preflight checks exactly the lenses Run passes.
         values = {value for call in self.invocations for name, value in call.options if name == "--category"}
         assert values, "no --category found"
         unknown = values - self.contract.category_ids
         assert not unknown, f"unknown categories {sorted(unknown)}"
+        checked = set(re.findall(r"`([a-z_]+)`", self.doc.section("Preflight"))) & self.contract.category_ids
+        assert checked == values, f"Preflight checks {sorted(checked)} but Run passes {sorted(values)}"
 
     def token_cap_agrees(self) -> None:
         # The --max-total-tokens the run passes equals the cap metadata.cost and Cost and consent state.
@@ -403,6 +405,7 @@ class MutationSuite:
         ("category check rejects an unknown category", "categories_are_registry_ids", ("--category adjacent_opportunity \\\n", "--category adjacent_work \\\n")),
         ("goal check rejects a goal holding a $", "goal_is_shell_inert", ("Leave the change for <the request", "Leave the change for $HOME <the request")),
         ("token-cap check rejects a cost line naming another cap", "token_cap_agrees", ("capped at 300,000 tokens per run", "capped at 400,000 tokens per run")),
+        ("category check rejects a Preflight lens Run does not pass", "categories_are_registry_ids", ("`adjacent_opportunity`, the five lenses", "`leverage`, the five lenses")),
         ("root-option check rejects --json after the path", "root_options_first", ("vidbyte-cli --json agents suggest handoff --input", "vidbyte-cli agents suggest handoff --json --input")),
     )
 
@@ -443,13 +446,14 @@ def main() -> int:
     # Runs every contract check, the website comparison when asked, and the mutation suite.
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cli-repo", help="path to the cerredz/vidbyte-cli-internal checkout")
+    parser.add_argument("--cli-ref", default="origin/main", help="git ref of the CLI contract, such as a release commit")
     parser.add_argument("--website-repo", help="path to a Vidbyte checkout holding the catalog entry")
     arguments = parser.parse_args()
 
     # Load the skill and the CLI contract every check reads.
     text = SKILL_FILE.read_text(encoding="utf-8")
     document = SkillDocument.from_text(text)
-    contract = CliContract(find_cli_repo(arguments.cli_repo))
+    contract = CliContract(find_cli_repo(arguments.cli_repo), arguments.cli_ref)
     invocations = CommandExtractor(contract).extract(document)
     checks = SkillChecks(document, contract, invocations)
     print(f"CLI contract: {contract.ref} @ {contract.sha}; {len(invocations)} vidbyte-cli invocations found\n")
