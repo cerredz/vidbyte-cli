@@ -1,0 +1,5 @@
+# Shell scripts must keep LF endings on every checkout, or bash fails on Windows clones with core.autocrlf.
+# This file lives in skills/ rather than the repository root because Anthropic's plugin directory
+# stops validating a repository whose root .gitattributes sets attributes that rewrite file
+# contents, and plugins/vidbyte is submitted from this repository.
+*.sh text eol=lf
