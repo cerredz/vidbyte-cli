@@ -22,6 +22,19 @@ vidbyte-cli --help
 
 Upgrade with `pipx upgrade vidbyte-cli` or `python -m pip install -U vidbyte-cli`.
 
+## Set up from Claude Code or Codex
+
+The `vidbyte` plugin teaches your coding agent to install `vidbyte-cli`, log you in, and check the
+account, asking before every install. Your API key never enters the chat.
+
+```bash
+claude plugin install vidbyte --marketplace cerredz/vidbyte-cli    # Claude Code
+codex plugin marketplace add cerredz/vidbyte-cli                   # Codex
+codex plugin add vidbyte@vidbyte
+```
+
+Then ask your agent: "Set me up on Vidbyte." Details are in [plugins/vidbyte](plugins/vidbyte).
+
 ## Quickstart
 
 ```bash
