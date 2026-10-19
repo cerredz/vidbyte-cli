@@ -411,3 +411,31 @@ PyPI. The price, 2 cents per block of up to ten requested ideas, comes from the
    only, reporting counts only.
 10. `cmp` of both shared `references/` files against the canonical copies, and a leak scan of the
     diff for home paths, login names, emails, and token shapes.
+
+## Update: usage-billed Suggestion Agent (2026-10-19)
+
+From vidbyte-cli 0.3.2 (cerredz/vidbyte-cli#162), `agents suggest run` buys no Vidbyte admission,
+does not run on the user's Codex, and has no `--idempotency-key` option: passing it fails with exit
+2 and `No such option '--idempotency-key'.` before anything runs. This skill now follows the
+pattern `next-actions-from-obsidian` and the other usage-billed skills use. Where the sections
+above say otherwise, this section wins.
+
+- **No admission, no key, no Codex.** The 2-cent admission, `--idempotency-key`,
+  `idempotency-key.txt`, the key-recovery path, and the `codex login status` gate (exit 6) are
+  gone. Every generator, critic, and revision step is one model call through Vidbyte's model
+  gateway, billed to the Vidbyte balance at the model's per-token rate plus 2%. A paid run writes
+  `paid-run.txt` first, and the script refuses a second paid run (or a new dry run) in a folder
+  that has that marker or a `result.json`.
+- **Model and cap.** No `--model` or `--reasoning-effort` is passed, so both roles run on gpt-6-sol
+  at high reasoning effort ($2 / $0.20 cached / $10 per million input / output tokens).
+  `notes_common.build_argv` adds `--max-total-tokens 400000` to both the dry and the paid run, so
+  the dry run checks the exact paid command.
+- **Bound.** The same as `next-actions-from-obsidian`: about five calls, a worst case of about
+  $2.93, stated to the user as "under about $4". `--count 8` does not change the bound, because
+  every call's output is capped at 32,000 tokens.
+- **Report fields.** `run` reports `models`, `usage` (`model_calls`, `input_tokens`,
+  `cached_input_tokens`, `output_tokens`), and `estimated_cost_usd` instead of `charged_cents` and
+  `idempotency_key`; `report` ends with a usage line instead of the cents line.
+- **Preflight.** `vidbyte-cli --json runtime doctor` and `codex login status` are dropped; the key
+  needs the `models:invoke` permission instead, and exit 4 now also covers a key without it.
+  `references/setup.md` and `references/troubleshooting.md` are the new canonical copies.

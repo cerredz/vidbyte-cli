@@ -8,7 +8,7 @@ Four subcommands, run in this order by the turn-my-request-into-a-checklist skil
   run        --dry-run is free: it reads typed.txt, redacts secrets, emails, and home paths,
              saves the exact request in request.json, and checks it with
              `vidbyte-cli agents suggest run --dry-run`. --paid replays that same request once.
-             It is the one charged step and needs the user's yes first.
+             It is the one usage-billed step and needs the user's yes first.
   checklist  Free. Prints result.json as a Markdown checklist grouped by Now, Next, and Later.
   feedback   Free and local. Records the user's explicit accept or reject of one item.
 
@@ -23,10 +23,8 @@ import argparse
 import datetime as dt
 import hashlib
 import json
-import math
 import os
 import re
-import secrets
 import shlex
 import shutil
 import subprocess
@@ -35,14 +33,21 @@ import tempfile
 from collections import Counter, OrderedDict
 from pathlib import Path
 
-SLUG = "turn-my-request-into-a-checklist"
 PROJECT_KEY = "request-checklists"
 # What a checklist needs: what must be true first, what to do now, how to check it, what to guard.
 CATEGORIES = ("prerequisite", "immediate_next_steps", "verification", "risk_prevention")
-HORIZON = "any"  # Any other value drops ideas after review, and the charge stays the same.
-DEFAULT_COUNT = 8  # One admission block (2 cents) covers up to ten ideas.
-CENTS_PER_BLOCK = 2
-IDEAS_PER_BLOCK = 10
+HORIZON = "any"  # Any other value drops ideas after review, and the run is still billed.
+DEFAULT_COUNT = 8  # Eight items fit on one screen; a larger count asks for longer replies.
+# The run starts no new model call once it has used this many tokens, which bounds its cost.
+MAX_TOTAL_TOKENS = 400000
+
+# vidbyte-cli's default model for both roles, and its regular rates in US dollars per million
+# tokens (https://developers.openai.com/api/docs/models/gpt-6-sol), which Vidbyte's model gateway
+# bills plus a 2% markup. They only estimate a finished run's cost; vidbyte.pro/usage is exact.
+MODEL = "gpt-6-sol"
+RATES_PER_MILLION = {"input": 2.0, "cached_input": 0.2, "output": 10.0}
+MARKUP = 1.02
+USAGE_KEYS = ("model_calls", "input_tokens", "cached_input_tokens", "output_tokens")
 MAX_GOAL_CHARS = 4096  # vidbyte-cli refuses a longer --goal.
 MAX_SUMMARY_CHARS = 600
 MAX_TEXT_CHARS = 200000
@@ -61,7 +66,6 @@ DROPPING_KINDS = ("completed", "in_progress", "avoid")
 MIN_DROPPING_WORDS = 4
 MAX_VALUE_CHARS = 400
 MAX_ARGV_CHARS = 24000  # Windows refuses command lines over 32,767 characters.
-KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 PROJECT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 IDEA_RE = re.compile(r"^idea-\d{3}$")
 TEXT_FILE = "typed.txt"
@@ -220,10 +224,6 @@ def read_typed_text(source: str) -> str:
     return text
 
 
-def cost_cents(count: int) -> int:
-    return CENTS_PER_BLOCK * int(math.ceil(count / float(IDEAS_PER_BLOCK)))
-
-
 def display_command(argv: list) -> str:
     shown = ["vidbyte-cli"] + list(argv[1:])
     if os.name == "nt":
@@ -364,7 +364,7 @@ def build_request(args, text: str, out_dir: Path, redact: Redactor) -> OrderedDi
     )
 
 
-def build_argv(exe: str, request: dict, dry_run: bool, key: str) -> list:
+def build_argv(exe: str, request: dict, dry_run: bool) -> list:
     argv = [exe, "--json", "--no-input", "agents", "suggest", "run", "--goal", request["goal"]]
     for category in request["categories"]:
         argv += ["--category", category]
@@ -376,8 +376,39 @@ def build_argv(exe: str, request: dict, dry_run: bool, key: str) -> list:
         argv += ["--files", name]  # Relative: vidbyte-cli runs inside out_dir, and the path is recorded.
     if request["project"]:
         argv += ["--project", request["project"]]
-    argv += ["--dry-run"] if dry_run else ["--idempotency-key", key]
+    argv += ["--max-total-tokens", str(MAX_TOTAL_TOKENS)]  # On both runs, so the dry run checks the paid command.
+    if dry_run:
+        argv.append("--dry-run")
     return argv
+
+
+def run_models(data: dict) -> list:
+    """The generator's and the critic's model, from a result's settings, without repeats."""
+    settings = data.get("settings") or {}
+    return list(OrderedDict.fromkeys(m for m in (settings.get("model"), settings.get("critic_model")) if m))
+
+
+def estimate_usd(usage: dict, models: list):
+    """Estimates a finished run's cost in dollars, or None when it made no call or left gpt-6-sol."""
+    if not usage.get("model_calls") or any(model != MODEL for model in models):
+        return None
+    cached = int(usage.get("cached_input_tokens") or 0)
+    fresh = max(int(usage.get("input_tokens") or 0) - cached, 0)
+    output = int(usage.get("output_tokens") or 0)
+    rates = RATES_PER_MILLION
+    dollars = (fresh * rates["input"] + cached * rates["cached_input"] + output * rates["output"]) / 1000000
+    return round(dollars * MARKUP, 2)
+
+
+def usage_line(data: dict) -> str:
+    """One sentence on what a finished run used, or an empty string when it made no model call."""
+    usage = data.get("usage") or {}
+    if not usage.get("model_calls"):
+        return ""
+    estimate = estimate_usd(usage, run_models(data))
+    return "This run made %d model calls with %d input and %d output tokens, %s from your Vidbyte balance; the exact amount is on vidbyte.pro/usage." % (
+        int(usage["model_calls"]), int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0),
+        "billed" if estimate is None else "about $%.2f" % estimate)
 
 
 def fingerprint(request: dict, out_dir: Path) -> str:
@@ -388,17 +419,12 @@ def fingerprint(request: dict, out_dir: Path) -> str:
     return digest.hexdigest()
 
 
-def finished_result(path: Path) -> bool:
-    document, data = read_result(path)
-    return document.get("kind") == "suggestions.result" and bool(data) and data.get("stop_reason") != "dry_run"
-
-
 def cmd_run(args) -> int:
     out_dir = Path(args.out).expanduser().resolve()
     if not out_dir.is_dir():
         raise UsageError("--out %s is not a folder. Run `start` first and pass the out_dir it printed." % out_dir)
     if args.dry_run == args.paid:
-        raise UsageError("Pass exactly one of --dry-run (the free check) or --paid (the charged run, only after the user said yes).")
+        raise UsageError("Pass exactly one of --dry-run (the free check) or --paid (the usage-billed run, only after the user said yes).")
     given = [flag for flag, value in (
         ("--text-file", args.text_file), ("--goal-summary", args.goal_summary), ("--context", args.context),
         ("--constraint", args.constraint), ("--completed", args.completed), ("--in-progress", args.in_progress),
@@ -406,25 +432,22 @@ def cmd_run(args) -> int:
     ) if value]
     if args.paid and given:
         raise UsageError("--paid replays the request the dry run checked, so it takes no %s. Pass them to --dry-run, show the user, then run --paid." % ", ".join(given))
-    if args.dry_run and args.idempotency_key:
-        raise UsageError("--idempotency-key belongs to --paid only.")
     exe = resolve_cli(args.cli)
     request_path = out_dir / "request.json"
     ok_path = out_dir / "dry-run.ok"
-    key_path = out_dir / "idempotency-key.txt"
+    marker = out_dir / "paid-run.txt"
     result_path = out_dir / "result.json"
-    key = ""
     redact = Redactor(Path.home())
     if args.dry_run:
-        if key_path.exists() or result_path.exists():
+        if marker.exists() or result_path.exists():
             raise UsageError("A paid run was already started in this folder. A new request needs a new folder: run `start` again.")
         text = read_typed_text(args.text_file or str(out_dir / TEXT_FILE))
         if ok_path.exists():
             ok_path.unlink()
         request = build_request(args, text, out_dir, redact)
         write_text(request_path, json.dumps(request, indent=2) + "\n")
-        argv = build_argv(exe, request, True, "")
-        if "--dry-run" not in argv or "--idempotency-key" in argv:  # Belt and braces: never pay here.
+        argv = build_argv(exe, request, True)
+        if "--dry-run" not in argv:  # Belt and braces: never call a model here.
             raise UsageError("Internal check failed: the dry-run command is not a dry run.")
     else:
         if not request_path.is_file():
@@ -437,37 +460,21 @@ def cmd_run(args) -> int:
             passed = False
         if not passed:
             raise UsageError("No passing dry run matches request.json in this folder. Run `run --dry-run`, show the user what will be sent, and ask before --paid.")
-        saved = ""
-        if key_path.exists():
-            with open(str(key_path), encoding="utf-8") as handle:
-                saved = handle.read().strip()
-        if args.idempotency_key:
-            if not KEY_RE.match(args.idempotency_key):
-                raise UsageError("--idempotency-key must be 8-128 letters, digits, dots, underscores, colons, or hyphens.")
-            if saved and saved != args.idempotency_key:
-                raise UsageError("This folder's paid attempt used the key %s. Only that key can recover it." % saved)
-            if finished_result(result_path):
-                raise UsageError("result.json already holds a finished paid run, so there is nothing to recover. Run `checklist` instead.")
-            key = args.idempotency_key
-        elif saved or result_path.exists():
-            # An earlier paid attempt here may already have been charged. A fresh key would buy
-            # a second admission, so only the saved key or a new folder may continue.
+        if marker.exists() or result_path.exists():
+            # The model calls an earlier paid run here finished were billed, and nothing recovers
+            # them. Another run is a new charge, so it needs the user's yes and a new folder.
             raise UsageError(
-                "A paid run was already started in this folder (see idempotency-key.txt and result.json). "
-                "To recover an attempt that stopped before Vidbyte verified its admission, rerun with --idempotency-key and the saved key. "
-                "Any other new run is a new charge: ask the user first, then run `start` again."
+                "A paid run was already started in this folder (see paid-run.txt and result.json), and the model calls it finished were billed. "
+                "Read result.json if it is there. Any other run is a new usage-billed run: ask the user first, then run `start` again."
             )
-        else:
-            key = "%s:%s:%s" % (SLUG, dt.datetime.now().strftime("%Y%m%d"), secrets.token_hex(3))
-        argv = build_argv(exe, request, False, key)
+        argv = build_argv(exe, request, False)
         if "--dry-run" in argv:
             raise UsageError("Internal check failed: the paid command contains --dry-run.")
     length = sum(len(a) + 3 for a in argv)
     if length > MAX_ARGV_CHARS:
         raise UsageError("The command would be %d characters; shorten the --context and other values to stay under %d." % (length, MAX_ARGV_CHARS))
     if args.paid:
-        write_text(key_path, key + "\n")
-        print("Idempotency key for this run: %s (saved in idempotency-key.txt)" % key, file=sys.stderr)
+        write_text(marker, "Paid run started %s with --max-total-tokens %d.\n" % (dt.datetime.now().isoformat(timespec="seconds"), MAX_TOTAL_TOKENS))
     print("Running in %s:\n%s" % (out_dir, display_command(argv)), file=sys.stderr)
     code, stdout_path, stderr_path, error = run_cli(argv, out_dir, "dry-run.json" if args.dry_run else "result.json")
     report = OrderedDict([("mode", "dry-run" if args.dry_run else "paid"), ("exit_code", code), ("out_dir", str(out_dir)), ("cli", exe)])
@@ -484,17 +491,17 @@ def cmd_run(args) -> int:
                 ("sent", sent),
                 ("redactions", OrderedDict((k, v) for k, v in sorted(redact.counts.items()) if v)),
                 ("count", request["count"]),
-                ("cost_cents", cost_cents(request["count"])),
+                ("max_total_tokens", MAX_TOTAL_TOKENS),
                 ("project", request["project"]),
             ]
         )
-    else:
-        report["idempotency_key"] = key
     report["command"] = display_command(argv)
     report["stderr_file"] = str(stderr_path)
     if code == 0:
         document, data = read_result(stdout_path)
         manifest = data.get("context_manifest") or []
+        models = run_models(data)
+        usage = data.get("usage") or {}
         report.update(
             [
                 ("result_file", str(stdout_path)),
@@ -502,7 +509,9 @@ def cmd_run(args) -> int:
                 ("status", data.get("status")),
                 ("stop_reason", data.get("stop_reason")),
                 ("ideas", len(data.get("ideas") or [])),
-                ("charged_cents", data.get("charged_cents")),
+                ("models", models),
+                ("usage", OrderedDict((key, int(usage.get(key) or 0)) for key in USAGE_KEYS)),
+                ("estimated_cost_usd", estimate_usd(usage, models)),
                 ("context_manifest", [OrderedDict((k, m.get(k)) for k in ("ref", "kind", "source", "chars", "status")) for m in manifest]),
                 ("warnings", data.get("warnings") or []),
             ]
@@ -531,7 +540,7 @@ def render_checklist(data: dict, title: str, result_path: Path) -> str:
             "",
             "> " + one_line(data["parent_message"]),
             "",
-            "A run with the answer added is a new run and a new charge.",
+            "A run with the answer added is a new usage-billed run.",
             "",
         ]
     elif not ideas:
@@ -554,8 +563,8 @@ def render_checklist(data: dict, title: str, result_path: Path) -> str:
         lines += ["Note: " + one_line(warning), ""]
     lines += ["---", ""]
     footer = "%d items from the Vidbyte Suggestion Agent." % len(ideas)
-    if data.get("charged_cents") is not None:
-        footer += " This run cost %s cents from your Vidbyte balance, plus model usage on your Codex account." % data["charged_cents"]
+    if usage_line(data):
+        footer += " " + usage_line(data)
     lines.append(footer)
     if ideas:
         lines += [
@@ -651,7 +660,7 @@ def main(argv=None) -> int:
             "examples:\n"
             "  python3 checklist.py start\n"
             "  python3 checklist.py run --out <out_dir> --dry-run --context \"Repository: shop-api, branch main.\"\n"
-            "  python3 checklist.py run --out <out_dir> --paid        # charged; ask the user first\n"
+            "  python3 checklist.py run --out <out_dir> --paid        # billed by usage; ask the user first\n"
             "  python3 checklist.py checklist --out <out_dir>\n"
             "  python3 checklist.py feedback --out <out_dir> --idea idea-002 --reject --reason \"we already have this\"\n"
         ),
@@ -660,11 +669,11 @@ def main(argv=None) -> int:
 
     sub.add_parser("start", help="Make a new output folder and print where to save the request (free).")
 
-    run = sub.add_parser("run", help="Check the request for free (--dry-run), or run it once (--paid, charged).", description="--dry-run reads typed.txt, redacts it, saves request.json, and runs `vidbyte-cli --json --no-input agents suggest run ... --dry-run` inside <out>. --paid replays the same request with one idempotency key, only after a passing dry run, and saves result.json. Prints a JSON report and exits with vidbyte-cli's exit code.")
+    run = sub.add_parser("run", help="Check the request for free (--dry-run), or run it once (--paid, billed by usage).", description="--dry-run reads typed.txt, redacts it, saves request.json, and runs `vidbyte-cli --json --no-input agents suggest run ... --dry-run` inside <out>. --paid replays the same request once, only after a passing dry run, and saves result.json. Prints a JSON report and exits with vidbyte-cli's exit code.")
     run.add_argument("--out", required=True, help="The out_dir that `start` printed.")
     mode = run.add_mutually_exclusive_group()
-    mode.add_argument("--dry-run", action="store_true", help="The free check: no model, no admission, no charge.")
-    mode.add_argument("--paid", action="store_true", help="The charged run. Use only after the user said yes to the cost.")
+    mode.add_argument("--dry-run", action="store_true", help="The free check: no model call, no charge.")
+    mode.add_argument("--paid", action="store_true", help="The usage-billed run. Use only after the user said yes to the cost.")
     run.add_argument("--text-file", help="Where the request is saved (default: typed.txt in --out). '-' reads stdin.")
     run.add_argument("--goal-summary", help="A one-sentence summary, needed only when the request is over 4,096 characters.")
     run.add_argument("--context", action="append", help="A short fact you already know, such as the repository and branch. At most 3.")
@@ -672,10 +681,9 @@ def main(argv=None) -> int:
     run.add_argument("--completed", action="append", help="Work the user said is already done, as a full sentence. At most 3.")
     run.add_argument("--in-progress", dest="in_progress", action="append", help="Work the user said is underway, as a full sentence. At most 3.")
     run.add_argument("--avoid", action="append", help="A direction the user does not want, as a full sentence. At most 3.")
-    run.add_argument("--count", type=int, default=DEFAULT_COUNT, help="Most checklist items, 2-100 (default: 8). 2 cents per block of ten.")
+    run.add_argument("--count", type=int, default=DEFAULT_COUNT, help="Most checklist items, 2-100 (default: 8). A larger count asks for longer replies, which are more output tokens.")
     run.add_argument("--project", help="The learning project (default: %s)." % PROJECT_KEY)
     run.add_argument("--no-project", action="store_true", help="Run without a learning project.")
-    run.add_argument("--idempotency-key", help="With --paid: the saved key of an earlier attempt, to recover its admission without paying twice.")
     run.add_argument("--cli", default="vidbyte-cli", metavar="PATH", help="The vidbyte-cli to call: a name on PATH or a full path (default: vidbyte-cli).")
 
     checklist = sub.add_parser("checklist", help="Print result.json as a Markdown checklist (free).", description="Print <out>/result.json as a Markdown checklist grouped by Now, Next, and Later, and save it as <out>/checklist.md.")

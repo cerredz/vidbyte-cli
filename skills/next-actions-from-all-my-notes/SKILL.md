@@ -4,7 +4,7 @@ description: Use when the user writes in more than one note tool and wants one l
 metadata:
   agent: "suggestion-agent"
   commands: "agents suggest project list, agents suggest project create, agents suggest run, agents suggest handoff, agents suggest feedback accept, agents suggest feedback reject"
-  cost: "2 cents per run + model usage on the user's own Codex account"
+  cost: "Model usage from the Vidbyte balance: gpt-6-sol at $2 / $10 per million input / output tokens + 2%, capped at 400,000 tokens per run"
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
@@ -56,7 +56,8 @@ Suggestion Agent with the question "what are the most important next actions giv
 writing and discussing across these tools?". Because the agent sees every tool at once, it can
 join a Notion task to the Slack thread that unblocks it, and rank across tools. A generator
 proposes candidates, an independent critic reviews them, and only actions backed by the digest
-survive. The agent runs on the user's own Codex login, for one 2-cent Vidbyte charge.
+survive. Its model calls run on OpenAI's gpt-6-sol through Vidbyte's model gateway and are billed
+to the user's Vidbyte balance.
 
 At the end the user has one short list of next actions grouped by now, next, and later. Each one
 names its sources by tool, title, and link, and the actions backed by more than one tool are
@@ -69,30 +70,31 @@ action the user wants.
 
 The goal is one short, ranked list of next actions built from everything the user wrote in every
 available note tool over one window, from a redacted digest the user saw and approved, with every
-action traced back to its sources, for one Vidbyte charge.
+action traced back to its sources, in one usage-billed run.
 
 Done when: the user has seen which providers were read and which were not, and why; the next
 actions are grouped by now, next, and later, each with its sources (tool, title, and link) and the
-multi-tool ones flagged; the charge from `charged_cents` has been reported; and the user has been
-offered a handoff for the action they choose and feedback on the actions they accepted or rejected.
+multi-tool ones flagged; the run's model usage and estimated cost have been reported; and the
+user has been offered a handoff for the action they choose and feedback on the actions they
+accepted or rejected.
 
 ## Preflight
 
 Run these in order. If a `vidbyte-cli` check fails, read `references/setup.md`, fix only what
-failed, and run the preflight again. Step 3 of that file covers Codex for the Suggestion Agent.
+failed, and run the preflight again. Step 3 of that file lists what the Suggestion Agent needs:
+no Codex and no OpenAI key, only a Vidbyte key with the `models:invoke` permission.
 
 ```bash
 vidbyte-cli --version                  # must be 0.3.0 or newer
 vidbyte-cli --json whoami              # exit 4 means no Vidbyte key is stored
-vidbyte-cli --json runtime doctor      # data.hosts must list "codex" with "available": true
-codex login status                     # must print "Logged in ..."; exit 1 means not logged in
 python3 --version                      # must be 3.8 or newer
 ```
 
-- Codex must be logged in. The CLI checks that Codex is on `PATH` before it charges, but it does
-  not check the login, so a run with a logged-out Codex is charged and then fails. If
-  `codex login status` prints `Not logged in`, ask the user to run `codex login` in their own
-  terminal.
+- The Vidbyte key must carry the `models:invoke` permission; an admin or full-access key has it
+  too. `whoami` does not show permissions, so a key without it fails at the run's first model call
+  with exit 4 and `The stored Vidbyte API key is missing the models:invoke permission.`, before
+  anything is billed. The user then creates a key with that permission at
+  <https://vidbyte.pro/settings/api> and runs `vidbyte-cli login` with it.
 - On Windows, `python3` may be missing or may open the Microsoft Store. Use `py -3 --version`, or
   `python --version`, and use that same command wherever this file says `python3`. The script uses
   only the Python standard library, so it runs unchanged on macOS, Linux, and Windows, from bash,
@@ -280,9 +282,9 @@ Everything in this section is free. Only reads are made, and nothing is sent to 
    and keep the window in it.
 
    The script saves the exact request in `<out_dir>/request.json`, with a fingerprint of
-   `digest.md`, and runs it with `--dry-run`. A dry run calls no model, buys no admission, and
+   `digest.md`, and runs it with `--dry-run` added. A dry run calls no model, is not billed, and
    needs no credentials. Expect exit 0, `"status": "no_suggestions"`, `"stop_reason": "dry_run"`,
-   `"charged_cents": null`, and every `context_manifest` entry `included`, with `digest.md` as one
+   `"models": ["gpt-6-sol"]`, and every `context_manifest` entry `included`, with `digest.md` as one
    `file` entry. On exit 2 the script or the CLI names the problem; fix it and run the dry run
    again.
 
@@ -299,8 +301,6 @@ Python command that worked in Preflight.
    ```bash
    vidbyte-cli --version
    vidbyte-cli --json whoami
-   vidbyte-cli --json runtime doctor
-   codex login status
    python3 --version
    ```
 
@@ -309,8 +309,6 @@ Python command that worked in Preflight.
    ```powershell
    vidbyte-cli --version
    vidbyte-cli --json whoami
-   vidbyte-cli --json runtime doctor
-   codex login status
    py -3 --version
    ```
 
@@ -377,7 +375,7 @@ Python command that worked in Preflight.
 
 9. **Show the user what will be sent and what it costs, and wait for a yes.** (Cost and consent)
 10. **Run the Suggestion Agent once.** It runs `vidbyte-cli --json --no-input agents suggest run
-    ... --idempotency-key <key>`. (Run)
+    ... --max-total-tokens 400000`. (Run)
 
     macOS and Linux:
 
@@ -440,11 +438,10 @@ Root options such as `--json` and `--no-input` always come before the command pa
 |---|---|---|
 | `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.3.0 or newer. Free and offline. |
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
-| `vidbyte-cli --json runtime doctor` | Preflight | Reports the working directory and which supported agent hosts are installed, from `PATH` alone, without reading credentials or using the network. Its `codex` row must be available. Free and offline. |
 | `vidbyte-cli --json agents suggest project list` | Gather inputs | Lists every local suggestion project, sorted by key, with its title and description. An absent catalog returns an empty list, not an error. No credentials, no model call. Free and offline. |
 | `vidbyte-cli --json agents suggest project create --key ... --title ... --description ...` | Gather inputs | Registers one local suggestion project with an empty feedback memory. Refuses a key that already exists. No credentials, no model call, sends nothing to Vidbyte. Free. |
-| `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `all_notes.py run --dry-run` | Validates and resolves the complete request without calling a model, and returns the settings, the context manifest, omissions, and warnings. Needs no credentials and buys nothing. Free. |
-| `vidbyte-cli --json --no-input agents suggest run ... --idempotency-key <key>` | Run, through `all_notes.py run --paid` | Develops ranked next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Buys one Vidbyte admission before any model is called: 2 cents for each block of up to ten requested ideas, so 2 cents at `--count 8`, plus model usage on the user's own Codex account. Writes no files; the script saves its output in the `out_dir`. |
+| `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `all_notes.py run --dry-run` | Validates and resolves the complete request without calling a model, and returns the settings, the context manifest, omissions, and warnings. Needs no credentials and is not billed. Free. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `all_notes.py run --paid` | Develops ranked next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. It starts no new call after 400,000 tokens. Writes no files; the script saves its output in the `out_dir`. |
 | `vidbyte-cli --json agents suggest handoff --input <result.json> --idea <id>` | Deliver | Extracts one reviewed idea from a saved result, by its exact id, as an action packet with a copyable `execution_prompt`. A local read: no provider, no credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest feedback accept --project ... --suggestion ...` | Deliver, through `all_notes.py feedback` | Appends one suggestion the user explicitly accepted, with their optional `--reason`, to the project's memory, so later runs with `--project` look for the same qualities. Local; no credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest feedback reject --project ... --suggestion ...` | Deliver, through `all_notes.py feedback` | Appends one suggestion the user explicitly rejected. On later runs with `--project`, the generator steers away from it and selection drops any idea that repeats it word for word. Local; no credentials, no model call. Free. |
@@ -460,16 +457,20 @@ and `comments.list` (only with `--google-comments`). Obsidian notes are read fro
 
 ## Cost and consent
 
-This skill runs `vidbyte-cli agents suggest run` once, for every provider together. The run costs
-2 cents from the user's Vidbyte balance, because one admission covers up to ten requested ideas and
-this skill asks for eight, plus model usage on the user's own Codex account (their ChatGPT plan or
-OpenAI API key, whichever Codex is logged in with). It does not edit any files: it never writes to
-a vault or a note tool, and the script writes only into its own `out_dir`.
+This skill runs `vidbyte-cli agents suggest run` once, for every provider together, and the run
+is billed by usage from the user's Vidbyte balance. It makes about five model calls on gpt-6-sol at
+high reasoning effort: one draft, then a critique and a revision in each of two rounds. Each call
+is billed at gpt-6-sol's rate, $2 per million input tokens ($0.20 when the input is cached) and $10
+per million output tokens, plus 2%, and the model's reasoning counts as output. The skill passes
+`--max-total-tokens 400000`, so the run starts no new call once it has used 400,000 tokens; a call
+already running still finishes and is billed. That keeps one run under about $4, and the script
+reports the run's real token usage and an estimate of its cost when it finishes. It does not edit
+any files: it never writes to a vault or a note tool, and the script writes only into its own
+`out_dir`.
 
 What leaves the machine: `digest.md` and any `--trajectory`, `--constraint`, or `--avoid` value go
-to the model through the user's own Codex login. Vidbyte's backend receives only the admission
-request, which holds the agent host and the number of idea blocks, never the digest. The notes
-themselves, `items.json`, `sources.json`, the tokens, and every excluded item are never sent.
+to Vidbyte, which sends them to OpenAI with every model call of the run. The notes themselves,
+`items.json`, `sources.json`, the tokens, and every excluded item are never sent.
 
 Before running, show the user:
 
@@ -483,18 +484,18 @@ Then ask, in your own words:
 
 > This runs the Vidbyte Suggestion Agent once over <N> items from <Obsidian (3 notes), Notion
 > (4 pages), Slack (8 threads), Google Docs (2 documents)> (<window>). It sends the redacted
-> digest above to the model through your own Codex login. It costs 2 cents from your Vidbyte
-> balance, plus model usage on your Codex account, and it changes no files. Run it?
+> digest above through Vidbyte to OpenAI's gpt-6-sol. It is billed by usage from your Vidbyte
+> balance, at most about $4 because the run starts no model call after 400,000 tokens, and it
+> changes no files. Run it?
 
 Wait for a yes. If the user wants something removed, run `gather` again with the matching exclude
 option, run the dry run on the new `out_dir`, and ask again. If the user spots a secret in the
 digest, leave that item out with an exclude option, tell them to rotate the secret, and ask again.
 Never edit `digest.md` by hand: the paid run refuses a digest that changed after its dry run.
 
-The script makes one idempotency key per paid run,
-`next-actions-from-all-my-notes:<YYYYMMDD>:<6 hex characters>`, saves it in
-`<out_dir>/idempotency-key.txt`, and prints it before the run. Reuse that key only to recover this
-same admission (Troubleshooting). Any new run is a new charge with a new key, in a new `out_dir`.
+The command takes no idempotency key: there is no purchase to recover, and each model call is
+billed once, when it finishes. The script writes `<out_dir>/paid-run.txt` before the run and
+refuses a second paid run in the same `out_dir`. Any new run is a new charge, in a new `out_dir`.
 
 ## Run
 
@@ -507,13 +508,13 @@ python3 "<skill>/scripts/all_notes.py" run --out "<out_dir>" --paid
 The run has no time limit of its own and often takes several minutes, longer than many hosts let
 one command run. Start it in the background and wait for it to exit, or give it a timeout of at
 least 20 minutes if the host allows one that long. A host timeout that kills the command loses the
-result of a run that was already paid for. Never stop it after stderr shows
-`Vidbyte has verified the admission for this run.`: from that line on, the run is paid for.
+result of model calls that were already billed. Do not stop it early for the same reason: the calls
+that finished are billed either way.
 
 The script refuses to start unless a dry run passed in this `out_dir`, `digest.md` and the request
-are unchanged since that dry run, Codex is logged in, and no paid attempt was made here before. It
-then replays the request the dry run checked, from inside the `out_dir` and without a shell, so
-quoting is the same on every operating system:
+are unchanged since that dry run, and no paid attempt was made here before. It then replays the
+request the dry run checked, from inside the `out_dir` and without a shell, so quoting is the same
+on every operating system:
 
 ```bash
 vidbyte-cli --json --no-input agents suggest run \
@@ -524,7 +525,7 @@ vidbyte-cli --json --no-input agents suggest run \
   --count 8 \
   --files digest.md \
   --project notes-next-actions \
-  --idempotency-key "next-actions-from-all-my-notes:20261011:3f9a1c"
+  --max-total-tokens 400000
 ```
 
 The goal names only the providers whose items are in the digest, and the window `gather` used.
@@ -539,10 +540,11 @@ stdout is saved to `<out_dir>/result.json`, and stderr is shown and saved to
   agent must say what comes first and what falls below the line. `completion`: close nearly
   finished work and open tasks. `continuation`: take the next step of plans already written down.
 - `--horizon any`: the CLI applies any other value only after review, as a filter on each idea's
-  own label, so `--horizon now` could remove ideas while the charge stays the same. The report
+  own label, so `--horizon now` could remove ideas while the run is still billed. The report
   groups ideas by their own horizon instead.
-- `--count 8`: four tools give more candidate actions than one, and eight still fit in one 2-cent
-  block of up to ten and can be decided on in one sitting.
+- `--count 8`: four tools give more candidate actions than one, and eight can still be read and
+  decided on in one sitting. The count is a maximum and not a quota; a larger count asks for longer
+  replies, which are more output tokens.
 - `--files digest.md`: the digest gets a context reference that ideas can cite as evidence. It is
   a relative path from inside the `out_dir`, because the path reaches the model and an absolute
   path would name the user's home folder. `--attach` is not used, because attached text gets no
@@ -552,16 +554,20 @@ stdout is saved to `<out_dir>/result.json`, and stderr is shown and saved to
 - `--trajectory`, `--constraint`, `--avoid`, only when the user said them: their current focus,
   the time they have, and directions they do not want. Typed inputs reach the model as labelled
   evidence.
-- `--idempotency-key`: the one key for this admission (Cost and consent).
-- Kept at their defaults: `--rounds` and `--max-messages`; no `--model` or `--reasoning-effort`,
-  so Codex uses the model the user configured.
+- `--max-total-tokens 400000`: the run starts no new model call after 400,000 tokens, which
+  bounds its cost (Cost and consent). A run that reaches it stops with `stop_reason: token_limit`
+  and returns the ideas it has so far.
+- Kept at their defaults: `--rounds` (two) and `--max-messages`; no `--model` or
+  `--reasoning-effort`, so the generator and the critic both run on gpt-6-sol at high reasoning
+  effort, the rate Cost and consent quotes.
 
 ## Read the result
 
-The script prints a JSON report and exits with `vidbyte-cli`'s exit code (or 6 when Codex is not
-logged in). On exit 0 the report has `result_file`, `kind`, `status`, `stop_reason`, `ideas` (a
-count), `charged_cents`, `warnings`, and `idempotency_key`; otherwise it has `error`, with the
-CLI's `code`, `message`, `hint`, and `retryable` (Troubleshooting).
+The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exit 0 the report has
+`result_file`, `kind`, `status`, `stop_reason`, `ideas` (a count), `models`, `usage`
+(`model_calls`, `input_tokens`, `cached_input_tokens`, `output_tokens`), `estimated_cost_usd`,
+`context_manifest`, and `warnings`; otherwise it has `error`, with the CLI's `code`, `message`,
+`hint`, and `retryable` (Troubleshooting).
 
 `<out_dir>/result.json` is one JSON document,
 `{"schema_version": 1, "kind": "suggestions.result", "data": {...}}`.
@@ -569,14 +575,14 @@ CLI's `code`, `message`, `hint`, and `retryable` (Troubleshooting).
 | Field | Use it for |
 |---|---|
 | `data.status` | `complete`, `partial` (fewer ideas than asked, which is normal), `no_suggestions`, or `needs_input`. |
-| `data.stop_reason` | Why the run stopped, such as `completed`, `count_shortfall`, or `provider_failed`. |
+| `data.stop_reason` | Why the run stopped, such as `completed`, `count_shortfall`, `token_limit` (the 400,000-token cap was reached), `gateway_limit` (the balance or the key's daily spend limit ran out after some ideas were reviewed), or `provider_failed`. |
 | `data.parent_message` | Set with `needs_input`: the generator's question for the user. |
 | `data.ideas[]` | The ranked ideas, best first. |
 | `.id`, `.rank`, `.title`, `.summary` | What to show; `id` (such as `idea-002`) selects an idea for handoff and feedback. |
 | `.horizon`, `.readiness` | `now`, `next`, or `later`; `ready`, `needs_evidence`, `needs_decision`, or `blocked`. |
 | `.first_action`, `.effort_estimate`, `.completion_criteria` | The concrete next step, its size, and how to know it is done. |
 | `data.warnings` | Gaps or shortfalls the run noticed. Mention them if they change how the user reads the ideas. |
-| `data.charged_cents`, `data.admission.admission_id` | What the run cost, and the id to give Vidbyte support if needed. |
+| `data.usage` | What the run used: `model_calls`, `input_tokens`, `cached_input_tokens`, and `output_tokens`. The report's `estimated_cost_usd` prices them at gpt-6-sol's rates plus 2%; the exact charge is on <https://vidbyte.pro/usage>. |
 
 ## Deliver
 
@@ -595,7 +601,10 @@ CLI's `code`, `message`, `hint`, and `retryable` (Troubleshooting).
    adds `Backed by more than one tool: ...`; point these out, because they are where the user's
    tools agree. "From: the digest as a whole" means the idea names no single item; say so instead
    of guessing. If the status is `needs_input`, show the agent's question; a run with the user's
-   answer added is a new charge. End with the charge line the report prints.
+   answer added is a new usage-billed run. End with the usage line the report prints: "This run
+   made <model_calls> model calls with <input_tokens> input and <output_tokens> output tokens,
+   about $<estimated_cost_usd> from your Vidbyte balance; the exact amount is on
+   vidbyte.pro/usage."
 
 2. **Offer a handoff** for the action the user wants to start. It is free and local:
 
@@ -639,9 +648,8 @@ CLI's `code`, `message`, `hint`, and `retryable` (Troubleshooting).
 | 1, from `gather` | Every provider it tried failed. Fix the first `error` with its `hint` and reference file, then gather again. |
 | 2, from `all_notes.py` | The script names the problem, such as a vault folder with no `.obsidian`, an `--from-items` file that breaks `notes-digest/1`, a paid run with no passing dry run, a digest that changed after the dry run, or a paid attempt already started in this `out_dir`. Fix it; do not retry unchanged. |
 | 2, from `vidbyte-cli` | Fix the flag the message names. `Suggestion project was not found: notes-next-actions.` means the project does not exist: create it (Gather inputs, step 7). |
-| 4 | Stop. Follow `references/setup.md` step 2. |
+| 4 | Stop. No Vidbyte key is stored, or the key lacks `models:invoke` (the message says which). Nothing was billed. Follow `references/setup.md` step 2. |
 | 5 | Stop. Follow "Out of credits" in `references/troubleshooting.md`. Never top up without the user's yes. |
-| 6, from `all_notes.py run --paid` | Codex is not logged in, and nothing was charged. Ask the user to run `codex login` in their own terminal. |
 | 127, from `all_notes.py` | `vidbyte-cli` is not on `PATH`. Follow `references/setup.md` step 1. |
 | Other | Read `references/troubleshooting.md`. |
 
@@ -661,22 +669,16 @@ the summary and in `sources.json` has a `kind` and a `hint`:
 
 Offer to go on without that provider, or to fix it and gather again into a new folder.
 
-If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` first:
+If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` and the report's `error`
+first. The model calls that finished before the failure were billed, and nothing recovers or
+refunds them: there is no admission and no idempotency key.
 
-- **It does not contain `Vidbyte has verified the admission for this run.`** The admission may
-  have been charged while its reply was lost. Recover it without paying twice by rerunning with the
-  saved key, after telling the user:
-
-  ```bash
-  python3 "<skill>/scripts/all_notes.py" run --out "<out_dir>" --paid --idempotency-key "<key from idempotency-key.txt>"
-  ```
-
-  The key recovers the purchase only: the backend returns the admission already bought, and the
-  ideas are generated again from the same request.
-- **It contains that line.** The run was paid for. A failure after it, such as
-  `stop_reason: provider_failed`, is usually Codex: check `codex login status`. Another run is a
-  new 2-cent charge plus model usage, so ask the user first, then run `gather` again into a new
-  folder.
+- **`stop_reason: gateway_limit`.** The balance or the key's daily spend limit ran out after some
+  ideas were reviewed. Deliver those ideas, then follow "Out of credits" in
+  `references/troubleshooting.md` before any new run.
+- **Exit 1 with `The model gateway did not complete the suggestion run.`** A provider outage or a
+  reply that did not validate. Another run is a new usage-billed run, so ask the user first, then
+  run `gather` again into a new folder.
 
 ## Guardrails
 
