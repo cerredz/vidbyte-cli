@@ -3,40 +3,55 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import re
 import urllib.parse
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 from .fetch import BROWSER_UA, FetchResult, HttpFetcher
 from .html import PageExtractor
 from .robots import RobotsTxt
 
-# Real user-agent strings, so a firewall rule keyed on the token sees what the crawler would send.
-# Requests still come from this machine's IP, so a pass does not prove IP-verified rules let the real crawler in.
-UA_PROBES = (
-    ("GPTBot", "training", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot"),
-    ("OAI-SearchBot", "search", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot"),
-    ("ChatGPT-User", "user", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot"),
-    ("ClaudeBot", "training", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)"),
-    ("Claude-SearchBot", "search", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-SearchBot/1.0; +Claude-SearchBot@anthropic.com)"),
-    ("Claude-User", "user", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +Claude-User@anthropic.com)"),
-    ("PerplexityBot", "search", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)"),
-    ("Perplexity-User", "user", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)"),
-    ("bingbot", "search", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/141.0.0.0 Safari/537.36"),
-    ("Googlebot", "search", "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"),
-    ("Applebot", "search", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)"),
-)
+BOTS_FILE = Path(__file__).resolve().with_name("bots.json")
+# The AI and search crawlers whose firewall access is checked at the highest severity (ACC-05); every other bot is ACC-18.
+CORE_BOTS = ("GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "Claude-User", "PerplexityBot", "Perplexity-User", "Bingbot", "Googlebot", "Applebot")
 
-# robots.txt product tokens checked without a fetch (some, like Google-Extended, never fetch at all).
-ROBOTS_TOKENS = (
-    ("OAI-SearchBot", "search"), ("Claude-SearchBot", "search"), ("PerplexityBot", "search"), ("Googlebot", "search"),
-    ("bingbot", "search"), ("Applebot", "search"), ("DuckAssistBot", "search"), ("meta-webindexer", "search"),
-    ("Amzn-SearchBot", "search"), ("MistralAI-Index", "search"),
-    ("ChatGPT-User", "user"), ("Claude-User", "user"), ("Perplexity-User", "user"), ("MistralAI-User", "user"),
-    ("GPTBot", "training"), ("ClaudeBot", "training"), ("Google-Extended", "training"), ("Applebot-Extended", "training"),
-    ("CCBot", "training"), ("meta-externalagent", "training"), ("Bytespider", "training"), ("Amazonbot", "training"),
-    ("MistralAI-Training", "training"),
-)
+
+class BotRegistry:
+    """The source-checked list of crawlers, AI fetchers, preview bots, and agents in bots.json (see its "source" field)."""
+
+    @staticmethod
+    def load(path: Path = BOTS_FILE) -> list:
+        # Every bot entry; an unreadable file is a broken install, so it raises.
+        return json.loads(Path(path).read_text(encoding="utf-8"))["bots"]
+
+    @staticmethod
+    def user_agent(bot: dict) -> str:
+        # The documented user agent, or a minimal one built from the token when the docs give only a token (as vidbyte's checker does).
+        if bot.get("userAgent") is not None:
+            return bot["userAgent"]
+        token = bot.get("uaToken") or bot.get("robotsToken") or ""
+        return "Mozilla/5.0 (compatible; %s)" % token if token else ""
+
+    @classmethod
+    def fetchers(cls, bots: list) -> list:
+        # (name, category, user agent) for every bot that fetches pages; robots-only tokens such as Google-Extended never fetch.
+        return [(b["name"], b["category"], cls.user_agent(b)) for b in bots if not b.get("uaOnly")]
+
+    @staticmethod
+    def robots_tokens(bots: list) -> list:
+        # (token, category, obeys only a group naming it) per robots.txt token, first entry wins (BingPreview reuses bingbot).
+        rows, seen = [], set()
+        for b in bots:
+            token = b.get("robotsToken")
+            if token and token.lower() not in seen:
+                seen.add(token.lower())
+                rows.append((token, b["category"], bool(b.get("ignoresWildcardGroup"))))
+        return rows
+
+
+BOTS = BotRegistry.load()
 
 WELL_KNOWN = (
     "/.well-known/security.txt", "/.well-known/ard.json", "/.well-known/ai-catalog.json", "/.well-known/api-catalog",
@@ -122,7 +137,8 @@ class SiteProbe:
             "bytes": result.bytes, "truncated": result.truncated,
             "text": result.body[:6000] if result.ok else "", "sitemaps": robots.sitemaps, "content_signals": robots.content_signals,
             "unknown_lines": robots.unknown_lines[:10], "lines": robots.lines,
-            "tokens": [{"agent": a, "purpose": p, "named": robots.names(a), "home_allowed": robots.allowed(a, "/")} for a, p in ROBOTS_TOKENS],
+            "tokens": [{"agent": a, "purpose": p, "named": robots.names(a), "named_only": only, "home_allowed": robots.allowed(a, "/") or (only and not robots.names(a))}
+                       for a, p, only in BotRegistry.robots_tokens(BOTS)],
         }
         return robots
 
@@ -219,10 +235,11 @@ class SiteProbe:
         return record
 
     def _ua_probes(self, origin: str, home: dict, facts: dict) -> None:
-        # Fetches the home page once per AI user agent and records status, size, and words next to the browser's.
+        # Fetches the home page once as every bot in the registry and records status, size, and words next to the browser's.
+        # Requests come from this machine's IP, so a pass does not prove IP-verified rules let the real crawler in.
         rows = [{"agent": "browser", "purpose": "baseline", "status": home["status"], "bytes": home["bytes"], "words": home["words"], "error": home["error"]}]
         rows[0]["challenge"] = home.get("challenge", False)
-        for agent, purpose, ua in UA_PROBES:
+        for agent, purpose, ua in BotRegistry.fetchers(BOTS):
             result = self.fetcher.get(origin + "/", user_agent=ua)
             words = PageExtractor.extract(result.body)["words"] if result.ok else 0
             challenge = bool(result.header("cf-mitigated")) or bool(CHALLENGE_RE.search(result.body[:20000]))

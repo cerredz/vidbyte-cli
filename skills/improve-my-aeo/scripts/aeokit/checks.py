@@ -9,6 +9,7 @@ from collections import Counter
 
 from .evidence import EvidenceIndex
 from .html import JsonLd
+from .probe import CORE_BOTS
 from .robots import RobotsTxt
 
 PASS, FAIL, WARN, INFO, NOT_CHECKED = "pass", "fail", "warn", "info", "not_checked"
@@ -17,9 +18,9 @@ STATUS_ORDER = {FAIL: 0, WARN: 1, INFO: 2, PASS: 3, NOT_CHECKED: 4}
 # Severity ranks failures for inputs.json: 3 = blocks every answer engine, 2 = loses citations or trust, 1 = polish.
 CHECKS = {
     "ACC-01": (3, "robots.txt is reachable and served as plain text"),
-    "ACC-02": (3, "AI search crawlers may fetch the site in robots.txt"),
+    "ACC-02": (3, "Search and AI search crawlers may fetch the site in robots.txt"),
     "ACC-03": (2, "User-triggered AI fetchers may fetch the site in robots.txt"),
-    "ACC-04": (1, "Training-crawler policy is a deliberate, explicit choice"),
+    "ACC-04": (2, "Training crawlers may fetch the site in robots.txt"),
     "ACC-05": (3, "AI user agents get the same page as a browser"),
     "ACC-06": (2, "A sitemap is declared and readable"),
     "ACC-07": (1, "Sitemap lastmod dates are present and believable"),
@@ -28,6 +29,8 @@ CHECKS = {
     "ACC-10": (2, "Missing pages answer 404 or 410"),
     "ACC-11": (1, "Bots that inherit other bots' rules get the rules you meant"),
     "ACC-16": (1, "Crawl-delay is not the only throttle"),
+    "ACC-17": (2, "Agents, previews, ads, and every other bot type may fetch the site in robots.txt"),
+    "ACC-18": (2, "Every other known bot gets the same page as a browser"),
     "REN-01": (3, "The home page's main text is in the raw HTML"),
     "REN-02": (2, "Every sampled page has an h1 in the raw HTML"),
     "REN-03": (3, "No sampled page is an empty JavaScript shell"),
@@ -90,6 +93,8 @@ CHECKS = {
 }
 
 SEARCH_MUST = ("OAI-SearchBot", "Googlebot", "bingbot", "PerplexityBot", "Claude-SearchBot")
+FAIL_CATEGORIES = {"search", "user", "agent"}  # Blocking these removes the site from answers or from agents acting for a person.
+OTHER_CATEGORIES = ("agent", "preview", "ads", "other", "infra", "catch-all")
 PLACEHOLDER_RE = re.compile(r"\b(lorem ipsum|example\.(com|org)|your (company|business|brand|name)|company name|yourdomain|acme( corp| inc)?|john doe|jane doe|xxx+|placeholder)\b", re.I)
 LOCAL_PATH_RE = re.compile(r"([A-Za-z]:\\\\?Users\\|/Users/[a-z]|/home/[a-z]|\b(src|app|lib|next-app|backend)/[\w./-]+\.(js|jsx|ts|tsx|py)\b)")
 QUESTION_RE = re.compile(r"^(how|what|why|when|which|who|where|can|does|do|is|are|should|will)\b|\?$", re.I)
@@ -266,7 +271,7 @@ class CheckSuite:
         self.results.append(CheckResult(check_id, status, detail, evidence))
 
     def access(self) -> None:
-        # ACC-01..ACC-09: robots.txt, crawler tokens, user-agent parity, sitemaps, page status.
+        # ACC-01..ACC-09, ACC-17, ACC-18: robots.txt, every bot token, user-agent parity, sitemaps, page status.
         r = self.facts.get("robots", {})
         url = self.origin + "/robots.txt"
         if self.robots.unreachable:
@@ -293,53 +298,88 @@ class CheckSuite:
         self._page_status()
 
     def _robots_tokens(self, url: str) -> None:
-        # ACC-02..ACC-04 from the robots verdict for every AI token on "/" and on the sampled paths.
+        # ACC-02..ACC-04 and ACC-17 from the robots verdict for every registry token on "/" and on the sampled paths.
         paths = ["/"] + [urllib.parse.urlsplit(p["url"]).path or "/" for p in self.pages[:10]]
         verdicts = {}
         for row in self.facts.get("robots", {}).get("tokens", []):
-            blocked = [p for p in paths if not self.robots.allowed(row["agent"], p)]
+            # A bot that obeys only a group naming it (AdsBot-Google and friends) is unaffected by * rules.
+            unaffected = row.get("named_only") and not row["named"]
+            blocked = [] if unaffected else [p for p in paths if not self.robots.allowed(row["agent"], p)]
             verdicts[row["agent"]] = (row["purpose"], row["named"], blocked)
-        def summarize(purpose):
-            rows = [(a, v) for a, v in verdicts.items() if v[0] == purpose]
-            blocked = [(a, v[2]) for a, v in rows if v[2]]
-            return rows, blocked
-        _, search_blocked = summarize("search")
+        search_blocked = self._blocked(verdicts, ("search",))
         if search_blocked:
             tag = self.ev.add("robots", url, "Blocked for search crawlers: " + "; ".join("%s on %s" % (a, ", ".join(b[:3])) for a, b in search_blocked))
             must = [a for a, _ in search_blocked if a in SEARCH_MUST]
-            self.add("ACC-02", FAIL if must else WARN, "robots.txt blocks AI search crawlers: %s." % ", ".join(a for a, _ in search_blocked), [tag])
+            self.add("ACC-02", FAIL if must else WARN, "robots.txt blocks search crawlers: %s." % ", ".join(a for a, _ in search_blocked), [tag])
         else:
-            self.add("ACC-02", PASS, "Every AI search crawler checked may fetch the home page and the sampled pages.", [])
-        _, user_blocked = summarize("user")
+            self.add("ACC-02", PASS, "Every search and AI search crawler in the bot list may fetch the home page and the sampled pages.", [])
+        user_blocked = self._blocked(verdicts, ("user",))
         if user_blocked:
             tag = self.ev.add("robots", url, "Blocked for user-triggered fetchers: " + ", ".join(a for a, _ in user_blocked))
             self.add("ACC-03", WARN, "robots.txt blocks fetchers that act for a person asking about this site: %s." % ", ".join(a for a, _ in user_blocked), [tag])
         else:
             self.add("ACC-03", PASS, "User-triggered fetchers are allowed.", [])
-        rows, training_blocked = summarize("training")
-        named = [a for a, v in rows if v[1]]
-        tag = self.ev.add("robots", url, "Training crawlers blocked: %s; named explicitly: %s." % (", ".join(a for a, _ in training_blocked) or "none", ", ".join(named) or "none"))
-        self.add("ACC-04", INFO if named or not training_blocked else WARN, "Training crawlers blocked: %d of %d; %d named explicitly. Blocking them does not remove the site from AI search answers." % (len(training_blocked), len(rows), len(named)), [tag])
+        training_blocked = self._blocked(verdicts, ("training",))
+        if training_blocked:
+            tag = self.ev.add("robots", url, "Blocked for training crawlers: " + ", ".join(a for a, _ in training_blocked))
+            self.add("ACC-04", WARN, "robots.txt blocks training crawlers: %s. This does not remove the site from AI search answers, but the models learn less about it." % ", ".join(a for a, _ in training_blocked), [tag])
+        else:
+            self.add("ACC-04", PASS, "Training crawlers are allowed.", [])
+        other_blocked = self._blocked(verdicts, OTHER_CATEGORIES)
+        if other_blocked:
+            labels = ["%s (%s)" % (a, verdicts[a][0]) for a, _ in other_blocked]
+            tag = self.ev.add("robots", url, "Blocked for other bots: " + ", ".join(labels))
+            severe = any(verdicts[a][0] in FAIL_CATEGORIES for a, _ in other_blocked)
+            self.add("ACC-17", FAIL if severe else WARN, "robots.txt blocks other bot types: %s." % ", ".join(labels), [tag])
+        else:
+            self.add("ACC-17", PASS, "Agents, link previews, ads checks, and generic clients are allowed by robots.txt.", [])
+
+    @staticmethod
+    def _blocked(verdicts: dict, purposes) -> list:
+        # [(token, blocked paths)] for the tokens in these categories that robots.txt blocks somewhere.
+        return [(a, v[2]) for a, v in verdicts.items() if v[0] in purposes and v[2]]
 
     def _ua_parity(self) -> None:
-        # ACC-05: every AI user agent gets the browser's status and about the browser's text.
+        # ACC-05 for the core AI and search crawlers, ACC-18 for every other bot: each gets the browser's status and about its text.
         probes = self.facts.get("ua_probes", [])
         if not probes:
             self.add("ACC-05", NOT_CHECKED, "No user-agent probes ran.")
+            self.add("ACC-18", NOT_CHECKED, "No user-agent probes ran.")
             return
         base = probes[0]
+        core = [row for row in probes[1:] if row["agent"] in CORE_BOTS]
+        others = [row for row in probes[1:] if row["agent"] not in CORE_BOTS]
+        # The core crawlers feed ChatGPT, Claude, Perplexity, Google, Bing, and Apple answers, so any refusal fails.
+        bad, tags = self._parity_failures(base, core)
+        if bad:
+            self.add("ACC-05", FAIL, "The home page answers AI and search crawlers differently from a browser: %s. A firewall or bot rule is likely blocking them." % ", ".join(r["agent"] for r in bad), tags)
+        else:
+            tag = self.ev.add("ua", self.origin + "/", "All %d core AI and search user agents got status %s like the browser (%d words). Sent from this machine, so IP-verified bot rules were not exercised." % (len(core), base["status"], base["words"]))
+            self.add("ACC-05", PASS, "Every core AI and search crawler got the browser's page.", [tag])
+        # Every other bot: refusing an agent, search, or user fetcher fails; previews, ads, and generic clients warn.
+        bad, tags = self._parity_failures(base, others)
+        behind_cloudflare = "cloudflare" in str((self.facts.get("home") or {}).get("server") or "").lower()
+        # Infra bots (Cloudflare's own monitors) only ever visit sites on that CDN.
+        counted = [r for r in bad if r.get("purpose") != "infra" or behind_cloudflare]
+        if counted:
+            severe = any(r.get("purpose") in FAIL_CATEGORIES for r in counted)
+            self.add("ACC-18", FAIL if severe else WARN, "The firewall or server treats these bots differently from a browser: %s." % ", ".join("%s (%s)" % (r["agent"], r.get("purpose")) for r in counted), tags)
+        elif bad:
+            self.add("ACC-18", INFO, "Only CDN infrastructure bots were refused, and the site does not look like it is behind that CDN: %s." % ", ".join(r["agent"] for r in bad), tags)
+        else:
+            tag = self.ev.add("ua", self.origin + "/", "All %d other bot user agents (previews, ads, agents, generic clients) got status %s like the browser." % (len(others), base["status"]))
+            self.add("ACC-18", PASS, "Every other known bot got the browser's page.", [tag])
+
+    def _parity_failures(self, base: dict, rows: list):
+        # The rows whose status, text, or challenge differs from the browser's, with one evidence tag each.
         bad, tags = [], []
-        for row in probes[1:]:
+        for row in rows:
             dropped = base["words"] and row["words"] < 0.5 * base["words"]
             challenged = row.get("challenge") and not base.get("challenge")
             if row["status"] != base["status"] or dropped or challenged:
-                bad.append(row["agent"])
+                bad.append(row)
                 tags.append(self.ev.add("ua", self.origin + "/", "GET / as %s -> %s, %d words%s (browser: %s, %d words)%s." % (row["agent"], row["status"], row["words"], ", challenge page" if challenged else "", base["status"], base["words"], (" " + row["error"]) if row.get("error") else "")))
-        if bad:
-            self.add("ACC-05", FAIL, "The home page answers AI user agents differently from a browser: %s. A firewall or bot rule is likely blocking them." % ", ".join(bad), tags)
-        else:
-            tag = self.ev.add("ua", self.origin + "/", "All %d AI user agents got status %s like the browser (%d words). Sent from this machine, so IP-verified bot rules were not exercised." % (len(probes) - 1, base["status"], base["words"]))
-            self.add("ACC-05", PASS, "Every AI user agent got the browser's page.", [tag])
+        return bad, tags
 
     def _sitemap_checks(self) -> None:
         # ACC-06 sitemap declared and readable; ACC-07 lastmod present and believable.

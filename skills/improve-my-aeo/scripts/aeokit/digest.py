@@ -103,10 +103,19 @@ class DigestWriter:
         if not self.facts:
             return ""
         f = self.facts
-        out = ["## Site facts", "", "### robots.txt verdicts for AI tokens (home page)", "", "| Token | Purpose | Named in robots.txt | Home allowed |", "|---|---|---|---|"]
-        out += ["| %s | %s | %s | %s |" % (t["agent"], t["purpose"], "yes" if t["named"] else "no", "yes" if t["home_allowed"] else "NO") for t in f.get("robots", {}).get("tokens", [])]
-        out += ["", "### Home page fetched as each user agent", "", "| Agent | Status | Bytes | Words |", "|---|---|---|---|"]
-        out += ["| %s | %s | %s | %s |" % (r["agent"], r["status"], r["bytes"], r["words"]) for r in f.get("ua_probes", [])]
+        # The bot list has about 60 tokens and 60 fetchers, so the tables list only named or blocked tokens and refused fetches, plus counts.
+        tokens = f.get("robots", {}).get("tokens", [])
+        shown = [t for t in tokens if t["named"] or not t["home_allowed"]]
+        out = ["## Site facts", "", "### robots.txt verdicts for the bot list (home page)", "",
+               "%d tokens checked; %d blocked from the home page. Tokens named in robots.txt or blocked:" % (len(tokens), sum(1 for t in tokens if not t["home_allowed"])), "",
+               "| Token | Category | Named in robots.txt | Home allowed |", "|---|---|---|---|"]
+        out += ["| %s | %s | %s | %s |" % (t["agent"], t["purpose"], "yes" if t["named"] else "no", "yes" if t["home_allowed"] else "NO") for t in shown] or ["| (none) | | | |"]
+        probes = f.get("ua_probes", [])
+        base = probes[0] if probes else {}
+        differing = [r for r in probes[1:] if r["status"] != base.get("status") or r.get("challenge")]
+        out += ["", "### Home page fetched as each bot", "", "%d bots fetched the home page; %d got a different status or a challenge. Browser: %s, %s words." % (len(probes) - 1 if probes else 0, len(differing), base.get("status"), base.get("words")), "",
+                "| Bot | Category | Status | Bytes | Words |", "|---|---|---|---|---|"]
+        out += ["| %s | %s | %s | %s | %s |" % (r["agent"], r["purpose"], r["status"], r["bytes"], r["words"]) for r in differing] or ["| (none) | | | | |"]
         llms = f.get("llms", {})
         out += ["", "### llms.txt (first 2,500 characters)", ""]
         out += ["```text", llms["text"][:2500], "```"] if llms.get("text") else ["Not found (GET /llms.txt -> %s)." % llms.get("status")]
