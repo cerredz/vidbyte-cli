@@ -4,15 +4,16 @@
 Subcommands:
   gather   Fetch the site (or take only questions) and write audit.md, checks.json, evidence.json, inputs.json,
            and copies of aeo-rubric.md and aeo-checklist.md into a new folder. Free; makes HTTP requests only.
-  suggest  Validate inputs.json and run `vidbyte-cli agents suggest run` from that folder (--dry-run is free,
-           --paid is billed by model usage).
+  suggest  Validate inputs.json and run `vidbyte-cli agents suggest run` from that folder (--dry-run is free;
+           --paid uses the learning project if it exists, runs the free dry run, then the run billed by model usage).
   report   Tie each idea in result.json to the evidence and checklist items it cites. Free and local.
-  feedback Record the user's explicit accept or reject of one idea. Free and local.
+  feedback Record the user's explicit accept or reject of one idea, creating the learning project on first use. Free and local.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -110,8 +111,35 @@ class GatherCommand:
             "failed_requests": [row for row in fetch_log if not row.get("status")][:10],
             "audit_chars": written["audit_chars"],
             "questions": questions,
-            "next": "Read audit.md and inputs.json, then: aeo_audit.py suggest --out <out_dir> --dry-run",
+            "next": "Read audit.md, show the failing checks, ask for a yes, then: aeo_audit.py suggest --out <out_dir> --paid",
         }
+
+
+class LearningProject:
+    """The local suggestion project that remembers the user's accepted and rejected fixes between runs."""
+
+    TITLE = "Improve my AEO"
+    DESCRIPTION = ("Fixes and answers for getting a site read, trusted, and cited by answer engines and AI agents, built from a free audit of the site. "
+                   "Accepted and rejected ideas record which kinds of AEO advice the user finds useful.")
+
+    def __init__(self, exe: str) -> None:
+        # exe is the resolved vidbyte-cli path.
+        self.exe = exe
+
+    def exists(self) -> bool:
+        # True when `agents suggest project list` (local, free) has this skill's project; any failure counts as absent.
+        try:
+            done = subprocess.run([self.exe, "--json", "agents", "suggest", "project", "list"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+            projects = (json.loads(done.stdout.decode("utf-8", "replace") or "{}").get("data") or {}).get("projects") or []
+        except (OSError, ValueError, subprocess.SubprocessError, AttributeError):
+            return False
+        return done.returncode == 0 and any(isinstance(p, dict) and p.get("key") == PROJECT_KEY for p in projects)
+
+    def create(self) -> int:
+        # Registers the project with `agents suggest project create` (local, free) and returns its exit code.
+        argv = [self.exe, "--json", "agents", "suggest", "project", "create", "--key", PROJECT_KEY, "--title", self.TITLE, "--description", self.DESCRIPTION]
+        print(CliInvoker().display(argv), file=sys.stderr)
+        return subprocess.call(argv, stdout=subprocess.DEVNULL)
 
 
 class SuggestCommand:
@@ -145,10 +173,19 @@ class SuggestCommand:
         guard = PaidRunGuard(self.out_dir)
         if self.args.paid and guard.problem():
             return CommandIO.usage_error(guard.problem())
+        # Use the learning project when the user already has one, so the run reads their earlier verdicts.
+        if not inputs.get("project") and LearningProject(exe).exists():
+            inputs["project"] = PROJECT_KEY
         argv = AeoRun.argv(exe, inputs, self.args.dry_run)
         if SuggestArgv.length(argv) > MAX_ARGV_CHARS:
             return CommandIO.usage_error("The command would be %d characters; shorten the inputs.json values to stay under %d." % (SuggestArgv.length(argv), MAX_ARGV_CHARS))
         if self.args.paid:
+            # Check the whole request for free first: a dry run calls no model, so a usage error never costs money.
+            code, stdout_path, stderr_path, error = invoker.run(AeoRun.argv(exe, inputs, True), self.out_dir, "dry-run.json")
+            if code != 0:
+                print("The free dry run failed, so the paid run did not start.", file=sys.stderr)
+                CommandIO.print_json(RunReporter.summarize(code, stdout_path, stderr_path, error))
+                return code
             guard.mark()
         print("Running in %s:\n%s" % (self.out_dir, invoker.display(argv)), file=sys.stderr)
         code, stdout_path, stderr_path, error = invoker.run(argv, self.out_dir, "dry-run.json" if self.args.dry_run else "result.json")
@@ -201,14 +238,20 @@ class FeedbackCommand:
         match = [i for i in ideas if isinstance(i, dict) and i.get("id") == self.args.idea]
         if not match:
             return CommandIO.usage_error("No idea with id %s in result.json. Ids look like idea-001." % self.args.idea)
-        project = self._project()
-        if not project or not PROJECT_RE.match(project):
-            return CommandIO.usage_error("No suggestion project. Create it first (see the skill's Deliver section), then pass --project %s or set project in inputs.json." % PROJECT_KEY)
         invoker = CliInvoker(self.args.cli)
         exe = invoker.resolve()
         if not exe:
             CommandIO.print_json({"error": NO_CLI})
             return 127
+        project = self._project()
+        if project and not PROJECT_RE.match(project):
+            return CommandIO.usage_error("%r is not a valid suggestion project key." % project)
+        if not project:
+            # An explicit accept or reject is the user asking to be remembered, so create this skill's project on first use.
+            project = PROJECT_KEY
+            learning = LearningProject(exe)
+            if not learning.exists() and learning.create() != 0:
+                return CommandIO.usage_error("Could not create the %s suggestion project; run `vidbyte-cli --json agents suggest project list` to see why." % PROJECT_KEY)
         argv = FeedbackArgv.build(exe, "accept" if self.args.accept else "reject", project, match[0]["title"], self.args.reason or "", Redactor())
         print(invoker.display(argv), file=sys.stderr)
         return subprocess.call(argv)
@@ -237,8 +280,7 @@ class ArgumentParserFactory:
             epilog=(
                 "Typical flow:\n"
                 "  python3 aeo_audit.py gather --url https://example.com          # free\n"
-                "  python3 aeo_audit.py suggest --out <out_dir> --dry-run         # free\n"
-                "  python3 aeo_audit.py suggest --out <out_dir> --paid            # billed by usage; ask the user first\n"
+                "  python3 aeo_audit.py suggest --out <out_dir> --paid            # free dry run, then billed by usage; ask the user first\n"
                 "  python3 aeo_audit.py report --out <out_dir>                    # free, local\n"
             ),
         )
@@ -263,7 +305,7 @@ class ArgumentParserFactory:
         verdict.add_argument("--accept", action="store_true", help="The user said they want this idea.")
         verdict.add_argument("--reject", action="store_true", help="The user said no to this idea.")
         feedback.add_argument("--reason", help="The user's own reason, if they gave one.")
-        feedback.add_argument("--project", help="The suggestion project key (default: project in inputs.json; this skill uses %s)." % PROJECT_KEY)
+        feedback.add_argument("--project", help="The suggestion project key (default: project in inputs.json, else %s, created on first use)." % PROJECT_KEY)
         feedback.add_argument("--cli", help="Path or name of the vidbyte-cli executable (default: vidbyte-cli on PATH).")
         return parser
 
