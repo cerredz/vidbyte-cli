@@ -2,7 +2,7 @@
 name: setup
 description: Use when the user wants to start using Vidbyte from this coding agent - "set me up on Vidbyte", "install vidbyte-cli and log me in", "is my Vidbyte setup ready?". Checks what is already installed, installs vidbyte-cli only after the user says yes, gets the user logged in without the API key ever entering the chat, and verifies the account before any Vidbyte agent runs. Needs a shell on the user's own machine.
 metadata:
-  commands: "--version, whoami, login, runtime doctor, runtime list, provider whoami, provider login"
+  commands: "--version, whoami, login, billing balance, runtime doctor, runtime list, provider whoami, provider login"
   cost: "none - the setup commands start no paid run"
   writes-files: "false"
   min-cli-version: "0.2.0"
@@ -76,10 +76,19 @@ B. The login. If `vidbyte-cli whoami` printed "Authenticated as", tell the user 
        command or API route mints a key. Wait for them, then have them run `vidbyte-cli login`
        themselves as above.
 
-C. The balance. The CLI has no command that reads the balance, and setup spends nothing, so do
-   not ask the user about their balance now. If a later run exits with status 5, the balance could
-   not cover it and nothing was charged: stop, show the user the CLI's message as printed, and
-   wait for them.
+C. The balance. Setup spends nothing, and reading the balance is free. Which check to run depends
+   on the version `vidbyte-cli --version` printed:
+   - 0.3.0 or newer: run `vidbyte-cli --json billing balance`. It sends one read-only request and
+     never pays, prompts, or changes the balance. Tell the user `data.spendable_balance_cents` in
+     dollars: it is what a new paid run can draw on now. `data.reserved_balance_cents` is held by
+     runs still in progress. If the spendable amount is 0, tell the user that every paid run will
+     be refused until they add balance at https://vidbyte.pro/settings/api, and never add it for
+     them.
+   - 0.2.0: this version has no command that reads the balance, so do not ask the user about
+     their balance now.
+
+   On either version, if a later run exits with status 5, the balance could not cover it and
+   nothing was charged: stop, show the user the CLI's message as printed, and wait for them.
 
 D. The host, only if the user picked an agent that drives a coding agent on their machine. Skip D
    for the Suggestion Agent, which needs no Codex and no OpenAI key; remind the user instead that
@@ -90,6 +99,11 @@ D. The host, only if the user picked an agent that drives a coding agent on thei
    - Then run `vidbyte-cli provider whoami openai`. If it fails, say: "Codex needs an OpenAI key
      and none is stored. Please run `vidbyte-cli provider login openai` in your own terminal."
      Wait for them, then run it again.
+   - A passing `provider whoami openai` proves the key is live, not that it can pay. The
+     Persistent Agent, Task Board, and Stages bill every Codex model call to that OpenAI API key,
+     never to a ChatGPT or Codex subscription, and Vidbyte charges their admission before Codex
+     makes its first call. Ask the user to confirm that the key's OpenAI account has API credits;
+     with none, the admission is spent and no work gets done.
 
 ## Step 3: verify, then tell the user what you found
 
