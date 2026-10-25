@@ -284,7 +284,7 @@ from the user's Vidbyte balance.
 - **Rates.** $2 per million input tokens ($0.20 when cached) and $10 per million output tokens,
   plus 2%. The model's reasoning counts as output.
 - **What makes each call larger.** `audit.md` (up to 40,000 characters), `aeo-checklist.md`
-  (about 80,000 bytes), and the rubric (about 12,000 bytes) go with every call; after the first
+  (about 80,000 bytes), and the rubric (about 17,000 bytes) go with every call; after the first
   call most of that input is cached.
 - **The cap.** The script passes `--max-total-tokens 400000`, so the run starts no new call once
   it has used 400,000 tokens; a call already running still finishes and is billed. That keeps one
