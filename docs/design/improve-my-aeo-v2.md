@@ -163,7 +163,7 @@ other products. This map is the only place it is named.
   - every checklist id having a rubric line;
   - SEO-01 to SEO-22 existing.
 - `ruff check` is clean.
-- `SKILL.md` is under 10 KB and has every contract section in order.
+- The `SKILL.md` body is under 10 KB and has every contract section in order.
 - A live `gather` against vidbyte.pro (every bot answered 200 on 2026-10-25) and
   conquerorapp.com (Applebot 403).
 - A free dry run through the real CLI.
