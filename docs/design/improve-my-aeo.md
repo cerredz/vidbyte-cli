@@ -3,7 +3,7 @@
 **Status:** Draft
 **Author:** Claude
 **Created:** 2026-10-25
-**Last Updated:** 2026-10-25
+**Last Updated:** 2026-10-25 (implementation deviations recorded in section 15)
 
 ---
 
@@ -14,9 +14,9 @@ Claude, Perplexity, Google AI Overviews and AI Mode, Copilot) and coding agents 
 never cite their site, and what to change first. A bundled, standard-library Python script audits
 any public site for free: it fetches `robots.txt`, sitemaps, `llms.txt` and `llms-full.txt`, the
 home page as a browser and as each major AI crawler and fetcher, the `.md` mirrors and
-`Accept: text/markdown` negotiation, and up to 60 pages. It runs about 45 mechanical checks
+`Accept: text/markdown` negotiation, and up to 60 pages. It runs 71 mechanical checks
 (crawler access, raw-HTML rendering, index controls, llms.txt quality, Markdown canonicals,
-structured-data leftovers, and message contradictions between pages) and writes a tagged evidence
+structured-data leftovers, message contradictions between pages, and agent discovery files) and writes a tagged evidence
 digest. One usage-billed `vidbyte-cli agents suggest run` then sends that digest, a compact AEO
 rubric through `--instructions` (it explains every checklist item to the generator and every
 critic), and the in-depth, sourced AEO checklist through `--files` as reference. The user can also
@@ -131,7 +131,7 @@ as a `coming-soon` entry, like every skill that needs vidbyte-cli 0.3.x, which i
 - No secrets: the audit reads public pages only; `inputs.json` values are redacted with the sibling
   redactor before any paid run.
 - Cost bound: `--max-total-tokens 400000` (≤ about $4 at gpt-6-sol rates plus 2%); the checklist
-  file is kept under 70,000 bytes so each call stays small.
+  file is kept under 80,000 bytes and `audit.md` under 40,000 characters so each call stays small.
 - Observability: the gather summary lists every fetch with status, bytes, and elapsed ms.
 
 ---
@@ -311,7 +311,7 @@ contradictions), `checks.json`, `evidence.json`, and `inputs.json`:
 - `capability`, `constraint`, `avoid`, `success`: empty for the host agent to fill from the user's
   words.
 
-`audit.md` is capped at 60,000 characters; sections are trimmed from the bottom (raw facts first).
+`audit.md` is capped at 40,000 characters; sections are trimmed from the bottom (the evidence index and raw facts first).
 
 ### 6.6 Runner (copied)
 **File(s):** `scripts/aeokit/runner.py` — New file (adapted copy of
@@ -342,9 +342,10 @@ ids found in title, summary, first_action, completion_criteria, and handoff evid
 checklist id appears); writes `report.md` and prints JSON.
 
 ### 6.9 References
-- `references/aeo-checklist.md` — New: the in-depth checklist (≈80 items in families ACC, REN, IDX,
-  LLM, MD, SCH, MSG, CNT, ENT, OFF, DSC, MEA), each with check / test / why / facts / sources /
-  confidence / mistake, plus "Contested or myth". Under 70,000 bytes.
+- `references/aeo-checklist.md` — New: the in-depth checklist (115 items in families ACC, REN, IDX,
+  LLM, MD, SCH, ENT, MSG, CNT, OFF, DSC, MEA), each with check / audit kind (script, owner, review) /
+  why with facts and numbers / sources / confidence / mistake, plus 25 "Contested claims and myths".
+  Under 80,000 bytes.
 - `references/aeo-rubric.md` — New: situation, what every idea must contain, what not to do, every
   checklist id with a one-to-three-line explanation, ranking rule. At most 20,000 bytes.
 - `references/setup.md`, `references/troubleshooting.md` — byte copies of the canonical files.
@@ -392,7 +393,8 @@ N/A - no endpoints. The skill calls existing `vidbyte-cli` commands only.
 | CREATE | `skills/improve-my-aeo/scripts/aeokit/robots.py` | RobotsTxt parser (RFC 9309 matching) |
 | CREATE | `skills/improve-my-aeo/scripts/aeokit/probe.py` | SiteProbe |
 | CREATE | `skills/improve-my-aeo/scripts/aeokit/checks.py` | CheckSuite |
-| CREATE | `skills/improve-my-aeo/scripts/aeokit/digest.py` | EvidenceIndex, DigestWriter |
+| CREATE | `skills/improve-my-aeo/scripts/aeokit/evidence.py` | EvidenceIndex (split out so checks and digest share it without a cycle) |
+| CREATE | `skills/improve-my-aeo/scripts/aeokit/digest.py` | DigestWriter |
 | CREATE | `skills/improve-my-aeo/scripts/aeokit/runner.py` | Copied usage-billed run plumbing |
 | CREATE | `skills/improve-my-aeo/scripts/aeokit/suggest.py` | AeoRun settings |
 | CREATE | `skills/improve-my-aeo/scripts/aeokit/report.py` | IdeaReporter |
@@ -502,3 +504,27 @@ All tests run offline against a local `http.server` fixture site on 127.0.0.1 an
 - What: ship the WordPress sitemap parser.
 - Why rejected: it assumes Yoast sitemap names, fetches without limits, and checks no AI-specific
   surface; the new script keeps its per-page fields and adds the rest.
+
+---
+
+## 15. Implementation notes (deviations from the first draft)
+
+- The research (three parallel passes over vendor docs, specs, Lighthouse source, papers, and
+  studies) produced 115 checklist items; 71 are checked mechanically, up from the ~45 planned.
+  New mechanical checks it justified: soft 404s (ACC-10), Applebot inheriting the Googlebot group
+  (ACC-11), Crawl-delay (ACC-16), the 2 MB Googlebot HTML limit (REN-05), plain links (REN-06),
+  `noarchive` removing pages from Copilot (IDX-05), llms.txt size/speed, discoverability, and
+  Optional-section checks (LLM-09..11), mirror cleanliness and Cloudflare Content-Signal mismatch
+  (MD-05, MD-06), marked-up vs visible prices, retired types, generic authors, Organization
+  completeness (SCH-09..12), ARD / API catalog / skills index / Link header discovery (DSC-04..07),
+  and Bing/Google verification tags (MEA-04).
+- A missing llms.txt is `info`, not `warn`: Google's AI guide (2026-07-10) says Search ignores it,
+  and studies of ~300K and 137K domains found no citation effect.
+- Person nodes are not treated as the site's Organization (blog authors produced false SCH-03
+  failures on conquerorapp.com); pages whose final URLs match are sampled once.
+- `audit.md` is capped at 40,000 characters (not 60,000) and the checklist at 80,000 bytes, to
+  keep each of the ~5 model calls near 40K input tokens.
+- Validated live on 2026-10-25: vidbyte.pro (MD-03 canonical gap, llms.txt comment, FAQ markup
+  not in raw HTML) and conquerorapp.com (Organization named "ChatPack", false Accept-header claim
+  in llms.txt, Applebot 403) reproduce the known findings; a free `--dry-run` through the CLI
+  (main) includes both files and all five categories.
