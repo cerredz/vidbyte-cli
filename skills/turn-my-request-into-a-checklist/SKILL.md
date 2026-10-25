@@ -4,7 +4,7 @@ description: Use when the user wants a request laid out as a checklist before wo
 metadata:
   agent: "suggestion-agent"
   commands: "agents suggest project list, agents suggest project create, agents suggest run, agents suggest handoff, agents suggest feedback accept, agents suggest feedback reject"
-  cost: "Model usage from the Vidbyte balance: gpt-6-sol at $2 / $10 per million input / output tokens + 2%, capped at 400,000 tokens per run"
+  cost: "Model usage from the Vidbyte balance: gpt-6-sol at $2 / $10 per million input / output tokens + 2%, about 5 model calls, capped at 400,000 tokens per run"
   writes-files: "true"
   min-cli-version: "0.3.0"
   status: stable
