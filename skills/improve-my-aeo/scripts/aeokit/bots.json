@@ -1,0 +1,1177 @@
+{
+ "source": "cerredz/Vidbyte next-app/seo/bot-registry.js at 2b89510e9 (PR #829)",
+ "exported": "2026-10-25",
+ "note": "Values copied from each operator's docs on the checked date; null means the docs did not state it. Re-check quarterly.",
+ "bots": [
+  {
+   "name": "Googlebot",
+   "operator": "Google",
+   "category": "search",
+   "robotsToken": "Googlebot",
+   "uaToken": "Googlebot",
+   "userAgent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/common-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/overview-google-crawlers",
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers",
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/verify-google-requests",
+    "https://developers.google.com/static/crawling/ipranges/common-crawlers.json"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Google-Extended",
+   "operator": "Google",
+   "category": "training",
+   "robotsToken": "Google-Extended",
+   "uaToken": "Google-Extended",
+   "userAgent": null,
+   "uaOnly": true,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Google-InspectionTool",
+   "operator": "Google",
+   "category": "search",
+   "robotsToken": "Google-InspectionTool",
+   "uaToken": "Google-InspectionTool",
+   "userAgent": "Mozilla/5.0 (compatible; Google-InspectionTool/1.0)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/common-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers",
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/verify-google-requests",
+    "https://developers.google.com/static/crawling/ipranges/common-crawlers.json"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Bingbot",
+   "operator": "Microsoft",
+   "category": "search",
+   "robotsToken": "bingbot",
+   "uaToken": "bingbot",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/131.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://www.bing.com/toolbox/bingbot.json",
+   "sourceUrls": [
+    "https://www.bing.com/webmasters/help/which-crawlers-does-bing-use-8c184ec0",
+    "https://www.bing.com/webmasters/help/how-to-verify-bingbot-3905dc26",
+    "https://www.bing.com/toolbox/bingbot.json"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Applebot",
+   "operator": "Apple",
+   "category": "search",
+   "robotsToken": "Applebot",
+   "uaToken": "Applebot",
+   "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://search.developer.apple.com/applebot.json",
+   "sourceUrls": [
+    "https://support.apple.com/en-us/119829",
+    "https://search.developer.apple.com/applebot.json"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Applebot-Extended",
+   "operator": "Apple",
+   "category": "training",
+   "robotsToken": "Applebot-Extended",
+   "uaToken": "Applebot-Extended",
+   "userAgent": null,
+   "uaOnly": true,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://support.apple.com/en-us/119829"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "DuckDuckBot",
+   "operator": "DuckDuckGo",
+   "category": "search",
+   "robotsToken": "DuckDuckBot",
+   "uaToken": "DuckDuckBot",
+   "userAgent": "DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://duckduckgo.com/duckduckbot.json",
+   "sourceUrls": [
+    "https://duckduckgo.com/duckduckgo-help-pages/results/duckduckbot",
+    "https://duckduckgo.com/duckduckbot.json"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "DuckAssistBot",
+   "operator": "DuckDuckGo",
+   "category": "search",
+   "robotsToken": "DuckAssistBot",
+   "uaToken": "DuckAssistBot",
+   "userAgent": "DuckAssistBot/1.2; (+http://duckduckgo.com/duckassistbot.html)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://duckduckgo.com/duckassistbot.json",
+   "sourceUrls": [
+    "https://duckduckgo.com/duckduckgo-help-pages/results/duckassistbot",
+    "https://duckduckgo.com/duckassistbot.json"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Google-Agent",
+   "operator": "Google",
+   "category": "agent",
+   "robotsToken": null,
+   "uaToken": "Google-Agent",
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko; compatible; Google-Agent; +https://developers.google.com/crawling/docs/crawlers-fetchers/google-agent) Chrome/131.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": false,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/user-triggered-agents.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-user-triggered-fetchers",
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/verify-google-requests",
+    "https://developers.google.com/static/crawling/ipranges/user-triggered-agents.json"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Googlebot-Image",
+   "operator": "Google",
+   "category": "search",
+   "robotsToken": "Googlebot-Image",
+   "uaToken": "Googlebot-Image",
+   "userAgent": "Googlebot-Image/1.0",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/common-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/common-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Googlebot-Video",
+   "operator": "Google",
+   "category": "search",
+   "robotsToken": "Googlebot-Video",
+   "uaToken": "Googlebot-Video",
+   "userAgent": "Googlebot-Video/1.0",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/common-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/common-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Googlebot-News",
+   "operator": "Google",
+   "category": "search",
+   "robotsToken": "Googlebot-News",
+   "uaToken": "Googlebot-News",
+   "userAgent": null,
+   "uaOnly": true,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Storebot-Google",
+   "operator": "Google",
+   "category": "search",
+   "robotsToken": "Storebot-Google",
+   "uaToken": "Storebot-Google",
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64; Storebot-Google/1.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/common-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/common-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "GoogleOther",
+   "operator": "Google",
+   "category": "other",
+   "robotsToken": "GoogleOther",
+   "uaToken": "GoogleOther",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GoogleOther) Chrome/131.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/common-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/common-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "GoogleOther-Image",
+   "operator": "Google",
+   "category": "other",
+   "robotsToken": "GoogleOther-Image",
+   "uaToken": "GoogleOther-Image",
+   "userAgent": "GoogleOther-Image/1.0",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/common-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/common-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "GoogleOther-Video",
+   "operator": "Google",
+   "category": "other",
+   "robotsToken": "GoogleOther-Video",
+   "uaToken": "GoogleOther-Video",
+   "userAgent": "GoogleOther-Video/1.0",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/common-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/common-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Google-CloudVertexBot",
+   "operator": "Google",
+   "category": "agent",
+   "robotsToken": "Google-CloudVertexBot",
+   "uaToken": "Google-CloudVertexBot",
+   "userAgent": "Mozilla/5.0 (compatible; Google-CloudVertexBot)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/common-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/common-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "AdsBot-Google",
+   "operator": "Google",
+   "category": "ads",
+   "robotsToken": "AdsBot-Google",
+   "uaToken": "AdsBot-Google",
+   "userAgent": "AdsBot-Google (+http://www.google.com/adsbot.html)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": true,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/special-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-special-case-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/special-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "AdsBot-Google-Mobile",
+   "operator": "Google",
+   "category": "ads",
+   "robotsToken": "AdsBot-Google-Mobile",
+   "uaToken": "AdsBot-Google-Mobile",
+   "userAgent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; AdsBot-Google-Mobile; +http://www.google.com/mobile/adsbot.html)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": true,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/special-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-special-case-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/special-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Mediapartners-Google",
+   "operator": "Google",
+   "category": "ads",
+   "robotsToken": "Mediapartners-Google",
+   "uaToken": "Mediapartners-Google",
+   "userAgent": "Mediapartners-Google",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": true,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/special-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-special-case-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/special-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "APIs-Google",
+   "operator": "Google",
+   "category": "other",
+   "robotsToken": "APIs-Google",
+   "uaToken": "APIs-Google",
+   "userAgent": "APIs-Google (+https://developers.google.com/webmasters/APIs-Google.html)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": true,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/special-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-special-case-crawlers",
+    "https://developers.google.com/static/crawling/ipranges/special-crawlers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Google-Safety",
+   "operator": "Google",
+   "category": "other",
+   "robotsToken": null,
+   "uaToken": "Google-Safety",
+   "userAgent": "Google-Safety",
+   "uaOnly": false,
+   "respectsRobotsTxt": false,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/special-crawlers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-special-case-crawlers"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "FeedFetcher-Google",
+   "operator": "Google",
+   "category": "user",
+   "robotsToken": null,
+   "uaToken": "FeedFetcher-Google",
+   "userAgent": "FeedFetcher-Google; (+http://www.google.com/feedfetcher.html)",
+   "uaOnly": false,
+   "respectsRobotsTxt": false,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/user-triggered-fetchers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-user-triggered-fetchers",
+    "https://developers.google.com/static/crawling/ipranges/user-triggered-fetchers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Google-GeminiNotebook",
+   "operator": "Google",
+   "category": "user",
+   "robotsToken": null,
+   "uaToken": "Google-GeminiNotebook",
+   "userAgent": null,
+   "uaOnly": false,
+   "respectsRobotsTxt": false,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/user-triggered-fetchers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-user-triggered-fetchers",
+    "https://developers.google.com/static/crawling/ipranges/user-triggered-fetchers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Google-Read-Aloud",
+   "operator": "Google",
+   "category": "user",
+   "robotsToken": null,
+   "uaToken": "Google-Read-Aloud",
+   "userAgent": null,
+   "uaOnly": false,
+   "respectsRobotsTxt": false,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/user-triggered-fetchers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-user-triggered-fetchers",
+    "https://developers.google.com/static/crawling/ipranges/user-triggered-fetchers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Google-Site-Verification",
+   "operator": "Google",
+   "category": "user",
+   "robotsToken": null,
+   "uaToken": "Google-Site-Verification",
+   "userAgent": null,
+   "uaOnly": false,
+   "respectsRobotsTxt": false,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/user-triggered-fetchers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-user-triggered-fetchers",
+    "https://developers.google.com/static/crawling/ipranges/user-triggered-fetchers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "GoogleMessages",
+   "operator": "Google",
+   "category": "preview",
+   "robotsToken": null,
+   "uaToken": "GoogleMessages",
+   "userAgent": null,
+   "uaOnly": false,
+   "respectsRobotsTxt": false,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developers.google.com/static/crawling/ipranges/user-triggered-fetchers.json",
+   "sourceUrls": [
+    "https://developers.google.com/crawling/docs/crawlers-fetchers/google-user-triggered-fetchers",
+    "https://developers.google.com/static/crawling/ipranges/user-triggered-fetchers.json"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "AdIdxBot",
+   "operator": "Microsoft",
+   "category": "ads",
+   "robotsToken": "adidxbot",
+   "uaToken": "adidxbot",
+   "userAgent": "Mozilla/5.0 (compatible; adidxbot/2.0; +http://www.bing.com/bingbot.htm)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": true,
+   "secondary": false,
+   "ipRangesUrl": "https://www.bing.com/toolbox/bingbot.json",
+   "sourceUrls": [
+    "https://www.bing.com/webmasters/help/which-crawlers-does-bing-use-8c184ec0"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "BingPreview",
+   "operator": "Microsoft",
+   "category": "preview",
+   "robotsToken": "bingbot",
+   "uaToken": "bingbot",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/131.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://www.bing.com/toolbox/bingbot.json",
+   "sourceUrls": [
+    "https://www.bing.com/webmasters/help/which-crawlers-does-bing-use-8c184ec0"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "MicrosoftPreview",
+   "operator": "Microsoft",
+   "category": "preview",
+   "robotsToken": "MicrosoftPreview",
+   "uaToken": "MicrosoftPreview",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; MicrosoftPreview/2.0; +https://aka.ms/MicrosoftPreview) Chrome/131.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://www.bing.com/webmasters/help/which-crawlers-does-bing-use-8c184ec0"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "BingVideoPreview",
+   "operator": "Microsoft",
+   "category": "preview",
+   "robotsToken": "BingVideoPreview",
+   "uaToken": "BingVideoPreview",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; BingVideoPreview/1.0; +https://aka.ms/microsoftbots) Chrome/131.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://www.bing.com/webmasters/help/which-crawlers-does-bing-use-8c184ec0"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "GPTBot",
+   "operator": "OpenAI",
+   "category": "training",
+   "robotsToken": "GPTBot",
+   "uaToken": "GPTBot",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://openai.com/gptbot.json",
+   "sourceUrls": [
+    "https://developers.openai.com/api/docs/bots"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "OAI-SearchBot",
+   "operator": "OpenAI",
+   "category": "search",
+   "robotsToken": "OAI-SearchBot",
+   "uaToken": "OAI-SearchBot",
+   "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://openai.com/searchbot.json",
+   "sourceUrls": [
+    "https://developers.openai.com/api/docs/bots"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "ChatGPT-User",
+   "operator": "OpenAI",
+   "category": "user",
+   "robotsToken": "ChatGPT-User",
+   "uaToken": "ChatGPT-User",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot",
+   "uaOnly": false,
+   "respectsRobotsTxt": "may-not",
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://openai.com/chatgpt-user.json",
+   "sourceUrls": [
+    "https://developers.openai.com/api/docs/bots"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "ClaudeBot",
+   "operator": "Anthropic",
+   "category": "training",
+   "robotsToken": "ClaudeBot",
+   "uaToken": "ClaudeBot",
+   "userAgent": null,
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://claude.com/crawling/bots.json",
+   "sourceUrls": [
+    "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+    "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler.md",
+    "https://claude.com/crawling/bots.json",
+    "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool.md"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Claude-SearchBot",
+   "operator": "Anthropic",
+   "category": "search",
+   "robotsToken": "Claude-SearchBot",
+   "uaToken": "Claude-SearchBot",
+   "userAgent": null,
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://claude.com/crawling/bots.json",
+   "sourceUrls": [
+    "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+    "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler.md",
+    "https://claude.com/crawling/bots.json",
+    "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool.md"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Claude-User",
+   "operator": "Anthropic",
+   "category": "user",
+   "robotsToken": "Claude-User",
+   "uaToken": "Claude-User",
+   "userAgent": null,
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://claude.com/crawling/bots.json",
+   "sourceUrls": [
+    "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+    "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler.md",
+    "https://claude.com/crawling/bots.json",
+    "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool.md"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "PerplexityBot",
+   "operator": "Perplexity",
+   "category": "search",
+   "robotsToken": "PerplexityBot",
+   "uaToken": "PerplexityBot",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://www.perplexity.com/perplexitybot.json",
+   "sourceUrls": [
+    "https://docs.perplexity.ai/docs/resources/perplexity-crawlers"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Perplexity-User",
+   "operator": "Perplexity",
+   "category": "user",
+   "robotsToken": "Perplexity-User",
+   "uaToken": "Perplexity-User",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)",
+   "uaOnly": false,
+   "respectsRobotsTxt": false,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://www.perplexity.com/perplexity-user.json",
+   "sourceUrls": [
+    "https://docs.perplexity.ai/docs/resources/perplexity-crawlers"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "meta-externalagent",
+   "operator": "Meta",
+   "category": "training",
+   "robotsToken": "meta-externalagent",
+   "uaToken": "meta-externalagent",
+   "userAgent": "meta-externalagent/1.1 (+/documentation/sharing/webmasters/web-crawlers)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers",
+    "https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers.md"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "meta-externalfetcher",
+   "operator": "Meta",
+   "category": "user",
+   "robotsToken": "meta-externalfetcher",
+   "uaToken": "meta-externalfetcher",
+   "userAgent": "meta-externalfetcher/1.1 (+/documentation/sharing/webmasters/web-crawlers)",
+   "uaOnly": false,
+   "respectsRobotsTxt": "may-not",
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers",
+    "https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers.md"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Meta-WebIndexer",
+   "operator": "Meta",
+   "category": "search",
+   "robotsToken": "meta-webindexer",
+   "uaToken": "meta-webindexer",
+   "userAgent": "meta-webindexer/1.1 (+/documentation/sharing/webmasters/web-crawlers)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers",
+    "https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers.md"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Amazonbot",
+   "operator": "Amazon",
+   "category": "training",
+   "robotsToken": "Amazonbot",
+   "uaToken": "Amazonbot",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Amazonbot/0.1) Chrome/131.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developer.amazon.com/amazonbot/ip-addresses/",
+   "sourceUrls": [
+    "https://developer.amazon.com/amazonbot",
+    "https://developer.amazon.com/amazonbot/ip-addresses/"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Amzn-SearchBot",
+   "operator": "Amazon",
+   "category": "search",
+   "robotsToken": "Amzn-SearchBot",
+   "uaToken": "Amzn-SearchBot",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Amzn-SearchBot/0.1) Chrome/131.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developer.amazon.com/amazonbot/searchbot-ip-addresses/",
+   "sourceUrls": [
+    "https://developer.amazon.com/amazonbot",
+    "https://developer.amazon.com/amazonbot/searchbot-ip-addresses/"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "CCBot",
+   "operator": "Common Crawl",
+   "category": "training",
+   "robotsToken": "CCBot",
+   "uaToken": "CCBot",
+   "userAgent": "CCBot/2.0 (https://commoncrawl.org/faq/)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://index.commoncrawl.org/ccbot.json",
+   "sourceUrls": [
+    "https://commoncrawl.org/ccbot",
+    "https://index.commoncrawl.org/ccbot.json"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "MistralAI-User",
+   "operator": "Mistral AI",
+   "category": "user",
+   "robotsToken": "MistralAI-User",
+   "uaToken": "MistralAI-User",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; MistralAI-User/1.0; +https://docs.mistral.ai/robots)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://mistral.ai/mistralai-user-ips.json",
+   "sourceUrls": [
+    "https://docs.mistral.ai/robots",
+    "https://mistral.ai/mistralai-user-ips.json"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Amzn-User",
+   "operator": "Amazon",
+   "category": "user",
+   "robotsToken": "Amzn-User",
+   "uaToken": "Amzn-User",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Amzn-User/0.1) Chrome/131.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": "may-not",
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://developer.amazon.com/amazonbot/live-ip-addresses/",
+   "sourceUrls": [
+    "https://developer.amazon.com/amazonbot",
+    "https://developer.amazon.com/amazonbot/live-ip-addresses/"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "MistralAI-Index",
+   "operator": "Mistral AI",
+   "category": "search",
+   "robotsToken": "MistralAI-Index",
+   "uaToken": "MistralAI-Index",
+   "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; MistralAI-Index/1.0; +https://docs.mistral.ai/robots)",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": "https://mistral.ai/mistralai-index-ips.json",
+   "sourceUrls": [
+    "https://docs.mistral.ai/robots",
+    "https://mistral.ai/mistralai-index-ips.json"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Bytespider",
+   "operator": "ByteDance",
+   "category": "training",
+   "robotsToken": "Bytespider",
+   "uaToken": "Bytespider",
+   "userAgent": "Mozilla/5.0 (Linux; Android 5.0) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Safari/537.36 (compatible; Bytespider; spider-feedback@bytedance.com)",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": true,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://darkvisitors.com/agents/bytespider",
+    "https://knownagents.com/agents/bytespider"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "facebookexternalhit",
+   "operator": "Meta",
+   "category": "preview",
+   "robotsToken": "facebookexternalhit",
+   "uaToken": "facebookexternalhit",
+   "userAgent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+   "uaOnly": false,
+   "respectsRobotsTxt": "may-not",
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers",
+    "https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers.md"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "LinkedInBot",
+   "operator": "LinkedIn",
+   "category": "preview",
+   "robotsToken": "LinkedInBot",
+   "uaToken": "LinkedInBot",
+   "userAgent": null,
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://www.linkedin.com/help/linkedin/answer/a521928",
+    "https://www.linkedin.com/robots.txt",
+    "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Twitterbot",
+   "operator": "X (Twitter)",
+   "category": "preview",
+   "robotsToken": "Twitterbot",
+   "uaToken": "Twitterbot",
+   "userAgent": null,
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developer.x.com/en/docs/x-for-websites/cards/guides/troubleshooting-cards",
+    "https://docs.x.com/llms-full.txt",
+    "https://help.x.com/robots.txt",
+    "https://developer.x.com/robots.txt",
+    "https://web.archive.org/web/20251231142717/https://developer.x.com/en/docs/x-for-websites/cards/guides/troubleshooting-cards"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Slackbot",
+   "operator": "Slack (Salesforce)",
+   "category": "preview",
+   "robotsToken": null,
+   "uaToken": "Slackbot-LinkExpanding",
+   "userAgent": "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+   "uaOnly": false,
+   "respectsRobotsTxt": false,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://api.slack.com/robots"
+   ],
+   "checked": "2026-10-21"
+  },
+  {
+   "name": "Cloudflare Browser Run crawler",
+   "operator": "Cloudflare",
+   "category": "agent",
+   "robotsToken": "CloudflareBrowserRenderingCrawler",
+   "uaToken": "CloudflareBrowserRenderingCrawler",
+   "userAgent": "CloudflareBrowserRenderingCrawler/1.0",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.cloudflare.com/browser-run/reference/automatic-request-headers/",
+    "https://developers.cloudflare.com/browser-rendering/reference/robots-txt/"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Cloudflare Browser Run Quick Actions",
+   "operator": "Cloudflare",
+   "category": "agent",
+   "robotsToken": null,
+   "uaToken": null,
+   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.cloudflare.com/browser-run/reference/automatic-request-headers/"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Cloudflare AI Search",
+   "operator": "Cloudflare",
+   "category": "search",
+   "robotsToken": "Cloudflare-AI-Search",
+   "uaToken": "Cloudflare-AI-Search",
+   "userAgent": "Cloudflare-AI-Search (https://developers.cloudflare.com/ai-search; ai-search@cloudflare.com)",
+   "uaOnly": false,
+   "respectsRobotsTxt": true,
+   "ignoresWildcardGroup": false,
+   "secondary": true,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.cloudflare.com/fundamentals/reference/cloudflare-site-crawling/",
+    "https://developers.cloudflare.com/ai-search/"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Cloudflare Always Online",
+   "operator": "Cloudflare",
+   "category": "infra",
+   "robotsToken": null,
+   "uaToken": "CloudFlare-AlwaysOnline",
+   "userAgent": "Mozilla/5.0 (compatible; CloudFlare-AlwaysOnline/1.0; +http://www.cloudflare.com/always-online)",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.cloudflare.com/fundamentals/reference/cloudflare-site-crawling/"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Cloudflare Health checks",
+   "operator": "Cloudflare",
+   "category": "infra",
+   "robotsToken": null,
+   "uaToken": "Cloudflare-Healthchecks",
+   "userAgent": "Mozilla/5.0 (compatible; Cloudflare-Healthchecks/1.0; +https://www.cloudflare.com/; healthcheck-id: 0123456789abcdef)",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.cloudflare.com/fundamentals/reference/cloudflare-site-crawling/"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Cloudflare Load-balancing monitor",
+   "operator": "Cloudflare",
+   "category": "infra",
+   "robotsToken": null,
+   "uaToken": "Cloudflare-Traffic-Manager",
+   "userAgent": "Mozilla/5.0 (compatible; Cloudflare-Traffic-Manager/1.0; +https://www.cloudflare.com/traffic-manager/; pool-id: 0123456789abcdef)",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.cloudflare.com/fundamentals/reference/cloudflare-site-crawling/"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Cloudflare Prefetch",
+   "operator": "Cloudflare",
+   "category": "infra",
+   "robotsToken": null,
+   "uaToken": "CloudFlare-Prefetch",
+   "userAgent": "Mozilla/5.0 (compatible; CloudFlare-Prefetch/0.1; +http://www.cloudflare.com/)",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.cloudflare.com/fundamentals/reference/cloudflare-site-crawling/"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Cloudflare SSL/TLS recommender",
+   "operator": "Cloudflare",
+   "category": "infra",
+   "robotsToken": "Cloudflare-SSLDetector",
+   "uaToken": "Cloudflare-SSLDetector",
+   "userAgent": "Cloudflare-SSLDetector",
+   "uaOnly": false,
+   "respectsRobotsTxt": "may-not",
+   "ignoresWildcardGroup": true,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.cloudflare.com/fundamentals/reference/cloudflare-site-crawling/"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Cloudflare Support diagnostics",
+   "operator": "Cloudflare",
+   "category": "infra",
+   "robotsToken": null,
+   "uaToken": "Cloudflare-diagnostics",
+   "userAgent": "Cloudflare-diagnostics",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [
+    "https://developers.cloudflare.com/fundamentals/reference/cloudflare-site-crawling/"
+   ],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Unknown new bot",
+   "operator": "(catch-all)",
+   "category": "catch-all",
+   "robotsToken": "ExampleNewBot",
+   "uaToken": "ExampleNewBot",
+   "userAgent": "Mozilla/5.0 (compatible; ExampleNewBot/0.1; +https://example.com/bot)",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "curl",
+   "operator": "(catch-all)",
+   "category": "catch-all",
+   "robotsToken": null,
+   "uaToken": "curl",
+   "userAgent": "curl/8.9.1",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "python-requests",
+   "operator": "(catch-all)",
+   "category": "catch-all",
+   "robotsToken": null,
+   "uaToken": "python-requests",
+   "userAgent": "python-requests/2.32.3",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [],
+   "checked": "2026-10-25"
+  },
+  {
+   "name": "Empty user-agent",
+   "operator": "(catch-all)",
+   "category": "catch-all",
+   "robotsToken": null,
+   "uaToken": null,
+   "userAgent": "",
+   "uaOnly": false,
+   "respectsRobotsTxt": null,
+   "ignoresWildcardGroup": false,
+   "secondary": false,
+   "ipRangesUrl": null,
+   "sourceUrls": [],
+   "checked": "2026-10-25"
+  }
+ ]
+}
