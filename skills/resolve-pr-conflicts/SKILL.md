@@ -4,7 +4,7 @@ description: Use when the user's open pull requests have merge conflicts and the
 metadata:
   agent: task-board
   commands: "runtime task-board run, runtime task-board status, runtime task-board show-step"
-  cost: "2 cents per board + OpenAI usage"
+  cost: "2 cents per board + OpenAI API usage billed to the user's own OpenAI API key, which needs credits (a ChatGPT or Codex login does not pay for it)"
   writes-files: "true"
   min-cli-version: "0.2.0"
   status: stable
@@ -61,7 +61,7 @@ writes a note for a person instead of guessing. The agents run in Codex's `works
 sandbox with no network, so they can edit files in their worktree but cannot commit, push, or
 touch the user's own checkout. The free, offline `runtime task-board status` and
 `runtime task-board show-step` commands then show what each agent did. The whole board is one
-2-cent Vidbyte charge plus OpenAI usage on the user's own account.
+2-cent Vidbyte charge plus OpenAI API usage, billed to the user's own OpenAI API key.
 
 At the end the user has, for each pull request, either a merge commit that resolves its conflicts
 (shown to them as a resolution diff and pushed only after their yes, as a normal fast-forward
@@ -97,6 +97,13 @@ git config user.email
 python3 --version                          # 3.8 or newer, for the helper script
 ```
 
+- The Task Board runs every Codex agent on the OpenAI API key that `provider whoami openai`
+  checks, through OpenAI's API, and bills every model call to that key's OpenAI account. A ChatGPT
+  or Codex subscription login is not used and does not pay for it. `data.verified: true` proves
+  the key is live, not that its account has credits, and the 2-cent admission is charged before
+  the first agent starts, so a key without credits spends the admission and resolves nothing. Ask
+  the user to confirm that the key's OpenAI account has API credits (the Billing page on
+  platform.openai.com). If it has none, stop here.
 - On Windows, use `python` or `py -3` wherever this skill says `python3`.
 - If `gh` is missing or not logged in, ask the user to install the GitHub CLI from
   <https://cli.github.com/> and run `gh auth login` in their own terminal. Never ask for a GitHub
@@ -201,7 +208,7 @@ The whole skill, in order. Each step names the section that holds its details.
 
 1. **Check the setup.** Run `vidbyte-cli --version`, `whoami`, `runtime doctor`, and
    `provider whoami openai`, then `gh auth status`, `git --version`, the git identity, and
-   Python. (Preflight)
+   Python, and have the user confirm that the OpenAI API key has credits. (Preflight)
 2. **Find the conflicting pull requests, free.** Run `resolve_pr_conflicts.py gather`, which runs
    `gh repo view`, `gh pr list`, and `gh pr view` for each `UNKNOWN`. Stop on exit 3. (Gather
    inputs, step 1)
@@ -239,8 +246,8 @@ Root options such as `--json` and `--no-input` always come before the command pa
 | `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.2.0 or newer. Free and offline. |
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
 | `vidbyte-cli --json runtime doctor` | Preflight | Reports the working directory and which supported agent hosts are installed, from `PATH` alone, without reading credentials or using the network. Its `codex` row must be available. Free and offline. |
-| `vidbyte-cli --json provider whoami openai` | Preflight | Shows the OpenAI key stored for this profile and checks that it is live. The Task Board needs it. Exit 4 means none is stored. Free. |
-| `vidbyte-cli --json --no-input runtime task-board run` | Run, through `resolve_pr_conflicts.py run` | Runs an ordered board of tasks on this machine, one at a time, each in its own Codex agent that is thrown away when its task ends. Here `--task-list tasks.json` holds one task per pull request, `--context-mode isolated` keeps every agent from reading another's result, and `--sandbox workspace-write` lets each agent edit files under the state folder only. Costs 2 cents from the Vidbyte balance for the whole board, plus OpenAI usage on the user's own account. The agents edit files in the worktrees; the board writes its checkpoints and report in the state folder. A retry (`--retry-failed-only`) or a resume (`--resume-from`) runs through the same command and is a new charge. |
+| `vidbyte-cli --json provider whoami openai` | Preflight | Shows the OpenAI key stored for this profile and checks that it is live. The Task Board needs it. It does not show whether the key's account has credits. Exit 4 means none is stored. Free. |
+| `vidbyte-cli --json --no-input runtime task-board run` | Run, through `resolve_pr_conflicts.py run` | Runs an ordered board of tasks on this machine, one at a time, each in its own Codex agent that is thrown away when its task ends. Here `--task-list tasks.json` holds one task per pull request, `--context-mode isolated` keeps every agent from reading another's result, and `--sandbox workspace-write` lets each agent edit files under the state folder only. Costs 2 cents from the Vidbyte balance for the whole board, charged before the first agent starts, plus OpenAI API usage billed to the user's own OpenAI API key; a ChatGPT or Codex login does not pay for it. The agents edit files in the worktrees; the board writes its checkpoints and report in the state folder. A retry (`--retry-failed-only`) or a resume (`--resume-from`) runs through the same command and is a new charge. |
 | `vidbyte-cli --json runtime task-board status` | Read the result, through `report`, and `run --retry-failed` or `run --resume` | Reports one stored board's progress without running or paying for anything: which steps completed, failed, or are still pending, and the reported token total. It also returns a resume command, which this skill never pastes. Free and offline. |
 | `vidbyte-cli --json runtime task-board show-step` | Read the result, through `report` | Returns everything stored for one board step in one response: the full prompt it received, its summary, its status, its token count, and the agent's full final message. Free and offline. |
 
@@ -251,8 +258,12 @@ credits" in `references/troubleshooting.md`, which tops up only after the user's
 
 This skill runs `vidbyte-cli runtime task-board run` once per batch. Each run costs 2 cents from
 the user's Vidbyte balance for the whole board, however many pull requests it holds, plus OpenAI
-usage for one Codex agent per conflicting pull request, billed to the user's own OpenAI account.
-A large conflict, or a slow test suite the agent runs, uses more tokens. The agents edit files
+API usage for one Codex agent per conflicting pull request, billed to the user's own OpenAI API
+key, the one `provider whoami openai` checks. A ChatGPT or Codex subscription does not pay for
+it. Vidbyte charges the 2 cents before the first agent starts, so if that key's OpenAI account has
+no API credits, the admission is spent and no pull request is resolved; ask only after the user
+has confirmed the credits in Preflight. A large conflict, or a slow test suite the agent runs,
+uses more tokens. The agents edit files
 only in the worktrees under `.vidbyte/resolve-pr-conflicts/`; the user's own checkout is never
 touched. Nothing is committed until the user has seen the result, and nothing is pushed until the
 user approves that pull request.
@@ -260,11 +271,11 @@ user approves that pull request.
 Before running it, ask, in your own words:
 
 > This runs one Vidbyte Task Board over <N> pull requests (<#212, #219, ...>) in <OWNER/NAME>. It
-> costs 2 cents from your Vidbyte balance plus OpenAI usage on your own account for <N> Codex
-> agents, one per pull request, run one after another. Each agent edits files only in its own
-> worktree under .vidbyte/resolve-pr-conflicts/, with no network and no git access. I commit each
-> resolved merge only after the run, show you the resolution, and push only the ones you approve.
-> Run it?
+> costs 2 cents from your Vidbyte balance plus OpenAI API usage on your own OpenAI API key, not
+> your ChatGPT plan, for <N> Codex agents, one per pull request, run one after another. Each
+> agent edits files only in its own worktree under .vidbyte/resolve-pr-conflicts/, with no network
+> and no git access. I commit each resolved merge only after the run, show you the resolution, and
+> push only the ones you approve. Run it?
 
 If the repository is private, add that Codex sends the code it reads to OpenAI under the user's
 own account. Wait for a yes.
@@ -483,6 +494,11 @@ If the paid run fails, check `result-stderr.log` for the line
 - If it appeared, the admission was used. Run `report`, then continue with Deliver step 5, which
   is a new charge with a new key, so ask first.
 
+If the steps failed and their summaries name an OpenAI quota or billing error, such as
+`insufficient_quota`, the OpenAI API key has no credits. The admission was used. Tell the user to
+add API credits to that key's OpenAI account, then offer Deliver step 5, a new charge, after a
+new yes.
+
 `An earlier batch is still in ...` from `prepare` means a previous batch was not cleaned up. Run
 `report` to see it, finish or abort its pull requests, then `cleanup`.
 
@@ -496,6 +512,8 @@ If the paid run fails, check `result-stderr.log` for the line
   worktrees until it ends; never edit files there while it runs.
 - Ask before every run. Each batch, retry, and resume is a new 2-cent charge plus OpenAI usage,
   with its own idempotency key.
+- Never start a board until the user has confirmed that their OpenAI API key has credits. A
+  ChatGPT or Codex login does not pay for the Task Board's model calls.
 - Never push without the user's yes for that exact pull request. Never use `git push --force` or
   `--force-with-lease`, never rebase a pull request branch, and never merge, close, or comment on a
   pull request.
