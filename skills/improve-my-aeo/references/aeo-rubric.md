@@ -49,7 +49,8 @@ MSG-02, LLM-07), then lost citations or trust, then polish. Fewer, correct ideas
   reviews, a "40% GEO boost", an "AI rank", Google-Extended for AI Overviews, GPTBot for ChatGPT
   search.
 - Do not call a spoofed user-agent result proof; say to confirm in logs (ACC-05, MEA-06).
-- Do not treat blocking training crawlers as a failure (ACC-04); it is the owner's choice.
+- The default is every bot allowed (ACC-04, ACC-17, ACC-18); keep a block only when a --constraint says so.
+- Label each number's source: the audit, the owner's Search Console, an SEO tool estimate, or judgment.
 - Do not recommend a file nobody reads (ai-plugin.json, agents.json, /.well-known/mcp.json).
 - Do not recommend DSC items for a site without an API, MCP server, or actions.
 - Do not invent timeouts, limits, or percentages the checklist does not give.
@@ -68,8 +69,8 @@ a person asked; training tokens decide training only. robots.txt changes take ~2
   Applebot, meta-webindexer, Amzn-SearchBot, DuckAssistBot.
 - ACC-03 User fetchers allowed: ChatGPT-User and Perplexity-User may ignore robots.txt; Claude-User
   obeys it, so a block mostly hurts the vendors that comply.
-- ACC-04 Training choice deliberate: GPTBot, ClaudeBot, Google-Extended, Applebot-Extended never affect
-  search inclusion. Blocking them is legitimate; report, do not fail.
+- ACC-04 Training crawlers allowed: GPTBot, ClaudeBot, Google-Extended, Applebot-Extended never affect
+  search inclusion; a block only teaches models less about the site. Warn, never fail.
 - ACC-05 AI user agents get the browser's page: 403, 429, or a challenge = blocked (AI fetchers run no
   JS; Anthropic never bypasses CAPTCHAs). A spoofed user agent is a screening signal; confirm in logs.
 - ACC-06 Sitemap declared and readable: AI crawlers spent ~34% of fetches on 404s (Vercel, 2024).
@@ -88,6 +89,9 @@ a person asked; training tokens decide training only. robots.txt changes take ~2
 - ACC-15 Search Console "Search generative AI" (worldwide 2026-08-31) is the opt-out for AI Overviews
   and AI Mode; keep Include unless opting out on purpose.
 - ACC-16 Crawl-delay is ignored by Google, Apple, and Amazon; throttle with temporary 429/503.
+- ACC-17 Every bot type allowed in robots.txt: agents, link previews, ads bots (obey only named groups),
+  and unknown bots via `*`. Bot list at the end of the checklist.
+- ACC-18 Every bot in the list gets the browser's page; a blocked preview bot means empty link cards.
 
 REN, raw HTML. ChatGPT-User made 37,045 page reads and fetched 0 scripts (Forge, 2026-09); only
 Googlebot (so Gemini and AI Overviews) renders.
@@ -238,3 +242,28 @@ MEA, measurement.
 - MEA-08 Rankings still matter (a page at rank 1 in ChatGPT's own search was cited 58% of the time,
   rank 10 14%), but citations diverge from Google rankings.
 - MEA-09 Trackers are samplers; ask for prompts, runs, and engines.
+
+SEO, search foundations (AEO for Google is SEO). Owner or review items; say what data to pull.
+- SEO-01 One project record: scope, markets, site stage, CMS, keywords, decisions.
+- SEO-02 Goal = outcome + metric + date; measure non-branded.
+- SEO-03 Positioning (audience, pain, substitutes, fit, no-go topics) before keywords.
+- SEO-04 Search Console first: 3 and 16 months, query+page; API up to 25,000 rows.
+- SEO-05 Inventory pages and linkable assets.
+- SEO-06 Striking distance first: average position 5-20 with impressions.
+- SEO-07 Fit and intent over volume; unknown metrics stay unknown.
+- SEO-08 Read the results page when intent is unclear.
+- SEO-09 Local: Business Profile, map pack; relevance, distance, prominence.
+- SEO-10 One page per cluster by result overlap, not wording.
+- SEO-11 A brief per page; internal links with real anchors.
+- SEO-12 No two pages split one query; merge or canonicalize.
+- SEO-13 Who wins the results, by domain type; publishers are not rivals.
+- SEO-14 Measure the referring-domain gap; target reachable difficulty.
+- SEO-15 Study competitors for openings; never copy.
+- SEO-16 One asset worth citing, with the reason.
+- SEO-17 Prospects from result queries, filtered, each with an angle; paid links need rel=sponsored.
+- SEO-18 Contacts only with their source URL; never guessed.
+- SEO-19 Title with the keyword, ~150-character description, gaps covered.
+- SEO-20 Rewrites keep voice, links, CMS blocks, shortcodes; invent nothing.
+- SEO-21 Pre-publish gate: facts, reachable keyword, no same-intent page, answer first, original,
+  copy-quality title, real links, worth publishing.
+- SEO-22 Agent edits are proposed diffs a person applies, with rollback.

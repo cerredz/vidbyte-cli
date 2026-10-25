@@ -9,7 +9,7 @@ How to read an item:
 - **Id** (`ACC-02`): cite it in ideas. Families: ACC crawler access, REN raw-HTML rendering, IDX
   index and snippet controls, LLM llms.txt, MD Markdown mirrors, SCH structured data, ENT entity,
   MSG message consistency, CNT content, OFF off-site and earned signals, DSC agent discovery,
-  MEA measurement.
+  MEA measurement, SEO search foundations. The Bot list at the end names every bot ACC checks.
 - **Audit**: `script` means `aeo_audit.py` checks it and `audit.md` reports its status; `owner`
   means only the site owner can check it (dashboards, logs, settings); `review` means a person or
   the model judges it by reading.
@@ -77,18 +77,19 @@ crawlers: do not state their behavior as fact.
 - Confidence: primary.
 - Mistake: blocking every `*-User` agent "to stop AI", which breaks live answers about the site.
 
-### ACC-04 Training opt-outs are deliberate and separate from search
-- Check: the choices for GPTBot, ClaudeBot, Google-Extended, Applebot-Extended,
-  meta-externalagent, Amazonbot, CCBot, and MistralAI-Training are written down on purpose, and
-  no search token is caught by them. Report as information; blocking training is legitimate.
-  Audit: script (info).
-- Why: Google-Extended "does not impact a site's inclusion in Google Search nor is it used as a
-  ranking signal." Applebot-Extended "does not crawl webpages"; disallowed pages "can still be
-  included in search results." OpenAI: "If your site has allowed both bots, we may use the
-  results from just one crawl for both use cases." Whether blocking training lowers a brand's
-  unprompted recall in model answers is unproven either way; do not claim it.
+### ACC-04 Training crawlers are allowed
+- Check: robots.txt lets GPTBot, ClaudeBot, Google-Extended, Applebot-Extended,
+  meta-externalagent, Amazonbot, CCBot, and Bytespider fetch public content. If the owner blocks
+  any, the reason is written down and no search token is caught by the block. Audit: script.
+- Why: allowing every bot type is this checklist's default, because models that cannot read a
+  site learn less about it. Google-Extended "does not impact a site's inclusion in Google Search
+  nor is it used as a ranking signal." Applebot-Extended "does not crawl webpages"; disallowed
+  pages "can still be included in search results." OpenAI: "If your site has allowed both bots,
+  we may use the results from just one crawl for both use cases." Whether blocking training lowers
+  a brand's unprompted recall in model answers is unproven either way; do not claim it.
 - Confidence: primary (mechanics); the recall effect is unknown.
-- Mistake: believing GPTBot controls ChatGPT search. OAI-SearchBot does.
+- Mistake: believing GPTBot controls ChatGPT search (OAI-SearchBot does), or pasting one "block
+  AI" list that catches search and user tokens too.
 
 ### ACC-05 AI user agents get the same page as a browser
 - Check: the home page (and ideally a product page and a post) fetched with each AI user-agent
@@ -220,6 +221,33 @@ crawlers: do not state their behavior as fact.
   `*` throttles only the bots that cooperate. A temporary 429 or 503 slows Google.
 - Confidence: primary (Bing secondary).
 - Mistake: `Crawl-delay: 30` for everyone.
+
+### ACC-17 Every bot type is allowed in robots.txt
+- Check: no robots.txt group blocks public content to agents (Google-CloudVertexBot,
+  CloudflareBrowserRenderingCrawler), link-preview bots (facebookexternalhit, LinkedInBot,
+  Twitterbot, MicrosoftPreview), ads checkers (AdsBot-Google, adidxbot), Google's other fetchers
+  (GoogleOther, APIs-Google), or a bot nobody has named yet (the `*` group). Every token is in the
+  "Bot list" at the end. Audit: script (every token, on / and the sampled pages).
+- Why: preview bots build the link cards shown when the site is shared in chat and social apps.
+  Ads bots check landing pages and obey only groups that name them, so `*` rules never reach
+  them. Agents fetch for people and developers. A `*` group that blocks unknown bots also blocks
+  next month's new AI crawler.
+- Sources: the operator pages listed for each bot in scripts/aeokit/bots.json.
+- Confidence: primary.
+- Mistake: `User-agent: *` + `Disallow: /` with allow groups for a few named search bots.
+
+### ACC-18 Every known bot gets the browser's page from the firewall
+- Check: the home page fetched as each fetching bot in the "Bot list" (previews, ads checkers,
+  agents, Google's other fetchers, generic clients such as curl and python-requests, and an empty
+  user agent) returns the browser's status, about the same text, and no challenge page.
+  Cloudflare's own infrastructure bots matter only for sites on Cloudflare. Audit: script.
+- Why: CDN and WAF bot settings (ACC-12) can block previews and generic clients even when
+  robots.txt allows them. A blocked preview bot shows an empty link card everywhere the site is
+  shared; blocking generic clients blocks agents that use plain HTTP libraries. The spoofing
+  caveat in ACC-05 applies.
+- Confidence: primary (mechanics); observed (vidbyte.pro answered 200 to all 66 bots on
+  2026-10-25 after removing its bot block).
+- Mistake: allowing only the bots in a CDN's "verified bots" directory.
 
 ---
 
@@ -1215,6 +1243,254 @@ DSC-02 and DSC-08, a transactional site needs DSC-09 to DSC-11.
 
 ---
 
+## SEO: search foundations
+
+Google's guide says AEO for Google is SEO: AI Overviews and AI Mode draw on the same index and
+ranking. These items are the search method that decides which pages exist and which queries they
+target. Most need the owner's Search Console or an SEO data tool, so they are `owner` or `review`.
+
+### SEO-01 One SEO project record holds the site's scope and decisions
+- Check: one file or folder records the domains and subdomains, target countries and languages,
+  the site's stage (new, established, migrating, or recovering from a drop), the CMS and
+  publishing workflow, the target keywords with tags, and the decisions made. Audit: owner.
+- Why: keyword targets, cluster maps, briefs, and prospect lists depend on each other. Without a
+  record, each session starts blank and repeats or contradicts earlier choices.
+- Confidence: secondary (practitioner method).
+- Mistake: saving keywords or tags before the owner confirms them.
+
+### SEO-02 SEO goals are business outcomes with a metric and a date
+- Check: the goal names an outcome (qualified leads, signups or trials, revenue, audience,
+  category awareness, recovery from a traffic loss, or rankings for named pages), a metric, and a
+  timeframe, such as "rank top 10 for 20 buying-intent terms by June". Audit: owner.
+- Why: the plan depends on the goal: a recovery starts with indexing and cannibalization
+  (SEO-12), a lead goal with buying-intent pages. Measure non-branded queries, because branded
+  demand grows with the brand, not with SEO.
+- Confidence: secondary.
+- Mistake: "more traffic" as the goal; traffic from off-intent queries does not convert.
+
+### SEO-03 Positioning is written down before keywords are chosen
+- Check: a short note says who the site is for, the pain it solves, why buyers choose it over
+  alternatives, its competitors and substitutes, its best-fit and bad-fit customers, the content
+  that already converts, the opinions it can defend, and the topics it will not target.
+  Audit: owner.
+- Why: the same keyword is worth chasing for one audience and noise for another. The note also
+  feeds entity and message consistency (ENT-05, MSG-01).
+- Confidence: secondary.
+- Mistake: chasing the category's biggest term when the product serves a niche.
+
+### SEO-04 Search Console data is the first input
+- Check: Search Console is verified (MEA-04) and its Performance data is read: queries and pages
+  for the last 3 months and for the full 16 months, and query and page together. Through the API,
+  request many rows (up to 25,000 per request) and filter by position locally. Every number in a
+  plan names its source: Search Console, a third-party SEO tool, this audit, or judgment.
+  Audit: owner.
+- Why: Search Console is the only first-party record of the queries that already show the site,
+  with clicks, impressions, CTR, and average position, kept for 16 months. Third-party tools
+  estimate; Search Console measures.
+- Sources: support.google.com/webmasters/answer/7576553;
+  developers.google.com/webmaster-tools/v1/searchanalytics/query.
+- Confidence: primary.
+- Mistake: estimating the site's own traffic from a third-party tool when Search Console exists.
+
+### SEO-05 The site's assets are inventoried, including what others would cite
+- Check: a list of the key URLs (or the sitemap), the content library, product, category, and
+  feature pages, existing keyword lists and rank trackers, backlink and press assets, and
+  linkable assets: original data, studies, templates, tools, calculators, and defensible
+  opinions. Audit: owner.
+- Why: the cheapest win is usually an existing page (SEO-06, SEO-19), and links and citations go
+  to assets that hold something unique (SEO-16).
+- Confidence: secondary.
+- Mistake: planning new pages before checking which page already targets the intent.
+
+### SEO-06 Striking-distance queries are worked first
+- Check: from Search Console, the queries with real impressions where the site's average
+  position is about 5 to 20 are listed with the page that ranks, enriched with volume,
+  difficulty, and intent, and improved before broad keyword discovery. Audit: owner.
+- Why: those pages already rank, so a better title, a fuller answer, or internal links can move
+  them onto page one; a new page starts from zero. The API sorts by clicks and cannot filter by
+  position, so request many rows and filter locally.
+- Confidence: secondary (method); primary (API behavior).
+- Mistake: reading only the first 1,000 rows, which hides long-tail near-misses.
+
+### SEO-07 Target keywords are chosen for business fit and intent, not volume
+- Check: each candidate carries volume, keyword difficulty, intent (informational, commercial,
+  transactional, or navigational), CPC, and trend, with `unknown` where the data source returned
+  nothing. Off-topic, duplicate, branded-only, and off-intent terms are removed. Priority is
+  product fit, then clear intent, then a difficulty the site can reach now, then volume and CPC.
+  Audit: owner.
+- Why: a reachable buying-intent term beats a large informational one the site cannot win, and
+  CPC shows commercial value. A guessed metric corrupts every later decision.
+- Confidence: secondary.
+- Mistake: filling a missing volume with an estimate.
+
+### SEO-08 The results page is read before deciding what a page should be
+- Check: for each priority keyword whose intent is unclear, the live results are read: which page
+  types rank (guides, product pages, lists, tools, forums, videos), which result features appear,
+  and which domains. Audit: review.
+- Why: the results show what satisfies the query better than its words do. "best X" usually
+  wants a list; "X pricing" wants a product page.
+- Sources: developers.google.com/search/docs/fundamentals/creating-helpful-content.
+- Confidence: secondary.
+- Mistake: writing a long guide for a query whose results are all product pages.
+
+### SEO-09 Local businesses are judged on local results
+- Check: for a business that serves an area, the Google Business Profile is complete with the
+  right primary category, local-pack and Maps results are checked at the priority locations,
+  Business Profile questions are answered, and each real service area has its own page.
+  Audit: owner.
+- Why: Google says local results depend mainly on relevance, distance, and prominence. National
+  keyword and domain metrics do not show who wins the map pack.
+- Sources: support.google.com/business/answer/7091.
+- Confidence: primary.
+- Mistake: inferring local-pack strength from national organic rankings.
+
+### SEO-10 Keywords are grouped into one cluster per page by search-result overlap
+- Check: keywords with the same intent and mostly the same ranking URLs go to one page; a
+  different intent, buyer stage, or result format gets its own page. Each cluster maps to an
+  existing page, a new page, or a do-not-target list. Fewer than about 10 usable terms get a
+  simple map, not clusters. Audit: review.
+- Why: similar words can need different pages, and different words can share one. The overlap of
+  the results pages shows which; similar wording does not.
+- Confidence: secondary.
+- Mistake: one page per keyword variant, which creates the competition SEO-12 removes.
+
+### SEO-11 Every target page has a brief and real internal links
+- Check: each cluster's page has a brief (page type, the searcher's problem, required sections,
+  and the pages that will link to it), and related pages link to it with anchors a person would
+  write. Audit: review.
+- Why: Google finds pages and their context through links, and anchor text tells it what the
+  target is about. A brief keeps a page aimed at one intent.
+- Sources: developers.google.com/search/docs/crawling-indexing/links-crawlable.
+- Confidence: primary (links); secondary (briefs).
+- Mistake: "click here" anchors, or links only from the footer.
+
+### SEO-12 No two pages compete for the same query
+- Check: Search Console query and page data shows no important query whose impressions split
+  across several URLs. Competing pages are merged, redirected, or re-targeted, and duplicates
+  name one canonical (IDX-03). Audit: owner.
+- Why: split signals weaken both pages, and an engine may show or cite the weaker one.
+- Sources: developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls.
+- Confidence: primary (canonicals); secondary (cannibalization).
+- Mistake: publishing a new post on a topic an older page already ranks for.
+
+### SEO-13 The owner knows who wins the market's results, and why
+- Check: 5 to 10 representative queries of mixed intent (informational, commercial, comparison,
+  tool) are checked. The recurring domains are listed by type: product competitor, publisher,
+  marketplace or directory, community, documentation. The winning formats and result features are
+  noted. Search competitors are kept apart from business competitors, and map-pack winners from
+  organic winners. Audit: review.
+- Why: the domains that outrank a site are often publishers and directories, not rivals, and the
+  plan for them differs: get listed or cited instead of outranking. A small query set shows a
+  direction, not a measurement.
+- Confidence: secondary.
+- Mistake: treating a publisher that ranks as a product competitor.
+
+### SEO-14 The authority gap is measured before a plan promises rankings
+- Check: the leading domains and the site are compared on organic footprint (ranking keywords,
+  estimated traffic) and referring domains, and the keyword plan targets a difficulty the site
+  can reach now. Audit: owner.
+- Why: a site with a fraction of the leaders' referring domains wins long-tail and
+  striking-distance terms first (SEO-06). Third-party traffic figures are estimates.
+- Confidence: secondary.
+- Mistake: reporting a third-party traffic estimate as a fact.
+
+### SEO-15 Competitors are studied for openings, not copied
+- Check: a named competitor's ranking keywords are grouped into themes (product and category,
+  alternatives and comparisons, templates, tools and calculators, guides, branded, local), the
+  results for shared terms are read side by side, and the output says what they do well, where
+  they are weak, which pages to pursue, and what not to copy. Claims about their pages come from
+  the pages or the results, not from keyword rows. Audit: review.
+- Why: copying produces the commodity content CNT-12 warns against. A stronger angle or a better
+  answer to the same intent can win.
+- Sources: developers.google.com/search/docs/fundamentals/creating-helpful-content.
+- Confidence: secondary.
+- Mistake: targeting every keyword a competitor ranks for, whatever the business fit.
+
+### SEO-16 The site has an asset worth citing, and a reason someone would
+- Check: at least one asset others would reference exists (original data, a study, a tool, a
+  template, a statistics page, or a documented opinion), with one sentence on why a writer would
+  link to or cite it. Audit: review.
+- Why: links and AI citations go to pages that hold something not available elsewhere (CNT-09,
+  CNT-12). Outreach without such an asset asks for a favor.
+- Confidence: secondary.
+- Mistake: promoting a product page as a "resource".
+
+### SEO-17 Link prospects come from search results, filtered, each with an angle
+- Check: prospects come from queries built from the asset ("<topic> resources", "best <category>
+  tools", "<competitor> alternatives", "<topic> statistics", "<topic> guide", "<topic> examples",
+  "<topic> templates", "<topic> software", "<topic> for <audience>") and from competitors'
+  backlinks. Editorial articles, resource pages, lists, comparisons, statistics pages, and
+  directories stay; home pages, login pages, thin affiliate pages, spam, and unrelated forums go;
+  competitors and likely paid placements are flagged. Each prospect gets an angle: a broken or
+  missing resource, newer data, a useful tool or template, a place in a list or comparison, or an
+  expert quote. Audit: review.
+- Why: Google's spam policies treat buying or exchanging links to pass ranking credit as link
+  spam, and paid links must carry `rel="sponsored"`. Relevance and a real reason earn editorial
+  links (OFF-07).
+- Sources: developers.google.com/search/docs/essentials/spam-policies;
+  developers.google.com/search/docs/crawling-indexing/qualify-outbound-links.
+- Confidence: primary (policy); secondary (method).
+- Mistake: emailing every page that mentions the topic.
+
+### SEO-18 Outreach uses real, sourced contacts and personal messages
+- Check: each contact (an author page, contact page, editorial guidelines, team page,
+  professional profile, masthead, an email shown on the page, or a Person node's email or sameAs)
+  is recorded with the URL it came from. Nothing is guessed. Each message names the page and the
+  reason to link. Audit: review.
+- Why: a guessed address bounces and hurts the sending domain's reputation, and a message that is
+  not about the recipient's page reads as spam.
+- Confidence: secondary.
+- Mistake: inventing a name@domain address.
+
+### SEO-19 Each target page is written for its keyword and intent
+- Check: the page that best matches a target keyword (often one that already ranks, SEO-06) has
+  a title that contains the keyword naturally and matches the intent; a meta description that
+  summarizes the page in about 150 characters, with the keyword, and reads like copy; the topic in
+  its first heading; and the subtopics the top results cover that it lacks. Audit: review; script
+  for titles and descriptions (CNT-01, CNT-02).
+- Why: Google builds title links mainly from the title element, and uses the meta description
+  for the snippet when it describes the page better than the page text. Neither has a fixed
+  length limit (both are cut by display width), so 150 characters is a convention.
+- Sources: developers.google.com/search/docs/appearance/title-link;
+  developers.google.com/search/docs/appearance/snippet.
+- Confidence: primary (mechanics); secondary (length).
+- Mistake: putting the keyword in every heading.
+
+### SEO-20 Rewrites keep the page's facts, voice, links, and structure
+- Check: a rewrite keeps the site's voice, its real links and images, and the CMS's own markup
+  (WordPress block comments `<!-- wp:... -->` and shortcodes). It invents no facts, prices, or
+  statistics, and every changed claim is checked. Audit: review.
+- Why: dropping block comments or shortcodes breaks the layout when the change is applied, and an
+  invented figure becomes a fact that assistants repeat (MSG-02).
+- Confidence: secondary.
+- Mistake: pasting a model's rewrite over the raw editor content.
+
+### SEO-21 Every new or automated page passes a pre-publish gate
+- Check: before publishing: (1) every claim, figure, price, and date is verified or removed;
+  (2) the target keyword has real volume and a difficulty the site can reach; (3) no existing
+  page targets the same intent (SEO-12); (4) the first paragraph answers the query (CNT-07);
+  (5) something in it could only come from the owner: data, process, screenshots (CNT-12); (6)
+  the title and meta description read like copy, not a template; (7) internal links point to
+  related pages with natural anchors (SEO-11); (8) it is worth publishing on its own merits, not
+  to fill a calendar. Audit: review.
+- Why: Google's spam policies name scaled content abuse: many pages made mainly to manipulate
+  rankings, however they are produced (CNT-14).
+- Sources: developers.google.com/search/docs/essentials/spam-policies.
+- Confidence: primary (policy); secondary (the gate).
+- Mistake: publishing drafts on a schedule because a tool can.
+
+### SEO-22 Automated changes are proposed, reviewed, and reversible
+- Check: an agent that edits the site proposes each change as a diff, with a before/after summary
+  and a one-line reason per change; a person applies it; the previous version is kept for
+  rollback; and the level of autonomy (assist, propose, or publish) is set per task, with nothing
+  published unreviewed until the drafts have earned trust. Audit: owner.
+- Why: an unreviewed bulk edit can put one error on every page at once, and engines and
+  assistants pick it up before anyone notices (SCH-05, MSG-02).
+- Confidence: secondary.
+- Mistake: telling the owner a change is live when it was only proposed.
+
+---
+
 ## Contested claims and myths
 
 Use these to correct the user, citing the evidence. Never recommend the left-hand claim.
@@ -1269,3 +1545,84 @@ Use these to correct the user, citing the evidence. Never recommend the left-han
 - **M-24 "Follow OpenAI Atlas ARIA guidance."** Atlas is retired; use Lighthouse's rules (DSC-09).
 - **M-25 "A spoofed-user-agent curl test proves what the real bot sees."** CDNs verify by IP and
   signature; confirm in logs (ACC-05).
+
+---
+
+## Bot list
+
+The 66 bots the audit checks (ACC-02 to ACC-05, ACC-17, ACC-18), copied from each operator's
+documentation on 2026-10-21 and 2026-10-25. The script's copy, with user agents, IP-range files,
+and sources, is `scripts/aeokit/bots.json`. Categories: search (indexes for a search or answer
+engine), training (collects model training data), user (fetches a page because a person asked),
+agent (crawls or drives a browser for a person or developer), preview (link cards), ads (landing
+page checks), other (operator utilities), infra (CDN infrastructure, only for sites on that CDN),
+catch-all (generic clients that show whether unknown bots get in). Re-check quarterly.
+
+| Bot | Operator | Category | robots.txt token | Fetches pages |
+|---|---|---|---|---|
+| Googlebot | Google | search | `Googlebot` | yes |
+| Google-Extended | Google | training | `Google-Extended` | no (robots.txt only) |
+| Google-InspectionTool | Google | search | `Google-InspectionTool` | yes |
+| Bingbot | Microsoft | search | `bingbot` | yes |
+| Applebot | Apple | search | `Applebot` | yes |
+| Applebot-Extended | Apple | training | `Applebot-Extended` | no (robots.txt only) |
+| DuckDuckBot | DuckDuckGo | search | `DuckDuckBot` | yes |
+| DuckAssistBot | DuckDuckGo | search | `DuckAssistBot` | yes |
+| Google-Agent | Google | agent | none | yes |
+| Googlebot-Image | Google | search | `Googlebot-Image` | yes |
+| Googlebot-Video | Google | search | `Googlebot-Video` | yes |
+| Googlebot-News | Google | search | `Googlebot-News` | no (robots.txt only) |
+| Storebot-Google | Google | search | `Storebot-Google` | yes |
+| GoogleOther | Google | other | `GoogleOther` | yes |
+| GoogleOther-Image | Google | other | `GoogleOther-Image` | yes |
+| GoogleOther-Video | Google | other | `GoogleOther-Video` | yes |
+| Google-CloudVertexBot | Google | agent | `Google-CloudVertexBot` | yes |
+| AdsBot-Google | Google | ads | `AdsBot-Google` | yes |
+| AdsBot-Google-Mobile | Google | ads | `AdsBot-Google-Mobile` | yes |
+| Mediapartners-Google | Google | ads | `Mediapartners-Google` | yes |
+| APIs-Google | Google | other | `APIs-Google` | yes |
+| Google-Safety | Google | other | none | yes |
+| FeedFetcher-Google | Google | user | none | yes |
+| Google-GeminiNotebook | Google | user | none | yes |
+| Google-Read-Aloud | Google | user | none | yes |
+| Google-Site-Verification | Google | user | none | yes |
+| GoogleMessages | Google | preview | none | yes |
+| AdIdxBot | Microsoft | ads | `adidxbot` | yes |
+| BingPreview | Microsoft | preview | `bingbot` | yes |
+| MicrosoftPreview | Microsoft | preview | `MicrosoftPreview` | yes |
+| BingVideoPreview | Microsoft | preview | `BingVideoPreview` | yes |
+| GPTBot | OpenAI | training | `GPTBot` | yes |
+| OAI-SearchBot | OpenAI | search | `OAI-SearchBot` | yes |
+| ChatGPT-User | OpenAI | user | `ChatGPT-User` | yes |
+| ClaudeBot | Anthropic | training | `ClaudeBot` | yes |
+| Claude-SearchBot | Anthropic | search | `Claude-SearchBot` | yes |
+| Claude-User | Anthropic | user | `Claude-User` | yes |
+| PerplexityBot | Perplexity | search | `PerplexityBot` | yes |
+| Perplexity-User | Perplexity | user | `Perplexity-User` | yes |
+| meta-externalagent | Meta | training | `meta-externalagent` | yes |
+| meta-externalfetcher | Meta | user | `meta-externalfetcher` | yes |
+| Meta-WebIndexer | Meta | search | `meta-webindexer` | yes |
+| Amazonbot | Amazon | training | `Amazonbot` | yes |
+| Amzn-SearchBot | Amazon | search | `Amzn-SearchBot` | yes |
+| CCBot | Common Crawl | training | `CCBot` | yes |
+| MistralAI-User | Mistral AI | user | `MistralAI-User` | yes |
+| Amzn-User | Amazon | user | `Amzn-User` | yes |
+| MistralAI-Index | Mistral AI | search | `MistralAI-Index` | yes |
+| Bytespider | ByteDance | training | `Bytespider` | yes |
+| facebookexternalhit | Meta | preview | `facebookexternalhit` | yes |
+| LinkedInBot | LinkedIn | preview | `LinkedInBot` | yes |
+| Twitterbot | X (Twitter) | preview | `Twitterbot` | yes |
+| Slackbot | Slack (Salesforce) | preview | none | yes |
+| Cloudflare Browser Run crawler | Cloudflare | agent | `CloudflareBrowserRenderingCrawler` | yes |
+| Cloudflare Browser Run Quick Actions | Cloudflare | agent | none | yes |
+| Cloudflare AI Search | Cloudflare | search | `Cloudflare-AI-Search` | yes |
+| Cloudflare Always Online | Cloudflare | infra | none | yes |
+| Cloudflare Health checks | Cloudflare | infra | none | yes |
+| Cloudflare Load-balancing monitor | Cloudflare | infra | none | yes |
+| Cloudflare Prefetch | Cloudflare | infra | none | yes |
+| Cloudflare SSL/TLS recommender | Cloudflare | infra | `Cloudflare-SSLDetector` | yes |
+| Cloudflare Support diagnostics | Cloudflare | infra | none | yes |
+| Unknown new bot | (catch-all) | catch-all | `ExampleNewBot` | yes |
+| curl | (catch-all) | catch-all | none | yes |
+| python-requests | (catch-all) | catch-all | none | yes |
+| Empty user-agent | (catch-all) | catch-all | none | yes |
