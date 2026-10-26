@@ -7,8 +7,18 @@
     "name": "Vidbyte Inc.",
     "url": "https://vidbyte.pro"
   },
-  "homepage": "https://vidbyte.pro",
+  "homepage": "https://vidbyte.pro/docs/cli/agent-skills",
   "repository": "https://github.com/cerredz/vidbyte-cli",
   "license": "MIT",
-  "keywords": ["vidbyte", "vidbyte-cli", "agents", "setup"]
+  "keywords": [
+    "vidbyte",
+    "vidbyte-cli",
+    "agents",
+    "setup",
+    "claude-code",
+    "codex",
+    "agent-skills",
+    "deep-research",
+    "coding-agents"
+  ]
 }

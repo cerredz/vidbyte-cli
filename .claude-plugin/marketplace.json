@@ -1,6 +1,6 @@
 {
   "name": "vidbyte",
-  "description": "Vidbyte's plugins for Claude Code and Codex.",
+  "description": "Vidbyte's plugins for Claude Code and Codex, from the home of vidbyte-cli (start hosted Research harness runs, run local Codex coding-agent teams, and get ranked next actions) and Vidbyte's agent skills (npx skills add cerredz/vidbyte-cli).",
   "owner": {
     "name": "Vidbyte Inc.",
     "url": "https://vidbyte.pro"
