@@ -49,8 +49,8 @@ vidbyte-cli --json whoami
 ```
 
 Exit code 4 with the message `Authentication is required.` means no key is stored. The user
-creates a key at <https://vidbyte.pro/settings/api> (creating a key needs a paid plan), then
-stores it with one of these:
+creates a key at <https://vidbyte.pro/settings/api> (any account can create one, the free plan
+included), then stores it with one of these:
 
 ```bash
 vidbyte-cli login                                              # interactive: a hidden prompt
