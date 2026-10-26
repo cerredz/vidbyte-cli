@@ -28,6 +28,7 @@ metadata:
   writes-files: "<true|false>"
   min-cli-version: "<x.y.z>"
   status: <stable|preview>
+  docs: "https://vidbyte.pro/agents/skills/<slug>"
 ---
 
 # <Title in plain words, named after the problem>
@@ -160,4 +161,6 @@ The result is one JSON document, `{"schema_version": 1, "kind": "<kind>", "data"
 - Never pass `vidbyte-cli billing top-up --confirm` unless the user explicitly approved that top-up.
 - Run at most one file-writing Vidbyte agent in a workspace at a time.
 - <A guardrail specific to this skill, such as "never push or open a PR; leave the changes for the user to review".>
+
+Docs: <https://vidbyte.pro/agents/skills/<slug>>
 ````

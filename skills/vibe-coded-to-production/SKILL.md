@@ -8,6 +8,7 @@ metadata:
   writes-files: "true"
   min-cli-version: "0.3.0"
   status: preview
+  docs: "https://vidbyte.pro/agents/skills/vibe-coded-to-production"
 ---
 
 # Make a vibe-coded app production ready
@@ -551,3 +552,5 @@ rate limit on a costly route, and credentialed CORS. List them in that order.
 - Start the Bug Finder only from a shell that holds no production secrets.
 - Do not push, merge, deploy, apply migrations to the live database, change dashboard settings, or
   rewrite git history yourself. Those are the user's steps, and Deliver lists them.
+
+Docs: <https://vidbyte.pro/agents/skills/vibe-coded-to-production>

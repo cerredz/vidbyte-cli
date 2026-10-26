@@ -8,6 +8,7 @@ metadata:
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/next-actions-from-all-my-notes"
 ---
 
 # Turn what you wrote this week, in every note tool, into next actions
@@ -702,3 +703,5 @@ refunds them: there is no admission and no idempotency key.
 - Record feedback only for an explicit accept or reject from the user.
 - Keep the `out_dir` and any `--from-items` folder out of every repository, every commit, and every
   vault.
+
+Docs: <https://vidbyte.pro/agents/skills/next-actions-from-all-my-notes>

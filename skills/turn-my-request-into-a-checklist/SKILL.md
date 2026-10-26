@@ -8,6 +8,7 @@ metadata:
   writes-files: "true"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/turn-my-request-into-a-checklist"
 ---
 
 # Turn your request into a checklist before the work starts
@@ -475,3 +476,5 @@ refunds them: there is no admission and no idempotency key.
   start an item without the user asking.
 - Record feedback only for an explicit accept or reject from the user.
 - Keep the `out_dir` out of every repository and every commit.
+
+Docs: <https://vidbyte.pro/agents/skills/turn-my-request-into-a-checklist>

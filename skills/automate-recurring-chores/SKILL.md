@@ -8,6 +8,7 @@ metadata:
   writes-files: "true"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/docs/cli/agent-skills"
 ---
 
 # Turn the chores you redo in coding-agent sessions into scheduled routines
@@ -741,3 +742,5 @@ whether today is a run day, and `--print-command` prints the harness command wit
 - Read the sessions only. Never edit, move, or delete them.
 - Record feedback only for an explicit accept or reject from the user.
 - Keep the `out_dir` out of every repository and every commit.
+
+Docs: <https://vidbyte.pro/docs/cli/agent-skills>

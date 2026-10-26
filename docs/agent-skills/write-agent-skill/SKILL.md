@@ -98,6 +98,7 @@ metadata:
   writes-files: "true"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/fix-every-instance"
 ---
 ```
 
@@ -111,6 +112,7 @@ metadata:
 | `metadata.writes-files` | `"true"` when any step edits the user's workspace. |
 | `metadata.min-cli-version` | The first released version on PyPI that has every command and flag the skill uses. See section 6. |
 | `metadata.status` | `stable`, or `preview` while the agent itself is labelled preview. A skill that is not ready is not published; it appears on the website as a coming-soon entry with no public file. |
+| `metadata.docs` | The skill's page, `https://vidbyte.pro/agents/skills/<slug>`, once cerredz/Vidbyte lists the skill in `next-app/constants/agent-skills/`; until then `https://vidbyte.pro/docs/cli/agent-skills`. The file's last line repeats it as `Docs: <url>` (section 4), because indexes such as Context7 and DeepWiki read the SKILL.md text, not the website. |
 
 Quote every `metadata` value except `status` so it stays a plain string for every agent that
 parses the frontmatter. The skills CLI reserves `metadata.internal`; never set it on a public skill.
@@ -136,6 +138,7 @@ ready to fill in.
 | Deliver | How to present the result and which skill to chain to next. |
 | Troubleshooting | The exit-code table: 2 fix the command, 4 setup, 5 stop and ask, anything else `references/troubleshooting.md`. |
 | Guardrails | The standing rules from section 5 plus any rule specific to this skill. |
+| Docs line | Not a section: the file's last line, `Docs: <url>`, with the same URL as `metadata.docs`. |
 
 Do not add "When to use" or "When not to use" sections. The frontmatter `description` already
 holds the phrasings the host agent matches a request against, so the lists only repeat it and cost
@@ -222,6 +225,8 @@ Never fix one public copy by hand.
 - [ ] The folder name, `name`, and website slug are identical, lowercase, and hyphenated.
 - [ ] `description` starts with "Use when", quotes real user phrasings, has no price, and is at most 1024 characters.
 - [ ] Every `metadata` field is present and matches the body (cost, commands, writes-files).
+- [ ] `metadata.docs` and the closing `Docs:` line name the same URL: the skill's
+      `vidbyte.pro/agents/skills/<slug>` page when it has one, else `/docs/cli/agent-skills`.
 - [ ] Every section from section 4 is present, in order, and there is no "When to use" or "When not to use" section.
 - [ ] "The problem" explains the situation, the concrete failures, and why they are hard to catch,
       and "How vidbyte-cli solves it" names `vidbyte-cli`, the agent, and its commands.

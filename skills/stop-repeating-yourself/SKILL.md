@@ -8,6 +8,7 @@ metadata:
   writes-files: "true"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/stop-repeating-yourself"
 ---
 
 # Stop having to repeat yourself to your coding agents
@@ -635,3 +636,5 @@ this week's report cannot compare with earlier runs.
 - Record feedback only for an explicit accept or reject from the user, and `--applied` only after
   the change is in place.
 - Keep the `out_dir` out of every repository and every commit.
+
+Docs: <https://vidbyte.pro/agents/skills/stop-repeating-yourself>

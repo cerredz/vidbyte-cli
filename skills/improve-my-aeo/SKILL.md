@@ -8,6 +8,7 @@ metadata:
   writes-files: "false"
   min-cli-version: "0.3.2"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/improve-my-aeo"
 ---
 
 # Get your site read, trusted, and cited by answer engines
@@ -180,3 +181,5 @@ cited evidence and `grounded: false` for ideas that cite nothing from the audit.
 - Change the site or repository only through a step the user approves, and record feedback only
   for an explicit accept or reject.
 - Keep the `out_dir` out of every repository and commit.
+
+Docs: <https://vidbyte.pro/agents/skills/improve-my-aeo>
