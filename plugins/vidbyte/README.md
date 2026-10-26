@@ -40,8 +40,9 @@ agent runs on your machine, and it asks before each install:
 - **Installs** `vidbyte-cli` from [PyPI](https://pypi.org/project/vidbyte-cli/) with
   `pipx install vidbyte-cli` (or `pip` inside a virtual environment), and the Codex CLI only if
   you pick an agent that needs it. Each install waits for your yes.
-- **Contacts Vidbyte.** `vidbyte-cli whoami`, `vidbyte-cli login`, and `vidbyte-cli runtime list`
-  call the Vidbyte API at `https://vidbyte-backend.onrender.com` to check your key and read the
+- **Contacts Vidbyte.** `vidbyte-cli whoami`, `vidbyte-cli login`, `vidbyte-cli runtime list`,
+  and, on vidbyte-cli 0.3.0 or newer, `vidbyte-cli billing balance` call the Vidbyte API at
+  `https://vidbyte-backend.onrender.com` to check your key, read your balance, and read the
   runtime catalog and prices. `vidbyte-cli runtime doctor` checks your machine only.
 - **Contacts OpenAI** only for agents that drive Codex: `vidbyte-cli provider whoami openai`
   verifies the OpenAI key you stored with `vidbyte-cli provider login openai`.

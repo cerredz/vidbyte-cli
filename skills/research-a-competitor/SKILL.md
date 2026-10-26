@@ -4,7 +4,7 @@ description: Use when the user names a competitor and wants to know what it is d
 metadata:
   agent: persistent-researcher
   commands: "runtime task-board run, runtime task-board show-step, research start, research watch, research status, research thread, research add, research resume"
-  cost: "2 cents per board + up to the cap per research run (500 cents by default) + OpenAI usage"
+  cost: "2 cents per board + up to the cap per research run (500 cents by default) + OpenAI API usage for the board, billed to the user's own OpenAI API key, which needs credits (a ChatGPT or Codex login does not pay for it)"
   writes-files: "true"
   min-cli-version: "0.2.0"
   status: stable
@@ -92,11 +92,18 @@ python3 --version                          # 3.8 or newer
 
 - On Windows, `python3` may not exist. Use `py -3 --version`, or `python --version`. Below,
   `<python>` means whichever of these works.
-- The last two `vidbyte-cli` checks are for the Task Board (`references/setup.md` step 3). If the
-  user cannot or does not want to set up Codex and an OpenAI key, the skill still works without
-  the board: skip `board`, and `collect` writes the default brief for every aspect. That saves the
-  2-cent board charge and the OpenAI usage, but the questions are generic, not specific to this
-  company.
+- The last two `vidbyte-cli` checks are for the Task Board (`references/setup.md` step 3). The
+  board runs every Codex agent on the OpenAI API key that `provider whoami openai` checks, through
+  OpenAI's API, and bills every model call to that key's OpenAI account. A ChatGPT or Codex
+  subscription login is not used and does not pay for it. `data.verified: true` proves the key is
+  live, not that its account has credits, and the 2-cent board admission is charged before the
+  first agent starts, so with no credits the 2 cents are spent and every aspect gets the default
+  brief anyway. Ask the user to confirm that the key's OpenAI account has API credits (the Billing
+  page on platform.openai.com).
+- If the user cannot or does not want to set up Codex and an OpenAI API key with credits, the
+  skill still works without the board: skip `board`, and `collect` writes the default brief for
+  every aspect. That saves the 2-cent board charge and the OpenAI usage, but the questions are
+  generic, not specific to this company.
 
 ## Gather inputs
 
@@ -155,7 +162,8 @@ the folder that holds this `SKILL.md`. It needs only Python's standard library.
 The whole skill, in order. Each step names the section that holds its details.
 
 1. **Check the setup.** Run `vidbyte-cli --version`, `whoami`, `runtime doctor`,
-   `provider whoami openai`, and check Python. (Preflight)
+   `provider whoami openai`, and check Python. Unless the board is skipped, have the user confirm
+   that the OpenAI API key has credits. (Preflight)
 2. **Settle the company, website, purpose, and who is asking.** (Gather inputs, steps 1 and 2)
 3. **Settle the aspects** with the user: drop, add, or narrow. (Gather inputs, step 2)
 4. **Plan, free.** Run `competitor_portfolio.py plan`. It prints the aspects, the cap, and the
@@ -190,8 +198,8 @@ between.
 | `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.2.0 or newer. Free and offline. |
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored credentials. Exit 4 means no key is stored. Free. |
 | `vidbyte-cli --json runtime doctor` | Preflight | Diagnoses local runtime host availability: which supported agent hosts, such as `codex`, are installed. Free and offline. |
-| `vidbyte-cli --json provider whoami openai` | Preflight | Shows the OpenAI key stored for the Task Board and checks it. Exit 4 means none is stored. Free. |
-| `vidbyte-cli --json --no-input runtime task-board run` | Run, through `board` | Runs an ordered board of tasks on this machine, one at a time, each in its own Codex agent that is thrown away when its task ends. Here `--task-list` holds one task per aspect, and `--sandbox read-only` lets no agent change a file. Costs 2 cents from the Vidbyte balance for the whole board, plus OpenAI usage on the user's own account. Writes its checkpoints and a Markdown report under `<OUT>/board/`. |
+| `vidbyte-cli --json provider whoami openai` | Preflight | Shows the OpenAI key stored for the Task Board and checks it. It does not show whether the key's account has credits. Exit 4 means none is stored. Free. |
+| `vidbyte-cli --json --no-input runtime task-board run` | Run, through `board` | Runs an ordered board of tasks on this machine, one at a time, each in its own Codex agent that is thrown away when its task ends. Here `--task-list` holds one task per aspect, and `--sandbox read-only` lets no agent change a file. Costs 2 cents from the Vidbyte balance for the whole board, charged before the first agent starts, plus OpenAI API usage billed to the user's own OpenAI API key; a ChatGPT or Codex login does not pay for it. Writes its checkpoints and a Markdown report under `<OUT>/board/`. |
 | `vidbyte-cli --json --no-input runtime task-board show-step` | Run, through `collect` | Returns everything stored for one board step in one response, including its status and the agent's full final message (`data.step.result_text`). Free and offline. |
 | `vidbyte-cli --json --no-input research start` | Run, through `launch` | Starts a new research thread from a prompt and returns at once with its `thread_id` and `run_id`; the run continues on Vidbyte's servers. Billed by usage from the Vidbyte balance, never above `--max-cost-cents`. Writes no local files. |
 | `vidbyte-cli --json --no-input research watch` | Read the result, through `wait` | Watches one research run until it finishes, or until `--timeout` seconds pass; the run keeps going either way. Free. |
@@ -207,8 +215,11 @@ credits" in `references/troubleshooting.md`, which tops up only after the user's
 
 A portfolio of N aspects costs, from the Vidbyte balance of the account `whoami` shows:
 
-- **The board:** 2 cents for the whole board, plus OpenAI usage on the user's own account for N
-  short Codex turns, one per aspect (a failed turn is retried once). The agents change no files.
+- **The board:** 2 cents for the whole board, plus OpenAI API usage for N short Codex turns, one
+  per aspect (a failed turn is retried once), billed to the user's own OpenAI API key, not to a
+  ChatGPT or Codex subscription. The 2 cents are charged before the first turn, so if that key's
+  OpenAI account has no API credits, they are spent and every aspect gets the default brief; ask
+  only after the user has confirmed the credits in Preflight. The agents change no files.
 - **The research:** N research runs, each billed by usage and capped at `--max-cost-cents`,
   500 cents ($5.00) by default. The cap is a hard ceiling that Vidbyte's backend enforces, so a
   run can cost less but never more.
@@ -227,10 +238,10 @@ It checks every task against the board's 20,000-character limit and prints the e
 Then ask once, in your own words:
 
 > This researches <Company> in <N> aspects: <list>. First, one Vidbyte Task Board drafts a research
-> brief per aspect: 2 cents from your Vidbyte balance, plus OpenAI usage on your own account for
-> <N> short Codex turns. Then it starts <N> Vidbyte research runs, one per aspect, each capped at
-> <cap> cents. The most it can cost is <worst case> plus that OpenAI usage. Files are written only
-> in <OUT>. Start it?
+> brief per aspect: 2 cents from your Vidbyte balance, plus OpenAI API usage on your own OpenAI
+> API key, not your ChatGPT plan, for <N> short Codex turns. Then it starts <N> Vidbyte research
+> runs, one per aspect, each capped at <cap> cents. The most it can cost is <worst case> plus that
+> OpenAI usage. Files are written only in <OUT>. Start it?
 
 If the purpose or "who is asking" is confidential, add that both are sent to OpenAI through Codex
 on the user's own account, and to Vidbyte inside every brief. Wait for a yes.
@@ -431,7 +442,7 @@ uses the same format.
 | 3 from `wait` | Runs are still going on Vidbyte's servers. Tell the user which, and run `wait` again. |
 | 4 | Stop. Follow `references/setup.md` step 2 for the Vidbyte key. For `Authentication for provider 'openai' is required.`, follow step 3. |
 | 5 | Stop. Follow "Out of credits" in `references/troubleshooting.md`. Never top up without the user's yes. After a top-up, run the same subcommand again: `launch` resends the stopped aspect with the same key. |
-| 1 from `board` | The board failed. Show the message. `collect` still works: it gives every aspect without a stored answer the default brief, at no charge. Retry the board only after a new yes, with `board --retry-failed`. |
+| 1 from `board` | The board failed. Show the message. `collect` still works: it gives every aspect without a stored answer the default brief, at no charge. Retry the board only after a new yes, with `board --retry-failed`. If the board's steps name an OpenAI quota or billing error, such as `insufficient_quota`, the OpenAI API key has no credits: the user adds API credits to that key's OpenAI account before any retry. |
 | 1 from `launch`, `Not started: ...` | A start kept failing with a retryable error, such as a rate limit. Wait a minute and run `launch` again; it reuses the same keys. |
 | Other | Read `references/troubleshooting.md`. |
 
@@ -449,6 +460,8 @@ briefs are the generic defaults.
 - Ask before spending. One yes covers `board`, `collect`, and `launch` for the plan as printed;
   every `resume`, `followup`, and new plan needs its own yes. Never raise the cap or the size above
   what the user approved.
+- Never start the board until the user has confirmed that their OpenAI API key has credits. A
+  ChatGPT or Codex login does not pay for the board's model calls.
 - Give every priced run one idempotency key, made by the script, and reuse it only to recover that
   same run. Never edit `portfolio.json` by hand: it holds those keys.
 - Research companies, not people. Never add an aspect about a private individual, never research

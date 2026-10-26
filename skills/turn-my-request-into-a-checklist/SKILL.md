@@ -4,7 +4,7 @@ description: Use when the user wants a request laid out as a checklist before wo
 metadata:
   agent: "suggestion-agent"
   commands: "agents suggest project list, agents suggest project create, agents suggest run, agents suggest handoff, agents suggest feedback accept, agents suggest feedback reject"
-  cost: "2 cents per block of up to 10 checklist items (2 cents at the default 8) + model usage on the user's own Codex account"
+  cost: "Model usage from the Vidbyte balance: gpt-6-sol at $2 / $10 per million input / output tokens + 2%, about 5 model calls, capped at 400,000 tokens per run"
   writes-files: "true"
   min-cli-version: "0.3.0"
   status: stable
@@ -41,10 +41,11 @@ This skill drives `vidbyte-cli`, the Vidbyte command-line tool, and its Suggesti
 script that ships with the skill, `scripts/checklist.py`, reads your request from a file, removes
 secrets, email addresses, and home-folder paths, and builds one `vidbyte-cli agents suggest run`
 command. A free dry run checks that command first. After your yes, the paid run starts the
-Suggestion Agent on your own Codex login: a generator proposes up to twice as many items as
-requested through four lenses (prerequisites, immediate next steps, verification, and risk
-prevention), an independent critic reviews them, and only items with evidence, a first action, and
-a completion check survive.
+Suggestion Agent, whose model calls run on OpenAI's gpt-6-sol through Vidbyte's model gateway and
+are billed to your Vidbyte balance: a generator proposes up to twice as many items as requested
+through four lenses (prerequisites, immediate next steps, verification, and risk prevention), an
+independent critic reviews them, and only items with evidence, a first action, and a completion
+check survive.
 
 At the end you have a Markdown checklist in the chat, grouped by Now, Next, and Later, with the
 first step of each item. The free `vidbyte-cli agents suggest handoff` command turns any item into
@@ -54,24 +55,22 @@ commands teach later checklists what you want on them.
 ## Goal and done-when
 
 The goal is one checklist of what to prepare, do, check, and guard against for the request the
-user just typed, built from text the user saw redacted and approved, for one Vidbyte charge.
+user just typed, built from text the user saw redacted and approved, in one usage-billed run.
 
 Done when: the user has seen the checklist in the chat, grouped by Now, Next, and Later with a
-first step for each item; the charge from `charged_cents` has been reported; and the user has been
-offered a handoff for one item.
+first step for each item; the run's model usage and estimated cost have been reported; and the
+user has been offered a handoff for one item.
 
 ## Preflight
 
 Run these in order. If a `vidbyte-cli` check fails, read `references/setup.md`, fix only what
-failed, and run the preflight again. Step 3 of that file covers Codex for the Suggestion Agent.
-The `vidbyte-cli`, `codex`, and `git` commands in this file are the same on macOS, Linux, and
-Windows.
+failed, and run the preflight again. Step 3 of that file lists what the Suggestion Agent needs:
+no Codex and no OpenAI key, only a Vidbyte key with the `models:invoke` permission. The
+`vidbyte-cli` and `git` commands in this file are the same on macOS, Linux, and Windows.
 
 ```bash
 vidbyte-cli --version                  # must be 0.3.0 or newer
 vidbyte-cli --json whoami              # exit 4 means no Vidbyte key is stored
-vidbyte-cli --json runtime doctor      # data.hosts must list "codex" with "available": true
-codex login status                     # must print "Logged in ..."; exit 1 means not logged in
 ```
 
 Then check Python 3.8 or newer. The command differs by system:
@@ -83,10 +82,11 @@ python3 --version
 py -3 --version
 ```
 
-- Codex must be logged in. The CLI checks that Codex is on `PATH` before it charges, but it does
-  not check the login, so a run with a logged-out Codex is charged and then fails. If
-  `codex login status` prints `Not logged in`, ask the user to run `codex login` in their own
-  terminal.
+- The Vidbyte key must carry the `models:invoke` permission; an admin or full-access key has it
+  too. `whoami` does not show permissions, so a key without it fails at the run's first model call
+  with exit 4 and `The stored Vidbyte API key is missing the models:invoke permission.`, before
+  anything is billed. The user then creates a key with that permission at
+  <https://vidbyte.pro/settings/api> and runs `vidbyte-cli login` with it.
 - On Windows, if `py` is missing, use `python` wherever this file says `py -3`. The script uses
   only the Python standard library.
 - `<skill>` below means the folder that holds this `SKILL.md`. The script writes only into a new
@@ -142,9 +142,10 @@ Everything in this section is free.
    These values, unlike the request, pass through your shell. Keep them plain: no `$`, backticks,
    or double quotes inside them.
 
-5. **Pick the count.** The default is 8 items for 2 cents. If the user asks for more, pass
-   `--count <N>` (2 to 100). The charge is 2 cents per started block of ten: 2 cents for up to 10,
-   4 cents for 11 to 20, and 20 cents for 91 to 100.
+5. **Pick the count.** The default is 8 items. If the user asks for more, pass `--count <N>` (2 to
+   100). The count is a maximum and not a quota. A longer request and a larger `--count` both make
+   the usage grow, because a larger count asks for longer replies, which are more output tokens;
+   the 400,000-token cap still bounds the run (Cost and consent).
 
 6. **Make sure the learning project exists.** One local project, `request-checklists`, remembers
    which items the user accepted or rejected, so later checklists learn. It is free and local:
@@ -173,11 +174,11 @@ Everything in this section is free.
    ```
 
    The script redacts the request and every value, saves the exact request in
-   `<out_dir>/request.json`, and runs it with `--dry-run`. A dry run calls no model, buys no
-   admission, and needs no credentials. It prints a JSON report. Expect exit 0,
-   `"stop_reason": "dry_run"`, `"charged_cents": null`, and `"ready_for_paid": true`. The report's
-   `sent` block holds exactly what the paid run will send, `redactions` counts what was removed,
-   and `cost_cents` is the charge.
+   `<out_dir>/request.json`, and runs it with `--dry-run` added. A dry run calls no model, is not
+   billed, and needs no credentials. It prints a JSON report. Expect exit 0,
+   `"stop_reason": "dry_run"`, `"models": ["gpt-6-sol"]`, and `"ready_for_paid": true`. The
+   report's `sent` block holds exactly what the paid run will send, `redactions` counts what was
+   removed, and `max_total_tokens` is the cap the paid run passes.
 
    If the request is over 4,096 characters (the most `--goal` accepts), the script stops with
    exit 2. Write a one-sentence summary of the request, at most 600 characters, and run the same
@@ -188,8 +189,8 @@ Everything in this section is free.
 
 The whole skill, in order. Each step names the commands it runs and the section with its details.
 
-1. **Check the setup.** Run `vidbyte-cli --version`, `vidbyte-cli --json whoami`,
-   `vidbyte-cli --json runtime doctor`, `codex login status`, and the Python check. (Preflight)
+1. **Check the setup.** Run `vidbyte-cli --version`, `vidbyte-cli --json whoami`, and the Python
+   check. (Preflight)
 2. **Pick the text and save it.** Run `checklist.py start`, then save the request to `typed.txt`.
    (Gather inputs, steps 1 and 2)
 3. **Add context and the user's own limits.** (Gather inputs, steps 3 to 5)
@@ -199,7 +200,7 @@ The whole skill, in order. Each step names the commands it runs and the section 
    `vidbyte-cli --json --no-input agents suggest run ... --dry-run`. (Gather inputs, step 7)
 6. **Show the user what will be sent and what it costs, and wait for a yes.** (Cost and consent)
 7. **Run the Suggestion Agent once** with `checklist.py run --paid`, which runs
-   `vidbyte-cli --json --no-input agents suggest run ... --idempotency-key <key>`. (Run)
+   `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000`. (Run)
 8. **Read the report and `result.json`.** (Read the result)
 9. **Print the checklist** with `checklist.py checklist` and show it in the chat. (Deliver, step 1)
 10. **Offer a handoff** with `vidbyte-cli --json agents suggest handoff`, and record feedback only
@@ -215,11 +216,10 @@ Root options such as `--json` and `--no-input` always come before the command pa
 |---|---|---|
 | `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.3.0 or newer. Free and offline. |
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored credentials. Exit 4 means no key is stored. Free. |
-| `vidbyte-cli --json runtime doctor` | Preflight | Diagnoses local runtime host availability: reports the working directory and which supported agent hosts are installed. Its `codex` row must be available. Free and offline. |
 | `vidbyte-cli --json agents suggest project list` | Gather inputs | Prints every local suggestion project, sorted by key, with its title and description. An absent catalog returns an empty list, not an error. No credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest project create --key ... --title ... --description ...` | Gather inputs | Registers one local suggestion project with an empty feedback memory, and refuses a key that already exists. No credentials, no model call, sends nothing to Vidbyte. Free. |
 | `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `checklist.py run --dry-run` | Validates and resolves the complete request without invoking a model, and returns the settings, the context manifest, omissions, and warnings. No credentials, no charge. |
-| `vidbyte-cli --json --no-input agents suggest run ... --idempotency-key <key>` | Run, through `checklist.py run --paid` | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Buys one Vidbyte admission before any model is called: 2 cents for each block of up to ten requested items, plus model usage on the user's own Codex account. Writes no files; the script saves the output in the `out_dir`. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `checklist.py run --paid` | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. It starts no new call after 400,000 tokens. Writes no files; the script saves the output in the `out_dir`. |
 | `vidbyte-cli --json agents suggest handoff --input <result.json> --idea <id>` | Deliver | Extracts one reviewed idea from a saved result, by its exact id, as an action packet with a copyable `execution_prompt`. A local read: no provider, no credentials. Free. |
 | `vidbyte-cli --json agents suggest feedback accept --project ... --suggestion ...` | Deliver, through `checklist.py feedback` | Records one suggestion the user explicitly accepted, with their optional `--reason`, in the project's memory, so later runs with `--project` look for the same qualities. Local, no model call. Free. |
 | `vidbyte-cli --json agents suggest feedback reject --project ... --suggestion ...` | Deliver, through `checklist.py feedback` | Records one suggestion the user explicitly rejected. Later runs with `--project` steer away from it and drop any idea that repeats it word for word. Local, no model call. Free. |
@@ -229,24 +229,28 @@ credits" in `references/troubleshooting.md`, which tops up only after the user's
 
 ## Cost and consent
 
-This skill runs `vidbyte-cli agents suggest run` once per checklist. It costs 2 cents per block of
-up to 10 checklist items (2 cents at the default 8) from the user's Vidbyte balance, plus model
-usage on the user's own Codex account (their ChatGPT plan or OpenAI API key, whichever Codex is
-logged in with). The run changes no files. The only file this skill ever writes in the user's
-workspace is a copy of the checklist, and only when the user asks for one (Deliver, step 4).
+This skill runs `vidbyte-cli agents suggest run` once per checklist, and the run is billed by
+usage from the user's Vidbyte balance. It makes about five model calls on gpt-6-sol at high
+reasoning effort: one draft, then a critique and a revision in each of two rounds. Each call is
+billed at gpt-6-sol's rate, $2 per million input tokens ($0.20 when the input is cached) and $10
+per million output tokens, plus 2%, and the model's reasoning counts as output. The skill passes
+`--max-total-tokens 400000`, so the run starts no new call once it has used 400,000 tokens; a call
+already running still finishes and is billed. That keeps one run under about $4, and the script
+reports the run's real token usage and an estimate of its cost when it finishes. The run changes
+no files. The only file this skill ever writes in the user's workspace is a copy of the checklist,
+and only when the user asks for one (Deliver, step 4).
 
 What leaves the machine: the redacted request (or the summary plus `request.md`) and the values in
-the report's `sent` block go to the model through the user's own Codex login. Vidbyte's backend
-receives only the admission request, which holds the host and the number of blocks, never the
-text. `typed.txt` and the user's repository are never sent.
+the report's `sent` block go to Vidbyte, which sends them to OpenAI with every model call of the
+run. `typed.txt` and the user's repository are never sent.
 
 Before running, show the user the report's `sent` block word for word, the `redactions` counts,
-and `cost_cents`. Then ask, in your own words:
+and `max_total_tokens`. Then ask, in your own words:
 
 > This runs the Vidbyte Suggestion Agent once on the request above, with the context shown. It
-> sends this redacted text to the model through your own Codex login. It costs <cost_cents> cents
-> from your Vidbyte balance, plus model usage on your Codex account, and it changes no files.
-> Run it?
+> sends this redacted text through Vidbyte to OpenAI's gpt-6-sol. It is billed by usage from your
+> Vidbyte balance, at most about $4 because the run starts no model call after 400,000 tokens, and
+> it changes no files. Run it?
 
 Wait for a yes. One yes covers one paid run. Ask again for every new request, even if the user
 said yes a moment ago: each request sends different text, and the user must see it before it
@@ -254,10 +258,9 @@ leaves the machine. If the user wants something changed, save the new text to `t
 the values, run the dry run again, and ask again. If the user spots a secret, remove it from
 `typed.txt`, tell them to rotate it, run the dry run again, and ask again.
 
-The script makes one idempotency key per paid run,
-`turn-my-request-into-a-checklist:<YYYYMMDD>:<6 hex characters>`, saves it in
-`<out_dir>/idempotency-key.txt`, and prints it before the run. Reuse that key only to recover this
-same admission (Troubleshooting). Any new run is a new charge with a new key, in a new `out_dir`.
+The command takes no idempotency key: there is no purchase to recover, and each model call is
+billed once, when it finishes. The script writes `<out_dir>/paid-run.txt` before the run and
+refuses a second paid run in the same `out_dir`. Any new run is a new charge, in a new `out_dir`.
 
 ## Run
 
@@ -272,9 +275,9 @@ py -3 "<skill>/scripts/checklist.py" run --out "<out_dir>" --paid
 
 The run often takes several minutes, longer than many hosts let one command run. Start it in the
 background and wait for it to exit, or give it a timeout of at least 20 minutes if the host allows
-one that long. A host timeout that kills the command loses the result of a run that was already
-paid for. Never stop it after stderr shows `Vidbyte has verified the admission for this run.`:
-from that line on, the run is paid for.
+one that long. A host timeout that kills the command loses the result of model calls that were
+already billed. Do not stop it early for the same reason: the calls that finished are billed
+either way.
 
 The script refuses to start unless a dry run passed in this `out_dir` and the request has not
 changed since, and it refuses a second paid attempt in the same folder. It then replays the
@@ -282,7 +285,7 @@ checked request, from inside the `out_dir` and without a shell, so the user's te
 `vidbyte-cli` unchanged on every system:
 
 ```bash
-vidbyte-cli --json --no-input agents suggest run --goal "add rate limiting to the public API" --category prerequisite --category immediate_next_steps --category verification --category risk_prevention --horizon any --count 8 --context "Repository: shop-api, branch main." --constraint "The change must ship before Friday's release." --project request-checklists --idempotency-key "turn-my-request-into-a-checklist:20261011:3f9a1c"
+vidbyte-cli --json --no-input agents suggest run --goal "add rate limiting to the public API" --category prerequisite --category immediate_next_steps --category verification --category risk_prevention --horizon any --count 8 --context "Repository: shop-api, branch main." --constraint "The change must ship before Friday's release." --project request-checklists --max-total-tokens 400000
 ```
 
 stdout is saved to `<out_dir>/result.json`, and stderr is shown and saved to
@@ -296,23 +299,28 @@ stdout is saved to `<out_dir>/result.json`, and stderr is shown and saved to
   lenses get their full guidance; without `--category` the agent sees only a one-line summary of
   all 31 and can return long-term bets that are not checklist items.
 - `--horizon any`: the CLI applies any other value only after review, as a filter on each item's
-  own label, so `--horizon now` could remove items while the charge stays the same. The checklist
+  own label, so `--horizon now` could remove items while the run is still billed. The checklist
   groups items by their own horizon instead.
-- `--count 8`: one 2-cent block covers up to ten, and eight items fit on one screen.
+- `--count 8`: eight items fit on one screen. The count is a maximum and not a quota; a larger
+  count asks for longer replies, which are more output tokens.
 - `--context`, `--constraint`, `--completed`, `--in-progress`, `--avoid`: the short facts from
   Gather inputs. Typed inputs reach the model as labelled evidence the critic can check items
   against.
 - `--project request-checklists`: loads the items the user accepted and rejected on earlier runs.
-- `--idempotency-key`: the one key for this admission (Cost and consent).
-- Kept at their defaults: `--rounds` and `--max-messages`; no `--model` or `--reasoning-effort`,
-  so Codex uses the model the user configured.
+- `--max-total-tokens 400000`: the run starts no new model call after 400,000 tokens, which
+  bounds its cost (Cost and consent). A run that reaches it stops with `stop_reason: token_limit`
+  and returns the items it has so far.
+- Kept at their defaults: `--rounds` (two) and `--max-messages`; no `--model` or
+  `--reasoning-effort`, so the generator and the critic both run on gpt-6-sol at high reasoning
+  effort, the rate Cost and consent quotes.
 
 ## Read the result
 
 The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exit 0 the report has
-`result_file`, `kind`, `status`, `stop_reason`, `ideas` (a count), `charged_cents`, `warnings`,
-and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message`, `hint`, and
-`retryable` (Troubleshooting).
+`result_file`, `kind`, `status`, `stop_reason`, `ideas` (a count), `models`, `usage`
+(`model_calls`, `input_tokens`, `cached_input_tokens`, `output_tokens`), `estimated_cost_usd`,
+`context_manifest`, and `warnings`; otherwise it has `error`, with the CLI's `code`, `message`,
+`hint`, and `retryable` (Troubleshooting).
 
 `<out_dir>/result.json` is one JSON document,
 `{"schema_version": 1, "kind": "suggestions.result", "data": {...}}`.
@@ -320,14 +328,14 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
 | Field | Use it for |
 |---|---|
 | `data.status` | `complete`, `partial` (fewer items than asked, which is normal), `no_suggestions`, or `needs_input`. |
-| `data.stop_reason` | Why the run stopped, such as `completed`, `count_shortfall`, or `provider_failed`. |
+| `data.stop_reason` | Why the run stopped, such as `completed`, `count_shortfall`, `token_limit` (the 400,000-token cap was reached), `gateway_limit` (the balance or the key's daily spend limit ran out after some items were reviewed), or `provider_failed`. |
 | `data.parent_message` | Set with `needs_input`: the agent's question for the user. |
 | `data.ideas[]` | The reviewed items, best first. |
 | `.id`, `.rank`, `.title` | The checklist line; `id` (such as `idea-002`) selects an item for handoff and feedback. |
 | `.horizon`, `.readiness` | `now`, `next`, or `later`; `ready`, `needs_evidence`, `needs_decision`, or `blocked`. |
 | `.first_action`, `.why_now`, `.completion_criteria` | The first step, why it matters now, and how to know it is done. |
 | `data.warnings` | Shortfalls the run noticed. The checklist prints them as notes. |
-| `data.charged_cents`, `data.admission.admission_id` | What the run cost, and the id to give Vidbyte support if needed. |
+| `data.usage` | What the run used: `model_calls`, `input_tokens`, `cached_input_tokens`, and `output_tokens`. The report's `estimated_cost_usd` prices them at gpt-6-sol's rates plus 2%; the exact charge is on <https://vidbyte.pro/usage>. |
 
 ## Deliver
 
@@ -343,10 +351,10 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
 
    It prints a heading with the request, the items under `## Now`, `## Next`, and `## Later` (rank
    order inside each), one `- [ ]` line per item with its first step and id below it, and a footer
-   with the charge and the handoff command. A flat rank order could put a `later` item above a
-   `now` item, so the checklist follows each item's horizon. If the status is `needs_input`, it
-   prints the agent's question instead; a run with the answer added is a new charge. An example,
-   from synthetic data:
+   with the run's usage line and the handoff command. A flat rank order could put a `later` item
+   above a `now` item, so the checklist follows each item's horizon. If the status is
+   `needs_input`, it prints the agent's question instead; a run with the answer added is a new
+   usage-billed run. An example, from synthetic data:
 
    ```markdown
    # Checklist: add rate limiting to the public API
@@ -378,7 +386,7 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
 
    ---
 
-   8 items from the Vidbyte Suggestion Agent. This run cost 2 cents from your Vidbyte balance, plus model usage on your Codex account.
+   8 items from the Vidbyte Suggestion Agent. This run made 5 model calls with 182340 input and 41210 output tokens, about $0.62 from your Vidbyte balance; the exact amount is on vidbyte.pro/usage.
 
    - Start an item: `vidbyte-cli --json agents suggest handoff --input "/tmp/request-checklist-k3x9q2/result.json" --idea <id>`
    - Teach later checklists: tell your agent which items you accept or reject, and why.
@@ -434,29 +442,21 @@ and `idempotency_key`; otherwise it has `error`, with the CLI's `code`, `message
 |---|---|
 | 2, from `checklist.py` | The script names the problem, such as an empty `typed.txt`, a request over 4,096 characters without `--goal-summary`, a value that is too short, a paid run with no passing dry run, or a paid attempt already started in this `out_dir`. Fix it; do not retry unchanged. |
 | 2, from `vidbyte-cli` | Fix the flag the message names. `Suggestion project was not found: request-checklists.` means the project does not exist: create it (Gather inputs, step 6) or pass `--no-project`. |
-| 4 | Stop. Follow `references/setup.md` step 2. |
+| 4 | Stop. No Vidbyte key is stored, or the key lacks `models:invoke` (the message says which). Nothing was billed. Follow `references/setup.md` step 2. |
 | 5 | Stop. Follow "Out of credits" in `references/troubleshooting.md`. Never top up without the user's yes. |
 | 127, from `checklist.py` | `vidbyte-cli` is not on `PATH`. Follow `references/setup.md` step 1, or pass `--cli` with the full path of `vidbyte-cli`. |
 | Other | Read `references/troubleshooting.md`. |
 
-If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` first:
+If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` and the report's `error`
+first. The model calls that finished before the failure were billed, and nothing recovers or
+refunds them: there is no admission and no idempotency key.
 
-- **It does not contain `Vidbyte has verified the admission for this run.`** The admission may
-  have been charged while its reply was lost. Recover it without paying twice by rerunning with the
-  saved key, after telling the user:
-
-  ```bash
-  # macOS and Linux
-  python3 "<skill>/scripts/checklist.py" run --out "<out_dir>" --paid --idempotency-key "<key from idempotency-key.txt>"
-  # Windows
-  py -3 "<skill>/scripts/checklist.py" run --out "<out_dir>" --paid --idempotency-key "<key from idempotency-key.txt>"
-  ```
-
-  The key recovers the purchase only: the backend returns the admission already bought, and the
-  items are generated again from the same request.
-- **It contains that line.** The run was paid for. A failure after it, such as
-  `stop_reason: provider_failed`, is usually Codex: check `codex login status`. Another run is a
-  new charge plus model usage, so ask the user first, then start again from `checklist.py start`.
+- **`stop_reason: gateway_limit`.** The balance or the key's daily spend limit ran out after some
+  items were reviewed. Deliver those items, then follow "Out of credits" in
+  `references/troubleshooting.md` before any new run.
+- **Exit 1 with `The model gateway did not complete the suggestion run.`** A provider outage or a
+  reply that did not validate. Another run is a new usage-billed run, so ask the user first, then
+  start again from `checklist.py start`.
 
 ## Guardrails
 
@@ -465,7 +465,7 @@ If a paid run fails or is cut off, read `<out_dir>/result.stderr.txt` first:
 - Run at most one file-writing Vidbyte agent in a workspace at a time. This skill's Vidbyte run
   edits nothing; the only workspace file it writes is a checklist copy the user asked for.
 - Run only when the user asks for a checklist. Never install a hook or any other setting that runs
-  this skill on every prompt: every run is charged and needs its own yes.
+  this skill on every prompt: every run is billed by usage and needs its own yes.
 - Never run `checklist.py run --paid`, or `vidbyte-cli agents suggest run` without `--dry-run`,
   before the user's yes. One yes covers one paid run.
 - Send only the redacted request and the short values the user saw in the report's `sent` block.

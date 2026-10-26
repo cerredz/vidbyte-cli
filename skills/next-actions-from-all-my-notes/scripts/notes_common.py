@@ -14,8 +14,10 @@ Changes from the source, and why:
   extended to the merged "all" document.
 - cut_chat comes from next-actions-from-slack and cut_head from next-actions-from-google-docs
   (PR #15), so each provider's text is cut the way its own skill cuts it.
-- resolve_cli and codex_logged_in come from next-actions-from-notion: --cli names the vidbyte-cli
-  executable, and the paid run checks the Codex login, which the CLI does not.
+- resolve_cli comes from next-actions-from-notion: --cli names the vidbyte-cli executable.
+- The run helpers follow the usage-billed Suggestion Agent, as next-actions-from-obsidian does: the
+  run buys nothing up front and needs no Codex, --max-total-tokens goes on both the dry and the
+  paid run, and run_models and estimate_usd report a finished run's usage.
 
 Only the Python standard library is used, and Python 3.8 or newer is enough.
 """
@@ -41,12 +43,21 @@ KINDS = ("note", "page", "database-row", "message", "thread", "file", "doc")
 PROVIDERS = ("obsidian", "notion", "slack", "google-docs")
 PROJECT_KEY = "notes-next-actions"  # The same key in every family skill, so feedback carries over.
 CATEGORIES = ("immediate_next_steps", "prioritization", "completion", "continuation")
-HORIZON = "any"  # Any other value drops ideas after review, and the charge stays the same.
+HORIZON = "any"  # Any other value drops ideas after review, and the run is still billed.
+# The run starts no new model call once it has used this many tokens, which bounds its cost.
+MAX_TOTAL_TOKENS = 400000
+
+# vidbyte-cli's default model for both roles, and its regular rates in US dollars per million
+# tokens (https://developers.openai.com/api/docs/models/gpt-6-sol), which Vidbyte's model gateway
+# bills plus a 2% markup. They only estimate a finished run's cost; vidbyte.pro/usage is exact.
+MODEL = "gpt-6-sol"
+RATES_PER_MILLION = {"input": 2.0, "cached_input": 0.2, "output": 10.0}
+MARKUP = 1.02
+USAGE_KEYS = ("model_calls", "input_tokens", "cached_input_tokens", "output_tokens")
 
 # Values the user may add to a run, with the vidbyte-cli flag each becomes and the most passed.
 USER_VALUES = OrderedDict([("trajectory", ("--trajectory", 2)), ("constraint", ("--constraint", 3)), ("avoid", ("--avoid", 3))])
 MAX_VALUE_CHARS = 400
-KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 PROJECT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 
@@ -433,7 +444,7 @@ def validate_items_doc(doc, provider: str) -> list:
 # Running vidbyte-cli
 
 
-def build_argv(exe: str, request: dict, dry_run: bool, key: str) -> list:
+def build_argv(exe: str, request: dict, dry_run: bool) -> list:
     argv = [exe, "--json", "--no-input", "agents", "suggest", "run", "--goal", request["goal"]]
     for category in request["categories"]:
         argv += ["--category", category]
@@ -444,8 +455,28 @@ def build_argv(exe: str, request: dict, dry_run: bool, key: str) -> list:
     for name in request["files"]:
         argv += ["--files", name]  # Relative: the path reaches the model, a home path must not.
     argv += ["--project", request["project"]]
-    argv += ["--dry-run"] if dry_run else ["--idempotency-key", key]
+    argv += ["--max-total-tokens", str(MAX_TOTAL_TOKENS)]  # On both runs, so the dry run checks the paid command.
+    if dry_run:
+        argv.append("--dry-run")
     return argv
+
+
+def run_models(data: dict) -> list:
+    """The generator's and the critic's model, from a result's settings, without repeats."""
+    settings = data.get("settings") or {}
+    return list(OrderedDict.fromkeys(m for m in (settings.get("model"), settings.get("critic_model")) if m))
+
+
+def estimate_usd(usage: dict, models: list):
+    """Estimates a finished run's cost in dollars, or None when it made no call or left gpt-6-sol."""
+    if not usage.get("model_calls") or any(model != MODEL for model in models):
+        return None
+    cached = int(usage.get("cached_input_tokens") or 0)
+    fresh = max(int(usage.get("input_tokens") or 0) - cached, 0)
+    output = int(usage.get("output_tokens") or 0)
+    rates = RATES_PER_MILLION
+    dollars = (fresh * rates["input"] + cached * rates["cached_input"] + output * rates["output"]) / 1000000
+    return round(dollars * MARKUP, 2)
 
 
 def display_command(argv: list) -> str:
@@ -473,21 +504,6 @@ def missing_cli(value) -> int:
     print(json.dumps({"error": message}, indent=2))
     print("Error: " + message, file=sys.stderr)
     return 127
-
-
-def codex_logged_in():
-    """Returns None when Codex is logged in, else a message. The CLI checks only PATH."""
-    exe = shutil.which("codex")
-    if not exe:
-        return "codex is not on PATH. Install Codex and run `codex login` (references/setup.md step 3)."
-    try:
-        proc = subprocess.run([exe, "login", "status"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL, timeout=60)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        return "`codex login status` could not run: %s" % error
-    if proc.returncode != 0:
-        text = (proc.stdout or b"").decode("utf-8", "replace") + (proc.stderr or b"").decode("utf-8", "replace")
-        return "Codex is not logged in (`codex login status` said: %s). Ask the user to run `codex login` in their own terminal." % one_line(text, 120)
-    return None
 
 
 def run_cli(argv: list, out_dir: Path, stdout_name: str):

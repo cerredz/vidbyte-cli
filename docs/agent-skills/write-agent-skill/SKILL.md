@@ -94,7 +94,7 @@ description: Use when the user wants one bug pattern fixed everywhere it occurs,
 metadata:
   agent: persistent-agent
   commands: "runtime persistence"
-  cost: "2 cents per run + OpenAI usage"
+  cost: "2 cents per run + OpenAI API usage billed to the user's own OpenAI API key, which needs credits (a ChatGPT or Codex login does not pay for it)"
   writes-files: "true"
   min-cli-version: "0.3.0"
   status: stable
@@ -107,7 +107,7 @@ metadata:
 | `description` | Starts with "Use when", quotes two or three phrasings a user would actually type, says what the skill gets done, and names the Vidbyte agent and `vidbyte-cli`. It is the only place the skill says when to use it (section 4). At most 1024 characters. The website catalog entry's `description` is a verbatim copy of this field, so edit both together. No price figures: on the website every price must trace to the backend's price table, and lint rule N038 checks only agent catalog entries and the sentences bound in `lint/allowlists/price_sources.txt`, so a price here would ship unchecked. Prices go in `metadata.cost` and the Cost and consent section. |
 | `metadata.agent` | The agent id, from the website vocabulary: `suggestion-agent`, `persistent-researcher`, `persistent-agent`, `ensemble-agent`, `task-board`, `stages-agent`, or `bug-finder`. |
 | `metadata.commands` | The command paths the skill runs, without the `vidbyte-cli` prefix, separated by commas. |
-| `metadata.cost` | The exact Vidbyte charge plus any provider usage, in the same words the Cost and consent section uses. For a usage-billed agent, which has no exact charge, the model, its per-token rates, and the token cap the skill passes. |
+| `metadata.cost` | The exact Vidbyte charge plus any provider usage, in the same words the Cost and consent section uses. For a usage-billed agent, which has no exact charge, the model, its per-token rates, and the token cap the skill passes. For `runtime persistence`, `runtime task-board run`, and `runtime stages run`, which run Codex on the user's own OpenAI API key and charge their admission before Codex starts, say that the key needs credits and that a ChatGPT or Codex login does not pay for it. |
 | `metadata.writes-files` | `"true"` when any step edits the user's workspace. |
 | `metadata.min-cli-version` | The first released version on PyPI that has every command and flag the skill uses. See section 6. |
 | `metadata.status` | `stable`, or `preview` while the agent itself is labelled preview. A skill that is not ready is not published; it appears on the website as a coming-soon entry with no public file. |

@@ -10,7 +10,8 @@ Run every subcommand from the root of the clone, in this order:
             that stops on the conflicts. Writes tasks.json (the Task Board's task list) and
             state.json. Nothing is committed or pushed.
   run       The one paid step: one vidbyte-cli runtime task-board run (2 cents from the
-            Vidbyte balance plus OpenAI usage on your own account). --check validates
+            Vidbyte balance plus OpenAI API usage on your own OpenAI API key, which needs
+            credits; a ChatGPT or Codex login does not pay for it). --check validates
             everything and prints the exact command for free. --retry-failed and --resume
             continue a board that did not finish.
   report    Free and offline. What happened to each pull request and what to do next.
@@ -746,7 +747,8 @@ def cmd_run(args) -> int:
         say("Nothing was run and nothing was charged.")
         return 0
     if not args.yes:
-        raise Failure("run spends money (2 cents + OpenAI usage). Ask the user first, then pass --yes. "
+        raise Failure("run spends money (2 cents + OpenAI API usage on the user's own OpenAI "
+                      "API key, which needs credits). Ask the user first, then pass --yes. "
                       "Use --check to validate for free.", 2)
 
     for index in targets:
@@ -1012,7 +1014,8 @@ def parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="Paid: one Task Board run. --check is free.",
                          description="Run vidbyte-cli runtime task-board run over the prepared batch, "
                                      "from inside .vidbyte/resolve-pr-conflicts/. Costs 2 cents plus "
-                                     "OpenAI usage; --check costs nothing.")
+                                     "OpenAI API usage on your own OpenAI API key, which needs "
+                                     "credits; --check costs nothing.")
     mode = run.add_mutually_exclusive_group()
     mode.add_argument("--retry-failed", action="store_true",
                       help="Reset the failed steps' worktrees, then re-run only them (--retry-failed-only).")

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# The one paid step: a Vidbyte Task Board run (2 cents + OpenAI usage) with one fresh Codex agent
-# per issue, in the worktree prepare.sh created. It is also the only way to retry or resume the
+# The one paid step: a Vidbyte Task Board run (2 cents + OpenAI API usage on the user's own OpenAI
+# API key, which needs credits) with one fresh Codex agent per issue, in the worktree prepare.sh
+# created. It is also the only way to retry or resume the
 # board, because only this command attaches the on_step.sh hook that keeps each issue on its own
 # branch; the resume_command the CLI prints does not.
 # Usage: WORKTREE=<path prepare.sh printed> bash <skill>/scripts/run.sh

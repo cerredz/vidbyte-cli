@@ -1,7 +1,7 @@
 {
   "name": "vidbyte",
   "displayName": "Vidbyte",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Set up Vidbyte from your coding agent: install vidbyte-cli, log in without pasting your API key into the chat, and verify the account before any agent runs.",
   "author": {
     "name": "Vidbyte Inc.",

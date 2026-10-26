@@ -15,8 +15,8 @@ Five subcommands, run in this order by the next-actions-from-all-my-notes skill:
              local index that is never sent.
   run        --dry-run is free: it records the exact request in request.json and checks it with
              `vidbyte-cli agents suggest run --dry-run`. --paid replays that same request once; it
-             is the one charged step and needs the user's yes first. --cli names the vidbyte-cli
-             executable (default: vidbyte-cli on PATH).
+             is the one usage-billed step and needs the user's yes first. --cli names the
+             vidbyte-cli executable (default: vidbyte-cli on PATH).
   report     Free and local. Groups the next actions in result.json by horizon and ties each one
              to its sources: provider, title, and link. Flags actions backed by more than one tool.
   feedback   Free and local. Records the user's explicit accept or reject of one idea.
@@ -59,7 +59,7 @@ from providers import google_docs, notion, obsidian, slack  # noqa: E402
 SLUG = "next-actions-from-all-my-notes"
 ADAPTERS = OrderedDict((module.NAME, module) for module in (obsidian, notion, slack, google_docs))
 ALIASES = {"google": "google-docs", "gdocs": "google-docs", "google_docs": "google-docs", "googledocs": "google-docs", "drive": "google-docs"}
-COUNT = 8  # One admission block covers up to ten ideas, so eight cost one block.
+COUNT = 8  # Eight actions across four tools fit one sitting; a larger count asks for longer replies.
 
 DEFAULT_DAYS = 7
 DEFAULT_MAX_ITEMS = 40  # Per provider.
@@ -816,72 +816,50 @@ def fingerprint(out_dir: Path, request: dict) -> str:
 def cmd_run(args) -> int:
     out_dir = Path(args.out).expanduser().resolve()
     if args.dry_run == args.paid:
-        raise UsageError("Pass exactly one of --dry-run (the free check) or --paid (the charged run, only after the user said yes).")
+        raise UsageError("Pass exactly one of --dry-run (the free check) or --paid (the usage-billed run, only after the user said yes).")
     for name in ("digest.md", "items.json", "sources.json"):
         if not (out_dir / name).is_file():
             raise UsageError("%s not found in %s. Run `gather` first and pass the out_dir it printed." % (name, out_dir))
     custom = [flag for flag, value in (("--goal", args.goal), ("--project", args.project), ("--trajectory", args.trajectory), ("--constraint", args.constraint), ("--avoid", args.avoid)) if value]
     if args.paid and custom:
         raise UsageError("--paid replays the request the dry run checked, so it takes no %s. Pass them to --dry-run, show the user, then run --paid." % ", ".join(custom))
-    if args.dry_run and args.idempotency_key:
-        raise UsageError("--idempotency-key belongs to --paid only.")
     exe = nc.resolve_cli(args.cli)
     if not exe:
         return nc.missing_cli(args.cli)
     request_path = out_dir / "request.json"
-    key_path = out_dir / "idempotency-key.txt"
+    marker = out_dir / "paid-run.txt"
     result_path = out_dir / "result.json"
-    key = ""
     if args.dry_run:
-        if key_path.exists() or result_path.exists():
+        if marker.exists() or result_path.exists():
             raise UsageError("A paid run was already started in this folder. A new request needs a new folder: run `gather` again.")
         sources = nc.load_json(out_dir / "sources.json", "sources.json")
         request = build_request(args, sources, nc.sha256_file(out_dir / "digest.md"), Redactor(Path.home()))
         write_json(request_path, request)
-        argv = nc.build_argv(exe, request, True, "")
-        if "--dry-run" not in argv or "--idempotency-key" in argv:  # Belt and braces: never pay here.
+        argv = nc.build_argv(exe, request, True)
+        if "--dry-run" not in argv:  # Belt and braces: never call a model here.
             raise UsageError("Internal check failed: the dry-run command is not a dry run.")
     else:
         request = nc.load_json(request_path, "request.json") if request_path.is_file() else {}
         if not request.get("dry_run_ok") or request.get("dry_run_ok") != fingerprint(out_dir, request):
             raise UsageError("No passing dry run is recorded for this exact digest.md and request. Run `run --dry-run`, show the user what will be sent, and ask before --paid.")
-        finished = result_path.is_file() and result_path.stat().st_size > 0
-        saved = key_path.read_text(encoding="utf-8").strip() if key_path.is_file() else ""
-        if args.idempotency_key:
-            if not nc.KEY_RE.match(args.idempotency_key):
-                raise UsageError("--idempotency-key must be 8-128 letters, digits, dots, underscores, colons, or hyphens.")
-            if finished:
-                raise UsageError("result.json already holds the output of a paid run, so there is nothing to recover. Read it instead.")
-            if saved and args.idempotency_key != saved:
-                raise UsageError("That key is not the one saved in idempotency-key.txt. Only the saved key recovers this folder's admission; a different key would buy a second one.")
-            key = args.idempotency_key
-        elif finished or result_path.exists() or saved:
-            # Any earlier paid attempt here may already have been charged. A fresh key would buy
-            # a second admission, so only the saved recovery key or a new folder may continue.
+        if marker.exists() or result_path.exists():
+            # The model calls an earlier paid run here finished were billed, and nothing recovers
+            # them. Another run is a new charge, so it needs the user's yes and a new folder.
             raise UsageError(
-                "A paid run was already started in this folder (see idempotency-key.txt and result.json). "
-                "To recover an attempt that stopped before Vidbyte verified its admission, rerun with --idempotency-key and the saved key. "
-                "Any other new run is a new charge: ask the user first, then gather into a new folder."
+                "A paid run was already started in this folder (see paid-run.txt and result.json), and the model calls it finished were billed. "
+                "Read result.json if it is there. Any other run is a new usage-billed run: ask the user first, then gather into a new folder."
             )
-        problem = nc.codex_logged_in()  # The CLI checks only that codex is on PATH, not the login.
-        if problem:
-            print(json.dumps({"error": problem}, indent=2))
-            print("Error: " + problem, file=sys.stderr)
-            return 6
-        if not key:
-            key = "%s:%s:%s" % (SLUG, dt.datetime.now().strftime("%Y%m%d"), secrets.token_hex(3))
-            write_text(key_path, key + "\n")
-        print("Idempotency key for this run: %s (saved in idempotency-key.txt)" % key, file=sys.stderr)
-        argv = nc.build_argv(exe, request, False, key)
+        argv = nc.build_argv(exe, request, False)
         if "--dry-run" in argv:
             raise UsageError("Internal check failed: the paid command contains --dry-run.")
+        write_text(marker, "Paid run started %s with --max-total-tokens %d.\n" % (dt.datetime.now().isoformat(timespec="seconds"), nc.MAX_TOTAL_TOKENS))
     print("Running in %s:\n%s" % (out_dir, nc.display_command(argv)), file=sys.stderr)
     code, stdout_path, stderr_path, error = nc.run_cli(argv, out_dir, "dry-run.json" if args.dry_run else "result.json")
     report = OrderedDict([("mode", "dry-run" if args.dry_run else "paid"), ("exit_code", code), ("cli", exe), ("command", nc.display_command(argv)), ("stderr_file", str(stderr_path))])
-    if args.paid:
-        report["idempotency_key"] = key
     if code == 0:
         document, data = nc.read_result(stdout_path)
+        models = nc.run_models(data)
+        usage = data.get("usage") or {}
         report.update(
             [
                 ("result_file", str(stdout_path)),
@@ -889,7 +867,9 @@ def cmd_run(args) -> int:
                 ("status", data.get("status")),
                 ("stop_reason", data.get("stop_reason")),
                 ("ideas", len(data.get("ideas") or [])),
-                ("charged_cents", data.get("charged_cents")),
+                ("models", models),
+                ("usage", OrderedDict((key, int(usage.get(key) or 0)) for key in nc.USAGE_KEYS)),
+                ("estimated_cost_usd", nc.estimate_usd(usage, models)),
                 ("context_manifest", [OrderedDict((k, m.get(k)) for k in ("ref", "kind", "source", "chars", "status")) for m in data.get("context_manifest") or []]),
                 ("warnings", data.get("warnings") or []),
             ]
@@ -968,9 +948,13 @@ def cmd_report(args) -> int:
             counts.append("%s %d of %d" % (label(name), len([e for e in mine if (name, e["id"]) not in named]), len(mine)))
     if counts:
         lines.append("Items no action named: %s (all are in digest.md)." % ", ".join(counts))
-    if data.get("charged_cents") is not None:
-        admission = (data.get("admission") or {}).get("admission_id")
-        lines.append("This run cost %s cents from your Vidbyte balance%s, plus model usage on your Codex account." % (data["charged_cents"], " (admission %s)" % admission if admission else ""))
+    usage = data.get("usage") or {}
+    if usage.get("model_calls"):
+        estimate = nc.estimate_usd(usage, nc.run_models(data))
+        lines.append(
+            "This run made %d model calls with %d input and %d output tokens, %s from your Vidbyte balance; the exact amount is on vidbyte.pro/usage."
+            % (int(usage["model_calls"]), int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0), "billed" if estimate is None else "about $%.2f" % estimate)
+        )
     for warning in data.get("warnings") or []:
         lines.append("Warning: " + str(warning))
     text = "\n".join(lines).rstrip() + "\n"
@@ -1032,7 +1016,7 @@ def main(argv=None) -> int:
             "  python3 all_notes.py gather --vault ~/Notes                       # every available provider, last 7 days\n"
             "  python3 all_notes.py gather --vault ~/Notes --providers obsidian,slack --days 14\n"
             "  python3 all_notes.py run --out <out_dir> --dry-run                # free\n"
-            "  python3 all_notes.py run --out <out_dir> --paid                   # charged; ask the user first\n"
+            "  python3 all_notes.py run --out <out_dir> --paid                   # billed by usage; ask the user first\n"
             "  python3 all_notes.py report --out <out_dir>\n"
             "  python3 all_notes.py feedback --out <out_dir> --idea idea-002 --reject --reason \"not this month\"\n"
         ),
@@ -1052,11 +1036,10 @@ def main(argv=None) -> int:
     gather.add_argument("--out", help="Output folder (default: a new folder under the system temp folder). Never inside the vault.")
     add_provider_options(gather, gather=True)
 
-    run = sub.add_parser("run", help="Run vidbyte-cli agents suggest run on the digest (--dry-run is free; --paid is charged).", description="--dry-run builds the request, saves it as request.json, and checks it with `vidbyte-cli --json --no-input agents suggest run ... --dry-run`. --paid replays that exact request once, after a passing dry run, with digest.md and the request unchanged and Codex logged in. Prints a JSON summary and exits with vidbyte-cli's exit code (6: Codex is not logged in).")
+    run = sub.add_parser("run", help="Run vidbyte-cli agents suggest run on the digest (--dry-run is free; --paid is billed by usage).", description="--dry-run builds the request, saves it as request.json, and checks it with `vidbyte-cli --json --no-input agents suggest run ... --dry-run`. --paid replays that exact request once, after a passing dry run, with digest.md and the request unchanged. Prints a JSON summary and exits with vidbyte-cli's exit code.")
     run.add_argument("--out", required=True, help="The out_dir that gather printed.")
-    run.add_argument("--dry-run", action="store_true", help="Check the full request for free: no model, no admission, no charge.")
-    run.add_argument("--paid", action="store_true", help="The charged run. Use only after the user agreed to the cost.")
-    run.add_argument("--idempotency-key", help="With --paid: the key saved in idempotency-key.txt, to recover that admission without paying twice.")
+    run.add_argument("--dry-run", action="store_true", help="Check the full request for free: no model call, no charge.")
+    run.add_argument("--paid", action="store_true", help="The usage-billed run. Use only after the user agreed to the cost.")
     run.add_argument("--trajectory", action="append", default=[], help="With --dry-run: the user's current focus, in their words. At most 2.")
     run.add_argument("--constraint", action="append", default=[], help="With --dry-run: a limit the user stated, such as the time they have. At most 3.")
     run.add_argument("--avoid", action="append", default=[], help="With --dry-run: a direction the user does not want proposed. At most 3.")

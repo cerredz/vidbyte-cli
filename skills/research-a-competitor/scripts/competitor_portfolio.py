@@ -6,8 +6,9 @@ each started from a research brief in one fixed format. Subcommands, in the orde
 them:
 
   plan      Free. Writes portfolio.json and board/tasks.json and prints the cost ceiling.
-  board     Paid: 2 cents + OpenAI usage. One Vidbyte Task Board in which a read-only Codex agent
-            per aspect drafts that aspect's research questions and filters. --dry-run is free.
+  board     Paid: 2 cents + OpenAI API usage on your own OpenAI API key, which needs credits.
+            One Vidbyte Task Board in which a read-only Codex agent per aspect drafts that
+            aspect's research questions and filters. --dry-run is free.
   collect   Free and offline. Reads each board step, checks each draft, and renders the briefs.
   launch    Paid: one research run per aspect, each capped. --dry-run is free.
   wait      Free reads. Waits for the runs, records status and counts, and writes README.md.
@@ -946,9 +947,10 @@ def command_plan(args):
         print("  {:>2}. {:<16} {}".format(number, aspect["id"], aspect["title"]))
     print("Each aspect is one research run: --kind web --size {}, capped at {} cents.".format(
         args.size, args.cap_cents))
-    print("Worst case: {} x {} cents + {} cents for the board = {} (plus OpenAI usage for {} "
-          "short Codex turns).".format(count, args.cap_cents, BOARD_FEE_CENTS,
-                                       money(count * args.cap_cents + BOARD_FEE_CENTS), count))
+    print("Worst case: {} x {} cents + {} cents for the board = {} (plus OpenAI API usage on your "
+          "own OpenAI API key for {} short Codex turns).".format(
+              count, args.cap_cents, BOARD_FEE_CENTS,
+              money(count * args.cap_cents + BOARD_FEE_CENTS), count))
     print("OUT={}".format(out.resolve()))
     return EXIT_OK
 
@@ -1452,8 +1454,9 @@ def parser():
                       help="Plan again in a folder whose board already ran.")
     plan.set_defaults(handler=command_plan)
 
-    board = add("board", "Paid: 2 cents + OpenAI usage. Run one Task Board in which a read-only "
-                         "Codex agent per aspect drafts that aspect's brief.")
+    board = add("board", "Paid: 2 cents + OpenAI API usage on your own OpenAI API key, which needs "
+                         "credits. Run one Task Board in which a read-only Codex agent per aspect "
+                         "drafts that aspect's brief.")
     board.add_argument("--out", required=True, help="The folder 'plan' printed.")
     board.add_argument("--dry-run", action="store_true",
                        help="Free. Check the task list and print the exact command; run nothing.")
