@@ -38,6 +38,10 @@ pipx upgrade vidbyte-cli
 python -m pip install -U vidbyte-cli
 ```
 
+If `vidbyte-cli --version` is still below the skill's `min-cli-version` after upgrading, that
+version is not on PyPI yet (on 2026-10-26 PyPI had 0.2.0), and this skill cannot run until it is
+released. Tell the user that, and stop.
+
 ## 2. A Vidbyte API key is stored
 
 ```bash

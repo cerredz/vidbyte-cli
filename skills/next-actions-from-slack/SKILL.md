@@ -8,6 +8,7 @@ metadata:
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/next-actions-from-slack"
 ---
 
 # Find your next actions in what you wrote and discussed in Slack
@@ -537,3 +538,5 @@ refunds them: there is no admission and no idempotency key.
 - `NEXT_ACTIONS_SLACK_TEST_BASE_URL` is for the script's own tests. Never set it.
 - Record feedback only for an explicit accept or reject from the user.
 - Keep the `out_dir` out of every repository and every commit.
+
+Docs: <https://vidbyte.pro/agents/skills/next-actions-from-slack>

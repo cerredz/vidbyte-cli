@@ -8,6 +8,7 @@ metadata:
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/too-many-meetings"
 ---
 
 # Get your focus time back from too many meetings
@@ -581,3 +582,5 @@ refunds them: there is no admission and no idempotency key.
 - Record feedback only for an explicit accept or reject from the user.
 - Keep the `OUT_DIR`, `events.json`, and the iCal address file out of every repository and every
   commit.
+
+Docs: <https://vidbyte.pro/agents/skills/too-many-meetings>

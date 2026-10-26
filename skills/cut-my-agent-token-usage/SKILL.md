@@ -8,6 +8,7 @@ metadata:
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/cut-my-agent-token-usage"
 ---
 
 # Find the coding-agent sessions that use the most tokens, and what to change
@@ -551,3 +552,5 @@ refunds them: there is no admission and no idempotency key.
   settings or instruction files yourself; a change happens only through a handoff the user starts.
 - Record feedback only for an explicit accept or reject from the user.
 - Keep the `out_dir` out of every repository and every commit.
+
+Docs: <https://vidbyte.pro/agents/skills/cut-my-agent-token-usage>

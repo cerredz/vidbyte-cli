@@ -8,6 +8,7 @@ metadata:
   writes-files: "true"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/turn-corrections-into-skills"
 ---
 
 # Turn the mistakes you keep correcting into agent skills
@@ -607,3 +608,5 @@ refunds them: there is no admission and no idempotency key.
 - Read the session files only. Never edit, move, or delete them.
 - Record feedback only for an explicit accept or reject from the user.
 - Keep the `out_dir` out of every repository and every commit.
+
+Docs: <https://vidbyte.pro/agents/skills/turn-corrections-into-skills>

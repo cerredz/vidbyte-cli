@@ -8,6 +8,7 @@ metadata:
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/which-pr-to-review-first"
 ---
 
 # Decide which open pull requests to review first
@@ -555,3 +556,5 @@ refuses another paid run in that `OUT_DIR`, so any new run starts with `gather` 
 - Never copy `OUT_DIR` files, `result.json`, or the report into the repository, a commit, an issue,
   or a pull request.
 - Record feedback only when the user explicitly accepts or rejects an idea. Silence is not feedback.
+
+Docs: <https://vidbyte.pro/agents/skills/which-pr-to-review-first>

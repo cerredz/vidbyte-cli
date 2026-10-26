@@ -8,6 +8,7 @@ metadata:
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/improve-my-prompting"
 ---
 
 # Critique how you prompt your coding agents, from your own sessions
@@ -624,3 +625,5 @@ refunds them: there is no admission and no idempotency key.
   starts.
 - Record feedback only for an explicit accept or reject from the user.
 - Keep the `out_dir` out of every repository and every commit.
+
+Docs: <https://vidbyte.pro/agents/skills/improve-my-prompting>

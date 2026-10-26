@@ -21,6 +21,72 @@ This repository is the public home of two things:
   Codex, and other coding agents to use `vidbyte-cli` for a job, such as researching a
   competitor or resolving the merge conflicts on your pull requests.
 
+## What you can do
+
+Each job below names the command or skill that does it in vidbyte-cli 0.2.0, the current PyPI
+release.
+
+### Persistent deep research from the terminal, alongside Claude Code or Codex
+
+`vidbyte-cli research start` starts a run of the hosted
+[Research harness](https://vidbyte.pro/docs/harnesses/research) on Vidbyte's servers, so the
+research keeps going after you close the terminal. Each run belongs to a thread you can add to or
+resume later, and it is never billed past its cap (`--max-cost-cents`, $5.00 by default). With
+`--json`, Claude Code or Codex can start a run and follow it with `research watch`.
+
+```bash
+vidbyte-cli --json research start "How do developer tools price usage-based plans?" --max-cost-cents 500
+```
+
+### Run several Codex agents in parallel and implement the best approach
+
+`vidbyte-cli runtime same-host-ensemble` runs the
+[Ensemble Agent](https://vidbyte.pro/agents/ensemble-agent) on your machine. A planner invents
+specialist roles, every role proposes approaches at the same time in its own read-only Codex
+fork, a selector narrows them to one, and a single writer implements it in your workspace. It
+needs Codex installed and logged in, and costs 2¢ per launch plus your own Codex usage.
+
+```bash
+vidbyte-cli runtime same-host-ensemble "Add retries with backoff to the HTTP client" --roles 3
+```
+
+### Turn a goal into ranked, critiqued next actions
+
+`vidbyte-cli agents suggest run` runs the
+[Suggestion Agent](https://vidbyte.pro/agents/suggestion-agent). It drafts candidate next actions
+for one goal, an independent critic rejects the weak and redundant ones, and the survivors come
+back ranked, each with its evidence and a handoff another agent can carry out. Options such as
+`--constraint` and `--files` add the context only you know.
+
+```bash
+vidbyte-cli --json agents suggest run --goal "Get our first 100 paying users" --count 5
+```
+
+### One fresh Codex agent per GitHub issue
+
+The [`github-issue-tasks`](https://vidbyte.pro/agents/skills/github-issue-tasks) agent skill gives
+each GitHub issue you name its own Codex agent with an empty context window, through the Vidbyte
+Task Board. Each issue's changes land on their own local branch, and a draft pull request opens
+only for the issues you approve. Install it, then ask your coding agent to "implement issues 12,
+31, and 40".
+
+```bash
+npx skills add cerredz/vidbyte-cli --skill github-issue-tasks
+```
+
+### Keep a Codex session working past its first answer
+
+`vidbyte-cli runtime persistence` runs the
+[Persistent Agent](https://vidbyte.pro/agents/persistent-agent): one local Codex session does your
+task, then gets a fixed number of further turns that ask it to check its assumptions, find
+omissions, and improve the result (6 at `--strength 1`, up to 100 at `--strength 6`). The
+strength you choose, not the model saying it is done, decides when it stops. It costs 2¢ per
+launch, and Codex runs on your own OpenAI API key.
+
+```bash
+vidbyte-cli runtime persistence "Raise test coverage in src/billing to 90 percent" --strength 1
+```
+
 ## Install
 
 Requires Python 3.11 or newer.

@@ -8,6 +8,7 @@ metadata:
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
+  docs: "https://vidbyte.pro/agents/skills/pick-up-where-my-sessions-left-off"
 ---
 
 # Pick up where your coding-agent sessions left off
@@ -513,3 +514,5 @@ refunds them: there is no admission and no idempotency key.
   input to another session; the resume commands are for the user.
 - Record feedback only for an explicit accept or reject from the user.
 - Keep the `out_dir` out of every repository and every commit.
+
+Docs: <https://vidbyte.pro/agents/skills/pick-up-where-my-sessions-left-off>
