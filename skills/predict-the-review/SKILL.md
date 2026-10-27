@@ -8,7 +8,7 @@ metadata:
   writes-files: "true"
   min-cli-version: "0.3.0"
   status: stable
-  docs: "https://vidbyte.pro/docs/cli/agent-skills"
+  docs: "https://vidbyte.pro/agents/skills/predict-the-review"
 ---
 
 # Predict what reviewers will object to before you open the PR
@@ -433,4 +433,4 @@ there is no admission and no idempotency key, and a suggestion run cannot resume
 - Add fixes as new commits. Never rewrite or force-push the branch as part of this skill, and push
   or open the pull request only when the user asked for it.
 
-Docs: <https://vidbyte.pro/docs/cli/agent-skills>
+Docs: <https://vidbyte.pro/agents/skills/predict-the-review>
