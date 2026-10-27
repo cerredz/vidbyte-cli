@@ -8,7 +8,7 @@ metadata:
   writes-files: "false"
   min-cli-version: "0.3.0"
   status: stable
-  docs: "https://vidbyte.pro/docs/cli/agent-skills"
+  docs: "https://vidbyte.pro/agents/skills/find-unfinished-agent-work"
 ---
 
 # Find the coding-agent work you started and never finished
@@ -601,4 +601,4 @@ refunds them: there is no admission and no idempotency key.
 - Record feedback only for an explicit accept or reject from the user.
 - Keep the `out_dir` out of every repository and every commit.
 
-Docs: <https://vidbyte.pro/docs/cli/agent-skills>
+Docs: <https://vidbyte.pro/agents/skills/find-unfinished-agent-work>
