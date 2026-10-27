@@ -110,6 +110,15 @@ npx skills add cerredz/vidbyte-cli --skill research-a-competitor    # for exampl
 Each skill names the `vidbyte-cli` version it needs. The guide is at
 <https://vidbyte.pro/docs/cli/agent-skills>.
 
+The same skills also install as one plugin, `vidbyte-agent-skills`, from this repository's
+marketplace. Its skills then run as `/vidbyte-agent-skills:<slug>` in Claude Code:
+
+```bash
+claude plugin install vidbyte-agent-skills --marketplace cerredz/vidbyte-cli    # Claude Code
+codex plugin marketplace add cerredz/vidbyte-cli                                # Codex
+codex plugin add vidbyte-agent-skills@vidbyte
+```
+
 Not the Vidbyte learning skills (the npm package `vidbyte-skills`, cerredz/Vidbyte-Skills).
 Those install with `npx -p vidbyte-skills vidbyte-learning-skills --version all`.
 
