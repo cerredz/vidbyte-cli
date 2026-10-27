@@ -1,6 +1,6 @@
 {
   "name": "vidbyte",
-  "description": "Vidbyte's plugins for Claude Code and Codex, from the home of vidbyte-cli (start hosted Research harness runs, run local Codex coding-agent teams, and get ranked next actions) and Vidbyte's agent skills (npx skills add cerredz/vidbyte-cli).",
+  "description": "Vidbyte's plugins for Claude Code and Codex, from the home of vidbyte-cli (start hosted Research harness runs, run local Codex coding-agent teams, and get ranked next actions): setup for vidbyte-cli, and Vidbyte's agent skills in one plugin (also installable with npx skills add cerredz/vidbyte-cli).",
   "owner": {
     "name": "Vidbyte Inc.",
     "url": "https://vidbyte.pro"
@@ -10,6 +10,28 @@
       "name": "vidbyte",
       "source": "./plugins/vidbyte",
       "description": "Set up Vidbyte from your coding agent: install vidbyte-cli, log in without pasting your API key into the chat, and verify the account before any agent runs."
+    },
+    {
+      "name": "vidbyte-agent-skills",
+      "displayName": "Vidbyte agent skills",
+      "source": "./",
+      "description": "Every Vidbyte agent skill in one plugin: each teaches your coding agent to hand one engineering job to Vidbyte's agents through vidbyte-cli, such as resolving the merge conflicts on your pull requests or researching a competitor. The same skills as npx skills add cerredz/vidbyte-cli.",
+      "author": {
+        "name": "Vidbyte Inc.",
+        "url": "https://vidbyte.pro"
+      },
+      "homepage": "https://vidbyte.pro/docs/cli/agent-skills",
+      "repository": "https://github.com/cerredz/vidbyte-cli",
+      "license": "MIT",
+      "keywords": [
+        "vidbyte",
+        "vidbyte-cli",
+        "agent-skills",
+        "claude-code",
+        "codex",
+        "coding-agents",
+        "deep-research"
+      ]
     }
   ]
 }
