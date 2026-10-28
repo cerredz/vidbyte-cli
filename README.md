@@ -124,6 +124,7 @@ Those install with `npx -p vidbyte-skills vidbyte-learning-skills --version all`
 
 | Skill | What it does | vidbyte-cli it needs |
 | --- | --- | --- |
+| [`app-conversion-tactics`](skills/app-conversion-tactics/SKILL.md) | Get more of your app's users to pay, with tactics checked against App Review | 0.3.2, needs the next vidbyte-cli release (not on PyPI yet) |
 | [`automate-recurring-chores`](skills/automate-recurring-chores/SKILL.md) | Turn the chores you redo in coding-agent sessions into scheduled routines | 0.3.0, needs the next vidbyte-cli release (not on PyPI yet) |
 | [`cut-my-agent-token-usage`](https://vidbyte.pro/agents/skills/cut-my-agent-token-usage) | Find the coding-agent sessions that use the most tokens, and what to change | 0.3.0, needs the next vidbyte-cli release (not on PyPI yet) |
 | [`find-unfinished-agent-work`](skills/find-unfinished-agent-work/SKILL.md) | Find the coding-agent work you started and never finished | 0.3.0, needs the next vidbyte-cli release (not on PyPI yet) |
