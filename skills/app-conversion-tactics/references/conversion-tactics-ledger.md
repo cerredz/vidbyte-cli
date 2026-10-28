@@ -128,6 +128,7 @@ Every tactic here needs the `X-02` step: describe it in Notes for Review and get
   do it "extremely tastefully!" [article]
 - **Example:** onboarding screens 1 to 3, then a paywall the user dismisses, then onboarding screens
   4 to 12, then a second, final paywall. [image]
+- **Apple:** "All new features, functionality, and product changes must be described with specificity in the Notes for Review section of App Store Connect" [apple § 2.3.1(a)]; "Before asking a customer to subscribe, you should clearly describe what the user will get for the price." [apple § 3.1.2(c)]
 
 ### G-02 Abandoned-transaction offers
 
@@ -140,11 +141,13 @@ Every tactic here needs the `X-02` step: describe it in Notes for Review and get
   fake one-time offers, fake "you won" offers, and timed offers. Very likely allowed are a clear and
   tasteful discount, a different plan such as a lifetime offer, and extending a trial. "The golden rule: never mislead the user." [post 2104522475761455536] If in doubt, add it through App Review, put it in the review notes, and get explicit approval.
 - **Results:** `N-04`, `N-05`. Event: `checkout_cancelled` (`F-06`).
+- **Apple:** "All new features, functionality, and product changes must be described with specificity in the Notes for Review section of App Store Connect" [apple § 2.3.1(a)]; "Apps should never prey on users or attempt to rip off customers, trick them into making unwanted purchases" [apple § 5.6]
 
 ### G-03 Close-paywall offers
 
 - **Claim:** The same pattern as `G-02`, but triggered when the user dismisses the paywall instead
   of abandoning a payment. [article] Event: `paywall_declined` (`F-06`).
+- **Apple:** "All new features, functionality, and product changes must be described with specificity in the Notes for Review section of App Store Connect" [apple § 2.3.1(a)]; see `G-02` for the § 5.6 rule.
 
 ---
 
@@ -163,7 +166,8 @@ Never suggest these, under any name. If an app already does one, the advice is t
 - **Claim:** Do not send users lots of notifications, even non-marketing ones, and especially
   marketing ones. Apple's wording is vague, but "as a general rule 1-2 marketing notis a week should be fine" [article]. The user must know about the notifications when you ask for permission, and
   opt in. [article]
-- **Apple:** § 4.5.3 (`B-01`) and § 4.5.4 (`A-02`). Apple states no number (`V-07`).
+- **Apple:** "Abuse of these services may result in revocation of your privileges." [apple § 4.5.4]
+  The full rules are § 4.5.3 (`B-01`) and § 4.5.4 (`A-02`). Apple states no number (`V-07`).
 
 ### B-03 Limited-time and random offers
 
