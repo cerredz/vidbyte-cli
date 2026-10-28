@@ -54,9 +54,9 @@
 2. The ledger records every tactic in the article (18), each with a tier, the article's claim, conditions, provenance tags, and, for every gray and banned tactic, at least one verbatim Apple anchor with its section number.
 3. The ledger records the article's supporting material as separate facts: the five-part paywall anatomy, the notification and win-back flows, the event vocabulary, the numbers, cross-cutting rules, and verification notes (the discrepancies listed in section 3).
 4. Every number the ledger states is tagged `[article]`, `[image]`, `[post]`, or `[derived]`; every `[derived]` number shows its arithmetic.
-5. `SKILL.md` passes the user's request verbatim as `--goal`. When the request is longer than 4,096 characters, the skill saves it to `request.txt` outside the repository, passes that file with `--files`, and uses the request's first sentence as `--goal`.
-6. `SKILL.md` passes the ledger with `--files` and the rubric with `--instructions` on both the dry run and the paid run.
-7. The skill runs a free `--dry-run` before asking for consent, and checks that the ledger's `context_manifest` entry has `status: included`.
+5. `SKILL.md` passes the user's request verbatim as `--goal`. The coding agent writes the request to `goal.txt` with its file tool and the shell inserts it (`"$(cat goal.txt)"` in bash; a variable, escaped only under Windows PowerShell's legacy argument passing), so `$`, quotes, backticks, and newlines arrive unchanged. When the request is longer than 4,096 characters, the skill writes it whole to `request.md`, passes that file with `--files`, and uses its first sentence as `--goal`.
+6. `SKILL.md` passes `app-facts.md` (the repository facts) and the ledger with `--files`, and the rubric with `--instructions`, on both the dry run and the paid run. The ledger and rubric are first copied into the output folder and passed by relative path, because a `--files` path reaches the model and an absolute one would name the user's home folder.
+7. The skill runs a free `--dry-run` before asking for consent, and checks that `data.goal` equals `goal.txt` exactly and that the `context_manifest` entries for `app-facts.md` and the ledger have `status: included`.
 8. The skill asks for consent with the cost stated (usage-billed, capped at 250,000 tokens, at most about $3) before the paid run, and never runs it without a yes.
 9. The rubric forbids recommending any banned (B-) tactic, including renamed variants. It requires every gray (G-) idea to include the Notes for Review step, and every idea that sends a push notification to carry the opt-in, disclosure, opt-out, and frequency rules. Every idea must cite at least one ledger ID.
 10. The Deliver section groups ideas by tier and shows each idea's ledger IDs, first step, and metric. It drops any idea that recommends a B- tactic and tells the user why.
@@ -78,9 +78,10 @@
 The skill is a thin, judgment-rich wrapper around one Suggestion Agent run. The judgment lives in three places: `SKILL.md` (which repository facts to gather, which flags fit a conversion question, how to deliver), the ledger (the facts), and the rubric (how the agent must use those facts). The coding agent reads the user's app repository for up to eight facts: platform, purchase SDK, products and prices, paywall, notification permission, ATT, Live Activities, and web checkout. It asks at most two questions the repository cannot answer: current funnel numbers, and acquisition channels and countries. It then runs a free dry run, states the cost, waits for a yes, and runs the agent once.
 
 ```
-user prompt ──► coding agent (skill) ──► reads app repo ──► --context facts
+user prompt ──► coding agent (skill) ──► reads app repo ──► app-facts.md
                      │
-                     ├─ --goal "<user prompt, verbatim>"
+                     ├─ --goal "$(cat goal.txt)"                          (the user prompt, verbatim)
+                     ├─ --files app-facts.md                              (task data: this app)
                      ├─ --files references/conversion-tactics-ledger.md   (task data: the source of truth)
                      ├─ --instructions references/conversion-rubric.md    (system-prompt addendum: how to use it)
                      ▼
@@ -119,7 +120,7 @@ name: app-conversion-tactics
 description: Use when ... (starts "Use when", quotes three phrasings, ≤ 1024 chars, no price; names the Vidbyte Suggestion Agent and vidbyte-cli)
 metadata:
   agent: "suggestion-agent"
-  commands: "agents suggest run, agents suggest handoff"
+  commands: "agents suggest categories, agents suggest run, agents suggest handoff"
   cost: "Model usage from the Vidbyte balance: gpt-6-sol at $2 / $10 per million input / output tokens + 2%, about 5 model calls, capped at 250,000 tokens per run"
   writes-files: "false"
   min-cli-version: "0.3.2"
@@ -130,18 +131,19 @@ metadata:
 Sections, in contract order: Title, The problem, How vidbyte-cli solves it, Goal and done-when, Preflight, Gather inputs, Steps, CLI commands, Cost and consent, Run, Read the result, Deliver, Troubleshooting, Guardrails.
 
 #### Logic / Algorithm
-1. Preflight: `vidbyte-cli --version` (0.3.2 or newer), `vidbyte-cli --json whoami` (exit 4 → `references/setup.md`).
-2. Gather inputs: take the request verbatim. Read the app repository for at most eight facts, each one `--context` value. Ask at most two questions. Make an output folder outside the repository.
-3. Dry run (free) with the exact paid-run flags plus `--dry-run`; confirm the ledger entry in `data.context_manifest` has `status: included`.
+1. Preflight: `vidbyte-cli --version` (0.3.2 or newer), `vidbyte-cli --json whoami` (exit 4 → `references/setup.md`), `vidbyte-cli --json agents suggest categories` (the five lenses exist).
+2. Gather inputs: make an output folder outside the repository and copy the ledger and rubric into it; write the request verbatim to `goal.txt`; read the app repository for facts; ask at most two questions; write at most 15 facts to `app-facts.md`.
+3. Dry run (free) with the exact paid-run flags plus `--dry-run`; confirm `data.goal` equals `goal.txt` and the manifest entries for `app-facts.md` and the ledger have `status: included`.
 4. State the cost; wait for yes.
 5. Paid run; write stdout to `result.json` and stderr to `result.stderr.txt` in the output folder.
 6. Read `data.status`, `data.stop_reason`, `data.ideas[]`, `data.usage`, and `data.parent_message`.
 7. Deliver grouped by tier; offer `agents suggest handoff` for the idea the user picks.
 
 #### Edge Cases & Error Handling
-- Request over 4,096 characters → `request.txt` via `--files`, first sentence as `--goal` (Gather inputs).
-- No repository, or not an app → run with `--context "No app repository is available; advice is general."`
-- Android-only or web-only app → `--context` says so; the rubric makes the agent label tiers as Apple's.
+- Request over 4,096 characters → `request.md` via `--files`, first sentence as `--goal` (Gather inputs).
+- A shell that changes the goal (Windows PowerShell 5.1 splits an argument at embedded quotes; verified empirically) → the dry run's `data.goal` check catches it before any charge.
+- No repository, or not an app → `app-facts.md` says "No app repository was available; the advice is general."
+- Android-only or web-only app → `app-facts.md` says so; the rubric makes the agent label tiers as Apple's.
 - Ledger reported `truncated` or missing from the manifest → stop; the skill folder is damaged; reinstall it.
 - `status: needs_input` → relay `data.parent_message` and stop.
 - An idea that recommends a B- tactic → dropped at delivery, with the reason given.
@@ -159,7 +161,7 @@ Holds every fact derived from the article, in a form the generator and critic ca
 ID scheme:  A-01..A-08 allowed · G-01..G-03 gray area · B-01..B-07 banned
             P-01..P-05 paywall anatomy · F-01..F-05 flows and event vocabulary
             N-01..N-xx numbers · X-01..X-xx cross-cutting rules · V-01..V-xx verification notes
-Tags:       [article] [image] [post] [derived] [apple]
+Tags:       [article] [image] [post] [derived] [apple], plus "Ledger note" for a connection between two sourced facts
 Per tactic: Tier · Claim · How (as the article describes it) · Conditions · Apple anchor · Ledger notes
 ```
 
@@ -193,7 +195,7 @@ Standing instructions for the generator and every critic: the ledger is the sour
 ### 6.4 Shared references
 
 **File(s):** `skills/app-conversion-tactics/references/setup.md`, `references/troubleshooting.md`
-**Type:** New files, byte-identical copies of `docs/agent-skills/write-agent-skill/references/` (themselves byte-identical to Vidbyte's canonical copies).
+**Type:** New files, byte-identical copies of the public mirror `docs/agent-skills/write-agent-skill/references/`, which all 23 published skills ship (setup.md blob a598c3b, troubleshooting.md cb9656b). The mirror's `setup.md` has drifted from Vidbyte's canonical copy (blob 25ece21: Vidbyte #833 changed the key-limit sentence, public #35 added the unreleased-CLI note); reconciling them is a separate contract PR, so this skill copies what its siblings ship.
 
 ### 6.5 Public README row
 
@@ -210,9 +212,9 @@ Runs every case in section 10: static contract checks on the skill folder, ledge
 
 #### Interface / API
 ```
-python scripts/test-app-conversion-tactics.py [--contract PATH] [--cli "CMD"] [--article PATH] [--guidelines PATH] [--website PATH] [--canonical PATH]
+python scripts/test-app-conversion-tactics.py --contract PATH --cli "CMD" --article PATH --apple PATH [--apple PATH ...] --website PATH
 ```
-Each optional input that is not given makes its checks FAIL, with a message naming the flag; nothing is silently skipped, so a full pass proves every check ran.
+Each input that is not given makes its checks FAIL, with a message naming the flag; nothing is silently skipped, so a full pass proves every check ran. The article and Apple snapshots stay out of the repository (third-party content); the PR records the run that used them.
 
 ### 6.7 Website listing
 
@@ -232,7 +234,7 @@ defineAgentSkill({
   agents: ["suggestion-agent"],
   topics: ["growth"],
   tags: ["Paywalls", "Subscriptions", "App Store", "Churn", "iOS"],
-  commands: ["vidbyte-cli agents suggest run", "vidbyte-cli agents suggest handoff"],
+  commands: ["vidbyte-cli agents suggest categories", "vidbyte-cli agents suggest run", "vidbyte-cli agents suggest handoff"],
   minCliVersion: "0.3.2",
   addedOn: "2026-10-28",
   writesFiles: false,
@@ -288,9 +290,10 @@ N/A - no HTTP route is added or changed; the skill calls the existing `agents su
 - `SkillContract` → `sections appear in contract order and no "## When" heading exists` — [Silent Failure]
 - `SkillContract` → `every vidbyte-cli line puts root options before the command path` — [Hidden Assumption]
 - `SkillContract` → `every vidbyte-cli command path and long option exists in contracts/cli-commands.json` — [Hidden Failure]
+- `SkillContract` → `every --files and --instructions path in Run is relative (no home-folder path reaches the model)` — [Hidden Assumption]
 - `SkillContract` → `the Run block passes --goal, --files <ledger>, and --instructions <rubric>` (the facts actually reach the agent) — [Silent Failure]
 - `SkillContract` → `the metadata cost cap equals the --max-total-tokens value in Run` — [Silent Failure]
-- `SkillContract` → `setup.md and troubleshooting.md are byte-identical to docs/agent-skills/write-agent-skill/references/` — [Silent Failure]
+- `SkillContract` → `setup.md and troubleshooting.md are byte-identical to docs/agent-skills/write-agent-skill/references/, the copy every sibling skill ships` — [Silent Failure]
 - `SkillContract` → `the docs metadata URL points at /agents/skills/app-conversion-tactics` — [Edge Case]
 - `Ledger` → `has exactly 8 A-, 3 G-, and 7 B- tactic records with unique, gap-free IDs` — [Edge Case]
 - `Ledger` → `every G- and B- record carries at least one [apple] anchor with a section number` — [Hidden Assumption]
@@ -310,7 +313,9 @@ N/A - no HTTP route is added or changed; the skill calls the existing `agents su
 - A 4,096-character goal passes; a 4,097-character goal exits 2 (the boundary the skill's long-request rule relies on) — [Edge Case]
 - A goal with emoji and non-ASCII text passes (the article itself uses emoji) — [Edge Case]
 - A missing ledger path exits 2 before any model call (a damaged install is caught for free) — [Hidden Failure]
-- `--context` values from Gather inputs appear as separate `kind: context` entries in order — [Hidden Assumption]
+- `app-facts.md`, the ledger, and `request.md` appear as separate `kind: file` entries in command-line order — [Hidden Assumption]
+- A goal holding `$`, double and single quotes, backticks, `!`, `%`, `&`, `|`, `<`, `>`, `^`, a newline, emoji, and a trailing backslash arrives verbatim (`data.goal`) through the bash `"$(cat goal.txt)"` form — [Hidden Failure]
+- The same goal arrives verbatim through the PowerShell block's escaped variable, and the unescaped form fails on Windows PowerShell 5.1 — [Hidden Failure]
 - Cross-repo (`--website`): the Vidbyte entry's `description` equals the public frontmatter verbatim; `minCliVersion`, `writesFiles`, and `commands` match `metadata`; `SKILL_SPECS`, `PUBLIC_MARKDOWN_PATHS`, and `llms.txt` contain the slug — [Silent Failure]
 - Mocked vs real: only the CLI's model calls are avoided (dry run); no fakes. Silent failure paths between components: truncation (manifest status), drift between public and website copies (cross-repo check), and a flag accepted by `main` but missing from the vendored contract (N050).
 
