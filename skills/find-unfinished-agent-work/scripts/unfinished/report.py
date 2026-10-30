@@ -25,7 +25,6 @@ TEXT_FIELDS = ("title", "summary", "first_action", "why_now", "expected_benefit"
 STATUS_RANK = {"still open": 0, "unknown": 1, "probably done": 2, "folded": 3}
 FLOOR = dt.datetime.min.replace(tzinfo=dt.timezone.utc)
 UNTRACED = "Not traced to a session"
-LOCAL_ONLY_RESULT = {"kind": "suggestions.result", "data": {"ideas": [], "status": "local_only", "stop_reason": None}}
 
 
 class ReportError(ValueError):
@@ -58,15 +57,14 @@ class SessionIndex:
 class ChecklistReporter:
     """Builds checklist.md and the JSON summary from result.json and sessions.json."""
 
-    def __init__(self, out_dir: Path, shell: str = None, local_only: bool = False) -> None:
-        # shell is "bash" or "powershell" (None: PowerShell on Windows, bash elsewhere); local_only skips result.json.
+    def __init__(self, out_dir: Path, shell: str = None) -> None:
+        # shell is "bash" or "powershell" (None: PowerShell on Windows, bash elsewhere).
         self.out_dir = Path(out_dir)
         self.shell = shell or ("powershell" if os.name == "nt" else "bash")
-        self.local_only = local_only
 
     def build(self) -> dict:
         # Maps every idea to its sessions, adds the open sessions no idea cites, writes checklist.md, returns JSON.
-        result = LOCAL_ONLY_RESULT if self.local_only else self._load(RESULT_FILE)
+        result = self._load(RESULT_FILE)
         if not isinstance(result, dict) or result.get("kind") != "suggestions.result":
             raise ReportError("%s is not a suggestions.result document; run `suggest --paid` first." % RESULT_FILE)
         index = SessionIndex(self._load(INDEX_FILE))
@@ -165,11 +163,8 @@ class ChecklistReporter:
         window = index.data.get("window") or {}
         since = window.get("since")
         span = ("since %s" % Clock.local_stamp(Clock.parse_ts(since))) if since else "with no time limit"
-        if self.local_only:
-            found = "%d open session%s found by the local check alone, without a Suggestion Agent run" % (len(added), "" if len(added) == 1 else "s")
-        else:
-            found = "%d item%s from the Vidbyte Suggestion Agent; %d more open session%s found by the local check and not listed by it" % (
-                len(entries), "" if len(entries) == 1 else "s", len(added), "" if len(added) == 1 else "s")
+        found = "%d item%s from the Vidbyte Suggestion Agent; %d more open session%s found by the local check and not listed by it" % (
+            len(entries), "" if len(entries) == 1 else "s", len(added), "" if len(added) == 1 else "s")
         lines = [
             "# Unfinished agent work",
             "",
@@ -177,7 +172,7 @@ class ChecklistReporter:
             "it opens the session in the folder it ran in." % (Clock.local_stamp(Clock.now()), counts.get("sessions", "?"), span, found),
             "",
         ]
-        if not entries and not self.local_only:
+        if not entries:
             data = result.get("data") or {}
             lines += ["The run returned no items (status `%s`, stop reason `%s`)." % (data.get("status"), data.get("stop_reason")), ""]
         return lines
@@ -209,7 +204,7 @@ class ChecklistReporter:
         status = record.get("status")
         verb = "Finish or close" if status == "still open" else "Check whether anything is left in"
         tag = "[%s] " % record["tag"] if record.get("tag") else ""
-        source = "found by the local check" if self.local_only else "found by the local check; the Suggestion Agent did not list it"
+        source = "found by the local check; the Suggestion Agent did not list it"
         lines = [
             '- [ ] **%s the session "%s"** (%s)' % (verb, TextTools.one_line(record.get("title"), 120), source),
             "  - Project: %s · Session: %s%s · Last touched: %s" % (record.get("project"), tag, self._harness(record.get("harness")), Clock.local_stamp(Clock.parse_ts(record.get("last")))),

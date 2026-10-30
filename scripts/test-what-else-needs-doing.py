@@ -34,7 +34,7 @@ SKILL_REFERENCES = ROOT / "skills" / SLUG / "references"
 
 SECTION_ORDER = (
     "The problem", "How vidbyte-cli solves it", "Goal and done-when", "Preflight", "Gather inputs", "Steps",
-    "CLI commands", "Cost and consent", "Run", "Read the result", "Deliver", "Troubleshooting", "Guardrails",
+    "CLI commands", "Cost and consent", "Paid work boundary", "Run", "Read the result", "Deliver", "Troubleshooting", "Guardrails",
 )
 METADATA_FIELDS = ("agent", "commands", "cost", "writes-files", "min-cli-version", "status")
 AGENT_IDS = ("suggestion-agent", "persistent-researcher", "persistent-agent", "ensemble-agent", "task-board", "stages-agent", "bug-finder")

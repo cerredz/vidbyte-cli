@@ -39,7 +39,7 @@ from sessionkit.model import Clock, Session  # noqa: E402
 from unfinished.digest import DigestWriter  # noqa: E402
 from unfinished.followup import LaterMatch, LaterWorkMatcher, ProjectKeys  # noqa: E402
 from unfinished.repo_state import BranchState, FolderState, PullState, RepoStateProbe  # noqa: E402
-from unfinished.report import ChecklistReporter  # noqa: E402
+from unfinished.report import ChecklistReporter, ReportError  # noqa: E402
 from unfinished.resume import ResumeCommandBuilder  # noqa: E402
 from unfinished.signals import PastedText, TaskText, UnfinishedDetector  # noqa: E402
 from unfinished.status import FOLDED, PROBABLY_DONE, STILL_OPEN, UNKNOWN, StatusJudge  # noqa: E402
@@ -874,21 +874,18 @@ class UnitTests:
             if line.startswith("- ["):
                 Check.true(line.startswith("- [ ] "), "bad item line: %r" % line)
 
-    def report_local_only(self) -> None:
-        # --local-only builds the checklist from sessions.json alone: every open and unknown session, each with a why and a first step.
+    def report_requires_paid_result(self) -> None:
+        # The checklist comes only from the paid run: without result.json the report raises, and --local-only no longer exists.
         out = self._report_folder("r5", with_result=False)
-        summary = ChecklistReporter(out, "bash", local_only=True).build()
-        Check.equal([e["tag"] for e in summary["added_from_local_check"]], ["S2", "S4", "S1", "S5"], "local-only items")
-        Check.equal(summary["counts"]["ideas"], 0, "ideas")
-        text = (out / "checklist.md").read_text(encoding="utf-8")
-        Check.true("without a Suggestion Agent run" in text, "intro")
-        Check.equal(text.count("  - First step: "), 4, "every local item needs a first step")
-        Check.true('First step: Resume [S4] and pick up its first open todo: "Fix the navbar overflow".' in text, "todo first step")
-        Check.true("First step: Review branch feat/retry, which has 2 commits on no remote" in text, "unpushed-branch first step")
-        Check.true("First step: Check whether the work from the removed folder was merged or dropped" in text, "removed-folder first step")
-        Check.true("First step: Resume [S2] and ask the agent what is still left to do." in text, "default first step")
-        Check.true("Why unfinished: the session was interrupted" in text, "why line for an unknown item")
-
+        try:
+            ChecklistReporter(out, "bash").build()
+            raise AssertionError("report built a checklist without result.json")
+        except ReportError as error:
+            Check.true("suggest --paid" in str(error), "error names the paid run: %s" % error)
+        Check.true(not (out / "checklist.md").exists(), "checklist.md written without a paid result")
+        process = subprocess.run([sys.executable, str(ENTRY), "report", "--out", str(out), "--local-only"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+        Check.equal(process.returncode, 2, "--local-only exit code")
+        Check.true("unrecognized arguments: --local-only" in process.stderr.decode("utf-8", "replace"), "--local-only is still accepted")
 
 class Home:
     """A temporary home with Claude Code and Codex stores and real project folders."""
@@ -1220,7 +1217,7 @@ def main() -> int:
             ("digest_inputs", "Hidden Assumption"), ("digest_limits", "Edge Case"), ("digest_short_lines_reserved", "Silent Failure"),
             ("digest_pasted", "Silent Failure"),
             ("report_grouping", "Silent Failure"), ("report_untraced", "Silent Failure"), ("report_probably_done", "Hidden Failure"),
-            ("report_added_and_order", "Silent Failure"), ("report_local_only", "Edge Case"),
+            ("report_added_and_order", "Silent Failure"), ("report_requires_paid_result", "Hidden Assumption"),
         ]:
             results.run(name, category, getattr(unit, name))
         world = base / "int"

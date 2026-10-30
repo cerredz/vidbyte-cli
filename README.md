@@ -209,7 +209,7 @@ fee and a 25% margin, never past its cap (`--max-cost-cents`, $5.00 by default).
 
 ## Part of Vidbyte
 
-- [Vidbyte SDK](https://vidbyte.pro/docs/sdks): `vidbyte-sdk`, a free MIT-licensed Python
+- [Vidbyte SDK](https://vidbyte.pro/docs/sdks): `vidbyte-sdk`, an MIT-licensed Python
   library for building, evaluating, and tracing agents.
 - [JevAgent](https://vidbyte.pro/docs/jev-agent): pairs your agent with Jev, TypeSafe's
   decision model.

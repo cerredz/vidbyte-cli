@@ -492,8 +492,8 @@ def build_task(portfolio, aspect):
         "# Draft one research brief for a competitor intelligence portfolio",
         "",
         "You are one of several agents. Each one drafts the research brief for one aspect of the "
-        "same company. A separate web research service runs your brief later. You do not "
-        "research anything yourself.",
+        "same company. A separate web research service runs your brief later. "
+        "You do not research anything yourself.",
         "",
         "<portfolio>",
         "Company: " + company,

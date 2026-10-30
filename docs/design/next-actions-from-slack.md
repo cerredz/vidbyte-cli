@@ -39,7 +39,7 @@ flowchart TD
     D --> P["project list; project create notes-next-actions if missing (free)"]
     P --> Y["next_actions.py run --dry-run (free): stop_reason dry_run"]
     Y --> C{"Show digest + cost:<br/>2 cents + Codex usage. Yes?"}
-    C -->|no| Z2["Stop. Offer digest.md as a free summary."]
+    C -->|no| Z2["Stop. Nothing spent, nothing else offered."]
     C -->|yes| E["next_actions.py run --paid:<br/>agents suggest run --horizon any --count 6<br/>--files digest.md --idempotency-key"]
     E -->|exit 2, 4, 5, other| X["Troubleshooting table"]
     E --> F["next_actions.py report: actions grouped by horizon,<br/>each with source titles and Slack links"]

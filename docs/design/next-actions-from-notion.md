@@ -43,7 +43,7 @@ flowchart TD
     P --> R["suggest --dry-run (free: no model, no admission)"]
     R -->|exit 2| E["Fix inputs.json"] --> R
     R --> K{"Cost and consent: show digest + inputs,<br/>2 cents + Codex usage. Yes?"}
-    K -->|no| Z["Stop. Nothing spent. Offer digest.md as a free summary."]
+    K -->|no| Z["Stop. Nothing spent, nothing else offered."]
     K -->|yes| Q["suggest --paid: codex login status, then<br/>vidbyte-cli --json --no-input agents suggest run ... --files digest.md"]
     Q -->|exit 4, 5, other| T["Troubleshooting table"]
     Q --> L["report (free): ideas grouped by their own horizon,<br/>each with source page titles and links"]

@@ -5,6 +5,10 @@
 **Created:** 2026-10-13
 **Last Updated:** 2026-10-13 (after real-data QA and sessionkit b72fe18)
 
+> **Superseded in part (2026-10-30):** `report --local-only` and the free local checklist were
+> removed by `docs/design/paid-work-boundary.md`. The checklist now comes only from the paid run,
+> and `report` requires `result.json`. Read every mention of `--local-only` below as history.
+
 ---
 
 ## 1. Overview

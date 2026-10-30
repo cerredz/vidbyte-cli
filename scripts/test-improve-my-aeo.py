@@ -34,7 +34,7 @@ ENTRY = SCRIPTS / "aeo_audit.py"
 RUBRIC = SKILL / "references" / "aeo-rubric.md"
 SKILL_MD = SKILL / "SKILL.md"
 CONTRACT_SECTIONS = ["The problem", "How vidbyte-cli solves it", "Goal and done-when", "Preflight", "Gather inputs", "Steps", "CLI commands",
-                     "Cost and consent", "Run", "Read the result", "Deliver", "Troubleshooting", "Guardrails"]
+                     "Cost and consent", "Paid work boundary", "Run", "Read the result", "Deliver", "Troubleshooting", "Guardrails"]
 BOT_CATEGORIES = {"search", "training", "user", "agent", "preview", "ads", "other", "infra", "catch-all"}
 CHECKLIST = SKILL / "references" / "aeo-checklist.md"
 sys.path.insert(0, str(SCRIPTS))
@@ -487,8 +487,12 @@ class UnitTests:
     def skill_contract(self) -> None:
         text = SKILL_MD.read_text(encoding="utf-8")
         Check.equal(re.findall(r"(?m)^## (.+)$", text), CONTRACT_SECTIONS, "sections")
-        body = text.split("\n---\n", 1)[1]
-        Check.true(len(body.encode("utf-8")) < 10_000, "body is %d bytes" % len(body.encode("utf-8")))
+        body = text.split("\n---\n", 1)[1].replace("\r\n", "\n")
+        # The cap keeps this skill's own instructions minimal; the paid work boundary text that scripts/sync-paid-work-boundary.py writes into every skill is not counted.
+        body = re.sub(r"(?ms)^## Paid work boundary\n.*?(?=^## )", "", body)
+        body = re.sub(r"(?m)^- Deliver [^\n]*(?:\n  [^\n]*)*\n", lambda m: "" if "(Paid work boundary)." in " ".join(m.group(0).split()) else m.group(0), body)
+        body = body.replace("The consent question has two answers. On a no, stop as Paid work boundary says: nothing is spent,\nand nothing else is offered.\n", "")
+        Check.true(len(body.encode("utf-8")) < 10_000, "body without the synced boundary is %d bytes" % len(body.encode("utf-8")))
         description = re.search(r"(?m)^description: (.+)$", text).group(1)
         Check.true(description.startswith("Use when") and len(description) <= 1024 and "$" not in description, "description contract")
         Check.true("%d checks" % len(CHECKS) in description and "%d-item" % len(AeoRun.checklist_ids(CHECKLIST)) in description, "description counts match")

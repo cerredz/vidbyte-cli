@@ -40,7 +40,7 @@ RUBRIC = SKILL / "references" / "conversion-rubric.md"
 MIRROR = ROOT / "docs" / "agent-skills" / "write-agent-skill" / "references"
 README = ROOT / "README.md"
 CONTRACT_SECTIONS = ["The problem", "How vidbyte-cli solves it", "Goal and done-when", "Preflight", "Gather inputs", "Steps", "CLI commands",
-                     "Cost and consent", "Run", "Read the result", "Deliver", "Troubleshooting", "Guardrails"]
+                     "Cost and consent", "Paid work boundary", "Run", "Read the result", "Deliver", "Troubleshooting", "Guardrails"]
 METADATA_FIELDS = ["agent", "commands", "cost", "writes-files", "min-cli-version", "status", "docs"]
 ROOT_ONLY_OPTIONS = {"--json", "--no-input", "--color", "--debug", "--format", "--profile"}
 CATEGORIES = ["business_growth", "product_experience", "quick_wins", "experiment", "risk_prevention"]
