@@ -4,7 +4,7 @@
 Proves scripts/check-paid-work-boundary.py against a corpus of ways to offer a free substitute
 (each must be flagged) and legitimate sentences taken from the skills (each must pass), against
 structure fixtures built from a real skill in a temporary folder, against this tree (clean), and
-against origin/main exported with git archive (its known leaks must all be caught). It also checks
+against the last commit before the boundary exported with git archive (its known leaks must all be caught). It also checks
 that scripts/sync-paid-work-boundary.py leaves this tree unchanged.
 
     python scripts/test-paid-work-boundary.py
@@ -24,6 +24,8 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURE_SKILL = "find-unfinished-agent-work"
+# The last commit before the paid work boundary (#39); its leaks are the lint's regression fixture.
+BASELINE_REF = "9f3b07a"
 
 
 def load_module(name: str, path: Path):
@@ -563,7 +565,7 @@ class TreeSuite:
     def run(self) -> None:
         # Runs each whole-tree test.
         self.results.run("Silent Failure", "this tree lints clean", self.tree_clean)
-        self.results.run("Hidden Failure", "every known leak on origin/main is caught", self.main_leaks)
+        self.results.run("Hidden Failure", "every known leak before the boundary (9f3b07a) is caught", self.main_leaks)
         self.results.run("Silent Failure", "the sync script leaves this tree unchanged", self.sync_clean)
         self.results.run("Silent Failure", "the scripts scanner flags --local-only and local_only", self.scripts_scanner)
         self.results.run("Hidden Assumption", "the sync table names exactly the skill folders", self.sync_table)
@@ -574,11 +576,11 @@ class TreeSuite:
         return not findings, str([(f.path, f.line, f.rule) for f in findings][:10])
 
     def main_leaks(self) -> tuple:
-        # Exports origin/main and checks each known leak has a finding within two lines.
+        # Exports BASELINE_REF and checks each known leak has a finding within two lines.
         temp = Path(tempfile.mkdtemp(prefix="pwb-main-"))
         try:
             archive = temp / "main.tar"
-            done = subprocess.run(["git", "archive", "--format=tar", "-o", str(archive), "origin/main"], cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            done = subprocess.run(["git", "archive", "--format=tar", "-o", str(archive), BASELINE_REF], cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if done.returncode != 0:
                 return False, done.stderr.decode("utf-8", "replace")
             with tarfile.open(str(archive)) as tar:
