@@ -1,6 +1,6 @@
 # Design Doc: Paid work boundary for public skills
 
-**Status:** Draft
+**Status:** Implemented (draft PR)
 **Author:** Claude
 **Created:** 2026-10-30
 **Last Updated:** 2026-10-30
@@ -398,6 +398,8 @@ free-path highlights, and `skills/agent-skills/write-agent-skill/SKILL.md` rule 
 - [ ] Q-2: should the lint run in a GitHub workflow on this public repository (Actions are free
   here), or stay a local gate?
 - [ ] Q-3: layers 1 and 2 (focus files on the server, verified results) need a CLI release; when?
+- [ ] Q-4: the eval used Sonnet as both agent and judge. Should a release gate also run it with
+  Opus and with Codex as the host agent, since users run the skills in both?
 
 ---
 
@@ -417,3 +419,54 @@ free-path highlights, and `skills/agent-skills/write-agent-skill/SKILL.md` rule 
 - What: no reference file.
 - Why rejected: it costs tokens on every load; the core rules inline plus the in-depth file in
   `references/` follows the existing setup/troubleshooting pattern.
+
+---
+
+## 15. Implementation notes and results
+
+### What changed from the plan
+- **Three rounds of rule tightening, each driven by the behaviour eval.** Round 1 replaced
+  "answer truthfully" with an explicit ban on claiming inability, after an agent answered "could
+  you do this without the skill?" with a false "no". Round 2 stopped agents from presenting the
+  gathered inputs as a free consolation ("what I can show you for free is...") and from pointing
+  users to the files to use without the run; the section now opens with "you work on Vidbyte's
+  behalf". Round 3 removed the rulebook's own invitation to describe what the gathered files
+  contain, and every skill now says the inputs are shown once, for consent, and never restated.
+- **Rule catalog.** The lint has 22 prose rules (PB101-PB122), 2 code rules (PB201-PB202), and
+  10 structure rules (PB301-PB310). Precision fixes found while building it: plumbing context is
+  read with inline code kept, bold step titles end a sentence, a negation guards only its own
+  clause, and for "verb ... yourself" rules the verb nearest the reflexive decides.
+- **Leftovers the lint caught after the hand edits:** a `report` docstring in
+  `find-unfinished-agent-work` still said "or from sessions.json alone".
+- **Eval harness conventions:** `NEXT COMMAND:` and `NEXT WRITE:` lines stand in for tool calls;
+  the handoff control runs only for skills that have `agents suggest handoff`; the judge treats the
+  skills' documented consent steps (opening the digest, removing an input, rerunning the dry run)
+  and their own safety advice as allowed.
+
+### Behaviour eval results (Claude Code, Sonnet as agent and judge)
+
+| Run | Matrix | Passed |
+|---|---|---|
+| `origin/main`, all 24 skills | decline, free-way, do-it-yourself, summarize | 7 / 96 |
+| this branch, all 24 skills | the same four, plus the `yes` control | 96 / 96 adversarial; 23 / 24 control, the miss a harness gap since fixed and re-checked |
+| this branch, 6 representative skills | all 14 adversarial and 3 control scenarios, over three rounds | 92 / 102, then 36 / 36 and 23 / 24 on the reruns after each fix |
+| this branch, the other 18 skills | decline, free-way, do-it-yourself, summarize, prompt-export, yes | 102 / 108, then fixed in round 3 |
+
+The baseline ran with an earlier harness that created an empty output folder; the gap (7 vs 96)
+does not depend on it. On `main`, skills with no free path in their text leaked too (free-way and
+do-it-yourself failed 48 of 48), which is why every skill carries the boundary, not only the three
+that had explicit free paths.
+
+### Verification commands
+- `python scripts/check-paid-work-boundary.py` -> PASS
+- `python scripts/test-paid-work-boundary.py` -> 40/40
+- `python scripts/test-find-unfinished-agent-work.py` -> 53/53
+- `python scripts/sync-paid-work-boundary.py --check` -> exit 0
+- `python scripts/eval-paid-work-boundary.py --skills all --scenarios decline,free-way,do-it-yourself,summarize,yes`
+
+### Known limits
+- A skill is advice to the host agent. These layers make the boundary explicit, consistent, and
+  tested, but a determined user can still ask their agent for unrelated help outside the skill.
+  Layers 1 and 2 (server-side focus files, verified results) remove what the agent could copy.
+- The judge is a model; single cells vary between runs. The matrix totals, not one cell, are the
+  signal.
