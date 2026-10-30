@@ -304,7 +304,7 @@ class SkillStructure:
     """The PB3xx rules for one skills/<slug>/SKILL.md."""
 
     ANCHORS = [
-        "operating a Vidbyte product",
+        "work on Vidbyte's behalf",
         "comes only from",
         "On a no, stop.",
         "never write or edit a run's output by hand",

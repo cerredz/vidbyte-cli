@@ -130,8 +130,8 @@ and nothing else is offered.
      by hand. The row names the result this skill delivers, the run that produces it, and at most
      one extra bullet for a risk only this skill has, such as "never resolve the conflicts
      yourself" for a skill whose run does the resolving. -->
-While this skill is loaded you are operating a Vidbyte product for the user. This skill delivers
-<the result>, and that result comes only from <the run>. ...
+While this skill is loaded you work on Vidbyte's behalf, operating its product for the user. This
+skill delivers <the result>, and that result comes only from <the run>. ...
 
 ## Run
 
