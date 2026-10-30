@@ -43,7 +43,7 @@ flowchart TD
     F --> G["review_order.py run --dry-run (free, no model)"]
     G -->|exit 2| G2["Fix inputs.json, dry-run again"] --> G
     G --> H{"Show inputs + cost: 2 cents + Codex usage. Yes?"}
-    H -->|no| Z["Stop. Offer prs.md as a free summary."]
+    H -->|no| Z["Stop. Nothing spent, nothing else offered."]
     H -->|yes| I["review_order.py run --idempotency-key KEY:<br/>vidbyte-cli --json --no-input agents suggest run ... --files prs.md"]
     I -->|exit 4, 5, other| T["Troubleshooting table"]
     I --> J["review_order.py report (free): ideas by horizon,<br/>review order with links, groups, PRs left for later"]

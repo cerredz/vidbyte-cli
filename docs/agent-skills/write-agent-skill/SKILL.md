@@ -1,6 +1,6 @@
 ---
 name: write-agent-skill
-description: The writing contract for a public Vidbyte agent skill - the SKILL.md a user installs from cerredz/vidbyte-cli with `npx skills add` that teaches their coding agent to solve one problem by driving vidbyte-cli. Covers why skills drive the CLI and not the MCP server, problem-first naming, the frontmatter and metadata fields, the fixed section order, the consent and spending rules, exact-command discipline, the shared setup and troubleshooting references, and the review checklist.
+description: The writing contract for a public Vidbyte agent skill - the SKILL.md a user installs from cerredz/vidbyte-cli with `npx skills add` that teaches their coding agent to solve one problem by driving vidbyte-cli. Covers why skills drive the CLI and not the MCP server, problem-first naming, the frontmatter and metadata fields, the fixed section order, the consent and spending rules, the paid work boundary, exact-command discipline, the shared references, and the review checklist.
 ---
 
 # Write Agent Skill
@@ -31,9 +31,10 @@ reason is not obvious, and leave out everything the agent does not need in order
 
 The goal is a `SKILL.md` that takes a coding agent from the user's request to a delivered,
 verified result with exactly one Vidbyte agent run (or a small, named chain of them), with the
-user told the cost and asked for consent before anything is spent or any file is changed. A
-reader should be able to tell from the first screen what problem the skill solves, how
-`vidbyte-cli` solves it, and what "done" looks like.
+user told the cost and asked for consent before anything is spent or any file is changed. That
+run is the only source of the result: a skill never offers, builds, or enables a version of it
+made any other way (section 5). A reader should be able to tell from the first screen what problem
+the skill solves, how `vidbyte-cli` solves it, and what "done" looks like.
 
 Each skill encodes judgment the CLI cannot supply on its own: which agent fits the problem, which
 flags fit the problem, what context to gather from the repository before running, and how to turn
@@ -52,7 +53,8 @@ skill guessed at its spelling.
 - Writing a new public skill under `skills/<slug>/` in cerredz/vidbyte-cli.
 - Reviewing a public skill PR against this contract.
 - Updating a published skill after the CLI renames a command or a flag.
-- Refreshing the shared `references/` copies after `setup.md` or `troubleshooting.md` changes.
+- Refreshing the shared `references/` copies after `setup.md`, `troubleshooting.md`, or
+  `paid-work-boundary.md` changes.
 
 `skills/agent-skills/add-agent-skill/SKILL.md` owns the end-to-end process across both
 repositories (where the file goes, the website catalog entry, the gates, and the deploy order).
@@ -105,7 +107,7 @@ metadata:
 | Field | Rule |
 |---|---|
 | `name` | Equals the folder name exactly. The website refuses to render a file whose `name` differs from its slug. |
-| `description` | Starts with "Use when", quotes two or three phrasings a user would actually type, says what the skill gets done, and names the Vidbyte agent and `vidbyte-cli`. It is the only place the skill says when to use it (section 4). At most 1024 characters. The website catalog entry's `description` is a verbatim copy of this field, so edit both together. No price figures: on the website every price must trace to the backend's price table, and lint rule N038 checks only agent catalog entries and the sentences bound in `lint/allowlists/price_sources.txt`, so a price here would ship unchecked. Prices go in `metadata.cost` and the Cost and consent section. |
+| `description` | Starts with "Use when", quotes two or three phrasings a user would actually type, says what the skill gets done, names the Vidbyte agent and `vidbyte-cli`, and ends with the run sentence, such as "The result comes only from that paid run." (section 5). It is the only place the skill says when to use it (section 4). At most 1024 characters. The website catalog entry's `description` is a verbatim copy of this field, so edit both together. No price figures: on the website every price must trace to the backend's price table, and lint rule N038 checks only agent catalog entries and the sentences bound in `lint/allowlists/price_sources.txt`, so a price here would ship unchecked. Prices go in `metadata.cost` and the Cost and consent section. |
 | `metadata.agent` | The agent id, from the website vocabulary: `suggestion-agent`, `persistent-researcher`, `persistent-agent`, `ensemble-agent`, `task-board`, `stages-agent`, or `bug-finder`. |
 | `metadata.commands` | The command paths the skill runs, without the `vidbyte-cli` prefix, separated by commas. |
 | `metadata.cost` | The exact Vidbyte charge plus any provider usage, in the same words the Cost and consent section uses. For a usage-billed agent, which has no exact charge, the model, its per-token rates, and the token cap the skill passes. For `runtime persistence`, `runtime task-board run`, and `runtime stages run`, which run Codex on the user's own OpenAI API key and charge their admission before Codex starts, say that the key needs credits and that a ChatGPT or Codex login does not pay for it. |
@@ -132,12 +134,13 @@ ready to fill in.
 | Gather inputs | What to read from the repository before asking the user anything, and the one or two questions only the user can answer. |
 | Steps | A numbered, high-level list of the whole procedure, from preflight to hand-back. Each step is one or two lines, names the `vidbyte-cli` command it runs if it runs one, and ends with the section that holds its details, such as "(Run)". |
 | CLI commands | A table of every `vidbyte-cli` command the skill runs or asks the user to run, in the order they come up: the full command with root options first, the section that uses it, and what the command does, what it costs, and whether it writes files. Describe each command from its help text in the CLI source (`src/vidbyte_cli/commands/**/prompts/*.md` on the internal repository), never from memory. |
-| Cost and consent | The exact charge (or, for a usage-billed agent, what makes the usage grow), whether files change, the consent question, and how to make the idempotency key when the command takes one. |
+| Cost and consent | The exact charge (or, for a usage-billed agent, what makes the usage grow), whether files change, the consent question, and how to make the idempotency key when the command takes one. It ends with the two-answers sentence: on a no, the skill stops. |
+| Paid work boundary | The canonical section from `scripts/sync-paid-work-boundary.py`, filled with the result this skill delivers and the run that produces it, plus at most one bullet for a risk only this skill has (section 5). |
 | Run | The exact command, always `vidbyte-cli --json --no-input ...`, with a one-line reason for each non-default flag. |
 | Read the result | The result `kind` and the `data` fields the next step uses. |
 | Deliver | How to present the result and which skill to chain to next. |
 | Troubleshooting | The exit-code table: 2 fix the command, 4 setup, 5 stop and ask, anything else `references/troubleshooting.md`. |
-| Guardrails | The standing rules from section 5 plus any rule specific to this skill. |
+| Guardrails | The standing rules from section 5, starting with the paid work boundary bullet, plus any rule specific to this skill. |
 | Docs line | Not a section: the file's last line, `Docs: <url>`, with the same URL as `metadata.docs`. |
 
 Do not add "When to use" or "When not to use" sections. The frontmatter `description` already
@@ -166,6 +169,10 @@ These rules are not optional and every skill restates them in its Guardrails sec
 4. Run at most one file-writing Vidbyte agent in a workspace at a time.
 5. Give every priced run one idempotency key and reuse it only to recover that same admission.
    `agents suggest run` buys no admission and takes no key; its model calls are billed one by one.
+6. The skill's result comes only from its Vidbyte run. Never write a step, an answer to a no, a
+   fallback, a troubleshooting tip, a flag, or a script path that gives the user the result, or
+   any part of it, without that run. The consent question has two answers, yes and no, and on a no
+   the skill stops. The paid work boundary below says what that covers and how to write it.
 
 A skill may install a CI workflow that starts a paid run each time an event fires, with nobody
 there to ask, but only when what starts the paid run (the event plus any condition the workflow
@@ -181,6 +188,60 @@ its trigger, or the CLI version it installs needs a new yes. The user stores eve
 the workflow needs in the CI system's secret store themselves; the skill never asks for, reads,
 or writes one (rule 3), and the workflow never runs `billing top-up`. A skill that installs such
 a workflow restates this paragraph in its Guardrails section.
+
+### The paid work boundary
+
+A public skill exists to deliver the output of one Vidbyte run, and the host agent that loads it
+works for the user, is trained to save them money, and can often see how to approximate the
+result: the gathered digest and the focus or rubric files are right there in the skill folder. A
+skill that adds a third option to its consent question, or that answers a no by handing over the
+digest, teaches that agent to turn Vidbyte's own skill into a way around Vidbyte. It happened in a
+published skill, and a user saw it. So every skill carries the same boundary, every skill is
+written so the boundary is never contradicted, and both are checked by a script, not by review
+alone.
+
+Every step in a skill belongs to one of five kinds:
+
+| Kind | Examples | Rule |
+|---|---|---|
+| Plumbing | Preflight, setup, `--dry-run`, status, collect, watch, the run ledger | Costs nothing. Run it as the steps say. |
+| Input preparation | `gather`, redaction, the digest, an audit or measurement the run reads | Costs nothing. Show it as it is so the user can consent to what is sent; never interpret it. |
+| The result | Whatever the run returns: ideas, checklists, rankings, routines, critiques, fixes, resolutions, research, reports | Only from the run. |
+| Post-result work | Rendering the paid result, `handoff`, `feedback`, writing an approved item, re-checking a fix the run proposed | Costs nothing, and exists only for a result a run produced. |
+| Substitutes | Anything that stands in for the result, in whole or in part | Never. |
+
+What every skill carries, all written by `scripts/sync-paid-work-boundary.py` from one table of
+per-skill values (the result, the run, the description sentence, and an optional skill-specific
+bullet):
+
+- the `## Paid work boundary` section right after Cost and consent;
+- the two-answers sentence at the end of Cost and consent;
+- the first Guardrails bullet;
+- the run sentence at the end of the description;
+- `references/paid-work-boundary.md`, a byte copy of the canonical rulebook in this folder. It
+  holds the in-depth answers for every way users ask around the run, and the host agent reads it
+  only when one does.
+
+How to write the rest of the skill so it never contradicts the boundary:
+
+- Describe plumbing and input steps by what they do ("gather the sessions locally", "check the
+  request with a dry run"), and keep "Free." for the CLI commands table, where it describes a
+  command. Never call a result, or anything that could stand in for one, free.
+- Tie every post-result step to the paid result: "build the report from the paid result".
+- When the inputs are empty or too small to need a run, say so and stop. Never hand over the
+  gathered file in place of the result.
+- Never ship a flag, mode, or code path that builds the deliverable without `result.json` from a
+  real run.
+- Keep the boundary honest. The host agent may decline and stop; it never lies about what it can
+  do, never invents a result, and never claims a run happened. It always tells the user about a
+  live secret or data exposure it found while gathering, whatever they decide about the run.
+
+To add a skill, add its row to `SKILLS` in `scripts/sync-paid-work-boundary.py` and run the
+script. To change the boundary itself, edit the canonical `references/paid-work-boundary.md` or
+the section template in that script, and run it again; it re-syncs every skill. Then run
+`python scripts/check-paid-work-boundary.py` (the lint, which must print PASS) and, for wording
+changes, `python scripts/eval-paid-work-boundary.py` (a behaviour eval that runs skills headless
+in Claude Code against users who push back).
 
 ## 6. Commands are exact
 
@@ -203,8 +264,8 @@ a workflow restates this paragraph in its Guardrails section.
 
 `npx skills add cerredz/vidbyte-cli --skill <slug>` installs one skill folder on its own, so a
 skill cannot link to a sibling's files. Every public skill therefore carries its own
-`references/setup.md` and `references/troubleshooting.md`, copied byte for byte from the canonical
-copies in this folder. Keeping them in `references/` also means the agent loads them only when
+`references/setup.md`, `references/troubleshooting.md`, and `references/paid-work-boundary.md`,
+copied byte for byte from the canonical copies in this folder. Keeping them in `references/` also means the agent loads them only when
 preflight or a command fails, so a healthy run never pays their token cost.
 
 Edit only the canonical copies here, then regenerate every public copy in the same public PR.
@@ -236,6 +297,10 @@ Never fix one public copy by hand.
 - [ ] Every `vidbyte-cli` line uses the full binary name with root options first, and every
       command path and long option exists in `contracts/cli-commands.json` and in `min-cli-version`.
 - [ ] The cost is stated before the run, and the skill waits for consent.
+- [ ] The consent question has two answers, and on a no the skill stops; nothing offers, builds,
+      or enables the result, or any part of it, without the run.
+- [ ] The skill is in `SKILLS` in `scripts/sync-paid-work-boundary.py`, the sync left it
+      unchanged, and `python scripts/check-paid-work-boundary.py` prints PASS.
 - [ ] A skill that installs a CI workflow that starts paid runs uses a trigger (the event plus
       any condition checked before the paid run) that only people with write access can cause,
       never one an outside contributor can cause, asks once, at install, naming the event, the
@@ -243,7 +308,8 @@ Never fix one public copy by hand.
       and how to stop it, and leaves every credential to the user's CI secret store.
 - [ ] Exit 5 stops and asks; `billing top-up --confirm` appears only behind explicit approval.
 - [ ] No step asks for a key in the chat.
-- [ ] `references/setup.md` and `references/troubleshooting.md` are byte-identical to the canonical copies.
+- [ ] `references/setup.md`, `references/troubleshooting.md`, and `references/paid-work-boundary.md`
+      are byte-identical to the canonical copies.
 - [ ] The skill was run end to end once against a real repository with the released CLI.
 
 ## Success criteria
@@ -251,4 +317,5 @@ Never fix one public copy by hand.
 A public skill meets this contract when an agent that has never seen Vidbyte can install it, pass
 or repair preflight, state the cost, run the command without a usage error, read the result, and
 deliver something the user can verify, all from the page, and when every command in it can be
-traced to the CLI's own contract and to a released version.
+traced to the CLI's own contract and to a released version. It also meets the contract only when
+the result it delivers can come from nowhere but its run.

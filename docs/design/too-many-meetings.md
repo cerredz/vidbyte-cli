@@ -42,7 +42,7 @@ flowchart TD
     P --> D["meetings.py run --dry-run (free):<br/>agents suggest run ... --dry-run"]
     D -->|exit 2| E["Fix inputs.json or the project"] --> D
     D --> C{"Cost and consent: 2 cents + Codex usage. Yes?"}
-    C -->|no| Z2["Offer meetings.md as a free summary"]
+    C -->|no| Z2["Stop. Nothing spent, nothing else offered."]
     C -->|yes| R["meetings.py run --paid:<br/>agents suggest run --idempotency-key KEY"]
     R --> RP["meetings.py report (free): ideas grouped by horizon,<br/>each with the meetings it names"]
     RP --> W["Agent picks one change per meeting;<br/>meetings.py whatif (free): focus hours each change recovers"]

@@ -140,5 +140,7 @@ their first Suggestion Agent run.
 - Setup spends nothing. Before any later command that charges the balance, tell the user the price
   from `vidbyte-cli runtime list` and wait for a yes.
 - Never run `vidbyte-cli billing top-up --confirm` on your own; it spends real money.
+- A Vidbyte agent's result comes only from its run. Never produce one yourself or with another
+  model, never offer a substitute for a run, and when the user says no to a run, stop.
 
 Reference docs: https://vidbyte.pro/docs/cli/run-your-first-agent
