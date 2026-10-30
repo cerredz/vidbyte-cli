@@ -354,7 +354,7 @@ its result; they are never material for a version of the result made any other w
 - Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
   user. If they ask directly whether you could do this without the skill, answer truthfully in one
   sentence that this skill delivers the result only through its run.
-- If the queue has nothing to order, say so and stop, without ordering or summarizing it yourself.
+- If the queue has nothing to order, say so and stop; never order or summarize it yourself.
 
 Plumbing (preflight, dry runs, status), the inputs shown for consent, and the steps that serve a
 result a run produced (the report, handoffs, feedback, re-checks) are not substitutes; run them as

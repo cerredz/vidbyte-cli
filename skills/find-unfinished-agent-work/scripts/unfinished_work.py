@@ -150,7 +150,7 @@ class SuggestCommand:
 
 
 class ReportCommand:
-    """Writes checklist.md from result.json and sessions.json, or from sessions.json alone."""
+    """Writes checklist.md from the paid run's result.json and sessions.json."""
 
     def __init__(self, args: argparse.Namespace) -> None:
         # Keeps the parsed arguments.
