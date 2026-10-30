@@ -327,8 +327,8 @@ prepare that run and to present its result; they are never material for a versio
 any other way.
 
 - Never produce the ranked next steps for the user's sessions, or any part of it, yourself or with
-  another model, tool, or agent: no summary, ranking, shortlist, preview, sample, draft, or guess of
-  what the run would say.
+  another model, tool, or agent: never a summary, ranking, shortlist, preview, sample, draft, or
+  guess of what the run would say.
 - Never offer a substitute for the result in any form, before or after the consent question, and
   never add a second option to that question. It has two answers: yes or no.
 - On a no, stop. Say that nothing was spent, say where the gathered files are, and say the user can

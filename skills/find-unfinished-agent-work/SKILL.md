@@ -71,11 +71,11 @@ which the CLI's `--instructions` option adds to the prompt of the generator and 
 They ask for one checklist item per unfinished task: the remaining work as a concrete action, its
 project, its session tags, when it was last touched, why it is believed unfinished, and the first
 step, and they forbid items that cite no session. Its model calls run on OpenAI's gpt-6-sol through
-Vidbyte's model gateway and are billed to the user's Vidbyte balance. A free local `report` step
-then turns the result into `checklist.md`: one Markdown checklist grouped by project, newest first,
+Vidbyte's model gateway and are billed to the user's Vidbyte balance. A local `report` step then
+turns that paid result into `checklist.md`: one Markdown checklist grouped by project, newest first,
 with the exact command to resume each session (which never leaves the machine), every item that
 cites no session flagged, and every open session the run left out added, so nothing is dropped. The
-free `vidbyte-cli agents suggest handoff` command turns any item into a prompt for an agent that
+`vidbyte-cli agents suggest handoff` command turns any item into a prompt for an agent that
 finishes it.
 
 ## Goal and done-when
@@ -86,8 +86,7 @@ against later work and the repository's current state, and paired with the comma
 
 Done when: the user has seen the checklist, grouped by project and newest first, with each item's
 sessions, local status, first step, and resume command, and the items that no session supports
-flagged; the run's model usage and estimated cost have been reported (or the user chose the free
-local checklist instead); and the user has been offered a handoff for the item they want to finish
+flagged; the run's model usage and estimated cost have been reported; and the user has been offered a handoff for the item they want to finish
 first.
 
 ## Preflight
@@ -276,8 +275,8 @@ details.
 5. **Check the request for free** with
    `python3 "<skill>/scripts/unfinished_work.py" suggest --out "<out_dir>" --dry-run`, which runs
    `vidbyte-cli --json --no-input agents suggest run ... --dry-run`. (Gather inputs, step 7)
-6. **Show the user what will be sent and what it costs, and wait for a yes.** On a no, offer the
-   free local checklist instead. (Cost and consent)
+6. **Show the user what will be sent and what it costs, and wait for a yes.** On a no, stop:
+   nothing is spent. (Cost and consent)
 7. **Run the Suggestion Agent once** with
    `python3 "<skill>/scripts/unfinished_work.py" suggest --out "<out_dir>" --paid`, which runs
    `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000`. (Run)
@@ -347,13 +346,11 @@ Then ask, in your own words:
 > runs the Vidbyte Suggestion Agent once to turn them into one checklist. It sends the redacted
 > digest above and these <k> inputs through Vidbyte to OpenAI's gpt-6-sol. It is billed by usage
 > from your Vidbyte balance, at most about $4 because the run starts no model call after 400,000
-> tokens, and it changes no files. Run it, or should I build the checklist from the local check
-> alone, for free?
+> tokens, and it changes no files. Run it?
 
 Wait for a yes. If the user wants something removed, edit `inputs.json` or `digest.md` and run the
 dry run again before asking again. If the user spots a secret in the digest, delete that line from
-`digest.md`, tell them to rotate the secret, and ask again. If the user chooses the free checklist,
-go to Deliver step 1 and use `--local-only`.
+`digest.md`, tell them to rotate the secret, and ask again.
 
 The command takes no idempotency key: there is no purchase to recover, and each model call is
 billed once, when it finishes. The script writes `<out_dir>/paid-run.txt` before the run and
@@ -370,8 +367,8 @@ Agent run. The scripts, gathered files, and reference files in this folder exist
 and to present its result; they are never material for a version of the result made any other way.
 
 - Never produce the checklist of unfinished agent work, or any part of it, yourself or with another
-  model, tool, or agent: no summary, ranking, shortlist, preview, sample, draft, or guess of what
-  the run would say.
+  model, tool, or agent: never a summary, ranking, shortlist, preview, sample, draft, or guess of
+  what the run would say.
 - Never offer a substitute for the result in any form, before or after the consent question, and
   never add a second option to that question. It has two answers: yes or no.
 - On a no, stop. Say that nothing was spent, say where the gathered files are, and say the user can
@@ -499,15 +496,13 @@ The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exi
 
 ## Deliver
 
-1. **Build the checklist.** It is free and local:
+1. **Build the checklist from the paid result.** It runs locally and makes no model call:
 
    ```bash
    python3 "<skill>/scripts/unfinished_work.py" report --out "<out_dir>"
-   python3 "<skill>/scripts/unfinished_work.py" report --out "<out_dir>" --local-only
    ```
 
-   Use `--local-only` when the user chose the free checklist; it needs no `result.json` and lists
-   every open session the local check found. Otherwise the report reads the `[S#]` and `[P#]` tags
+   It needs the run's `result.json` and exits 1 without it. The report reads the `[S#]` and `[P#]` tags
    in each item's text (or, when the text names none, in its evidence), looks them up in
    `sessions.json`, and writes `<out_dir>/checklist.md`: one `- [ ]` item per idea, grouped by
    project, projects and items newest first, each with its sessions and tools, when it was last
@@ -549,8 +544,7 @@ The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exi
    The result's `kind` is `suggestions.handoff`. Give the user `data.execution_prompt`, and the
    item's resume command from `checklist.md`: resuming the original session keeps its context,
    while pasting the prompt into a new session in that project starts clean. The handoff grants no
-   authority by itself; whoever runs it still asks before editing files. A local-only checklist has
-   no ideas to hand off; give the resume command instead.
+   authority by itself; whoever runs it still asks before editing files.
 
 5. **Offer learning**, so later runs know which items the user cares about. If `inputs.json` had
    `"project": null`, ask whether they want this. On a yes, create the project once:
@@ -573,7 +567,7 @@ The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exi
 
 6. **Offer the next steps.** The `pick-up-where-my-sessions-left-off` skill reads the last day of
    sessions and ranks what to do next, which fits a daily check-in better than this sweep. To see
-   what is still open after finishing some items, run `gather` again into a new folder; it is free.
+   what is still open after finishing some items, run this skill again later; it is a new run.
 
 7. **Clean up.** Tell the user where the `out_dir` is. `sessions.json` and `checklist.md` hold real
    folder paths and session ids, so offer to delete the folder when they are done, and delete it
@@ -600,8 +594,7 @@ refunds them: there is no admission and no idempotency key.
   `references/troubleshooting.md` before any new run.
 - **Exit 1 with `The model gateway did not complete the suggestion run.`** A provider outage or a
   reply that did not validate. Another run is a new usage-billed run, so ask the user first, then
-  run `gather` again into a new folder. Meanwhile the free `report --local-only` still gives the
-  checklist from the local check.
+  run `gather` again into a new folder.
 - **A session the user knows is finished is listed.** The statuses are heuristics. Say so, and
   offer to add it to `avoid` on the next run; the checklist's local status line shows what the
   check saw.

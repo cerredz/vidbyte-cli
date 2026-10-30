@@ -180,8 +180,7 @@ a new folder in the system temp directory, never to the repository.
    The script prints the counts, every distilled value, how the paid run is billed, the
    suggestion project for this repository with the exact command to create it, and `OUT_DIR=<folder>`
    as its last line. Keep that path. Exit 0 means done. Exit 3 means fewer than two pull requests
-   are in the queue: tell the user, offer `prs.md` as a free summary, and stop, because there is
-   nothing to rank. Exit 1 means `gh` is missing, not logged in, or the repository could not be
+   are in the queue: tell the user there is nothing to rank, and stop. Exit 1 means `gh` is missing, not logged in, or the repository could not be
    read; show the message.
 
    `OUT_DIR` holds these files:
@@ -265,7 +264,7 @@ The whole skill, in order. Each step names the section that holds its details.
    `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` once and saves
    `result.json`. (Run)
 8. **Read the result**: `data.status`, `data.ideas`, and `data.usage`. (Read the result)
-9. **Report, free.** Run `review_order.py report` for the review order with links and groups, and
+9. **Report the paid result.** Run `review_order.py report` for the review order with links and groups, and
    present it. (Deliver, step 1)
 10. **Offer to start the first review** with `vidbyte-cli --json agents suggest handoff`, and a
     local checkout of that pull request after a yes. (Deliver, step 2)
@@ -326,8 +325,8 @@ Before running it, show the user what will be sent and ask, in your own words:
 > tokens, and it changes no files and nothing on GitHub. Run it?
 
 If the repository is private, say that plainly: its pull request titles, paths, and description
-excerpts go to Vidbyte, which sends them to OpenAI. Wait for a yes. If the user says no, offer
-`prs.md` as a free summary instead.
+excerpts go to Vidbyte, which sends them to OpenAI. Wait for a yes. If the user says no, stop as
+Paid work boundary says.
 
 The command takes no idempotency key: there is no purchase to recover, and each model call is
 billed once, when it finishes. The script writes `<OUT_DIR>/paid-run.txt` before the run and
@@ -344,7 +343,7 @@ scripts, gathered files, and reference files in this folder exist to prepare tha
 its result; they are never material for a version of the result made any other way.
 
 - Never produce the review order, or any part of it, yourself or with another model, tool, or agent:
-  no summary, ranking, shortlist, preview, sample, draft, or guess of what the run would say.
+  never a summary, ranking, shortlist, preview, sample, draft, or guess of what the run would say.
 - Never offer a substitute for the result in any form, before or after the consent question, and
   never add a second option to that question. It has two answers: yes or no.
 - On a no, stop. Say that nothing was spent, say where the gathered files are, and say the user can

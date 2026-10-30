@@ -167,7 +167,7 @@ The whole skill, in order. Each step names the section that holds its details.
    that the OpenAI API key has credits. (Preflight)
 2. **Settle the company, website, purpose, and who is asking.** (Gather inputs, steps 1 and 2)
 3. **Settle the aspects** with the user: drop, add, or narrow. (Gather inputs, step 2)
-4. **Plan, free.** Run `competitor_portfolio.py plan`. It prints the aspects, the cap, and the
+4. **Plan the aspects.** Run `competitor_portfolio.py plan` (local, no charge). It prints the aspects, the cap, and the
    worst case. (Gather inputs, step 3)
 5. **Check the board, free.** Run `board --dry-run`. (Cost and consent)
 6. **Get one yes** for the board and every research run, with the worst-case total.
@@ -272,8 +272,8 @@ exist to prepare that run and to present its result; they are never material for
 result made any other way.
 
 - Never produce the research briefs and the competitor research, or any part of it, yourself or with
-  another model, tool, or agent: no summary, ranking, shortlist, preview, sample, draft, or guess of
-  what the run would say.
+  another model, tool, or agent: never a summary, ranking, shortlist, preview, sample, draft, or
+  guess of what the run would say.
 - Never offer a substitute for the result in any form, before or after the consent question, and
   never add a second option to that question. It has two answers: yes or no.
 - On a no, stop. Say that nothing was spent, say where the gathered files are, and say the user can

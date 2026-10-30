@@ -11,9 +11,8 @@ Four subcommands, run in this order by the find-unfinished-agent-work skill:
   suggest   Checks inputs.json, then runs `vidbyte-cli --json --no-input agents suggest run ...` from
             inside the output folder. --dry-run is free; --paid is the one billed step and needs the
             user's yes first.
-  report    Free and local. Maps the run's ideas back to sessions and writes checklist.md, grouped by
-            project, newest first, with each session's resume command. --local-only builds it from the
-            local check alone, for a user who does not want the paid run.
+  report    Local, no model call. Maps the paid run's ideas back to sessions and writes checklist.md,
+            grouped by project, newest first, with each session's resume command. Needs result.json.
   feedback  Records the user's explicit accept or reject of one idea, copying its exact title from
             result.json into `vidbyte-cli agents suggest feedback`.
 
@@ -158,9 +157,9 @@ class ReportCommand:
         self.args = args
 
     def run(self) -> int:
-        # Builds the checklist (from result.json, or from sessions.json alone with --local-only); exit 2 on a bad file.
+        # Builds the checklist from result.json and sessions.json; exit 2 on a missing or bad file.
         try:
-            summary = ChecklistReporter(Path(self.args.out).expanduser().resolve(), self.args.shell, self.args.local_only).build()
+            summary = ChecklistReporter(Path(self.args.out).expanduser().resolve(), self.args.shell).build()
         except ReportError as error:
             return CommandIO.usage_error(str(error))
         CommandIO.print_json(summary)
@@ -230,10 +229,9 @@ class Cli:
         suggest.add_argument("--paid", action="store_true", help="Run it for real (usage-billed; only after the user's yes).")
         suggest.add_argument("--count", type=int, default=DEFAULT_COUNT, help="Most checklist items to ask for (%d-%d, default %d)." % (MIN_COUNT, MAX_COUNT, DEFAULT_COUNT))
         suggest.add_argument("--cli", default=None, help="Path to vidbyte-cli when it is not on PATH.")
-        report = sub.add_parser("report", help="Write checklist.md from result.json, or from the local check alone (free, local).")
+        report = sub.add_parser("report", help="Write checklist.md from the paid run's result.json (local, no model call).")
         report.add_argument("--out", required=True, help="The output folder gather printed.")
         report.add_argument("--shell", choices=("bash", "powershell"), default=None, help="Spell resume commands for this shell (default: PowerShell on Windows, bash elsewhere).")
-        report.add_argument("--local-only", action="store_true", help="Build the checklist from the local check alone, without a Suggestion Agent run (free).")
         feedback = sub.add_parser("feedback", help="Record an explicit accept or reject of one idea (free, local).")
         feedback.add_argument("--out", required=True, help="The output folder gather printed.")
         feedback.add_argument("--idea", required=True, help="The idea id, such as idea-002.")

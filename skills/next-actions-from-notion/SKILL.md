@@ -386,7 +386,7 @@ Then ask, in your own words:
 Wait for a yes. If the user wants a page left out, run `gather` again with another `--exclude`,
 then the dry run again, and ask again. If the user spots a secret in the digest, run `gather`
 again with that page excluded, tell them to rotate the secret, and ask again. If the user says no,
-offer `digest.md` as a free summary of their week in Notion.
+stop as Paid work boundary says.
 
 The command takes no idempotency key: there is no purchase to recover, and each model call is
 billed once, when it finishes. The script writes `<out_dir>/paid-run.txt` before the run and
@@ -403,7 +403,8 @@ scripts, gathered files, and reference files in this folder exist to prepare tha
 its result; they are never material for a version of the result made any other way.
 
 - Never produce the ranked next actions, or any part of it, yourself or with another model, tool, or
-  agent: no summary, ranking, shortlist, preview, sample, draft, or guess of what the run would say.
+  agent: never a summary, ranking, shortlist, preview, sample, draft, or guess of what the run would
+  say.
 - Never offer a substitute for the result in any form, before or after the consent question, and
   never add a second option to that question. It has two answers: yes or no.
 - On a no, stop. Say that nothing was spent, say where the gathered files are, and say the user can

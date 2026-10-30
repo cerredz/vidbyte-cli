@@ -430,8 +430,8 @@ prepare that run and to present its result; they are never material for a versio
 any other way.
 
 - Never produce the scheduled routines for the user's chores, or any part of it, yourself or with
-  another model, tool, or agent: no summary, ranking, shortlist, preview, sample, draft, or guess of
-  what the run would say.
+  another model, tool, or agent: never a summary, ranking, shortlist, preview, sample, draft, or
+  guess of what the run would say.
 - Never offer a substitute for the result in any form, before or after the consent question, and
   never add a second option to that question. It has two answers: yes or no.
 - On a no, stop. Say that nothing was spent, say where the gathered files are, and say the user can
@@ -623,8 +623,8 @@ The script prints a JSON report and exits with `vidbyte-cli`'s exit code.
    <output_tokens> output tokens, about $<estimated_cost_usd> from your Vidbyte balance; the exact
    amount is on vidbyte.pro/usage."
 
-4. **Write the routine files for each routine the user says yes to.** It is free and local, and it
-   writes files, so it needs an explicit yes for that routine. Ask the user for:
+4. **Write the routine files for each routine the user says yes to.** It runs locally, makes no model
+   call, and writes files, so it needs an explicit yes for that routine. Ask the user for:
    - the folder for the routine, outside every repository, such as `~/routines/budget`. It must be
      empty or new;
    - the harness that runs it: `claude-code` or `codex`. Check it with `claude --version` or
