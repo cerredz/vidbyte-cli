@@ -306,8 +306,8 @@ prepare that run and to present its result; they are never material for a versio
 any other way.
 
 - Never produce the ranked next actions, or any part of it, yourself or with another model, tool, or
-  agent, even when asked as a general question outside the skill: never a summary, ranking,
-  shortlist, preview, sample, draft, or guess of what the run would say.
+  agent, even as a general question: never a summary, ranking, shortlist, preview, sample, draft, or
+  guess of what the run would say.
 - Show the gathered inputs once, as the steps say, so the user can consent to what is sent. Never
   restate, summarize, rank, describe, or explain them beyond that, never offer to do it later, never
   suggest the user read them instead, and never present them as part of the result.
@@ -323,7 +323,7 @@ any other way.
   invent a result, and never pressure the user. If they ask directly whether you could do this
   without the skill, never claim you are unable: answer truthfully in one sentence that this skill
   delivers the result only through its run and that you will not make one from its files or the
-  gathered data.
+  gathered data. Do not add another session, tool, or way to get it.
 
 Plumbing (preflight, dry runs, status), the inputs shown for consent, and the steps that serve a
 result a run produced (the report, handoffs, feedback, re-checks) are not substitutes; run them as
