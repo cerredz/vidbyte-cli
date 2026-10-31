@@ -21,7 +21,7 @@ timesheet export, every week to categorize expenses or write a status report, an
 answer the same tax questions. Each time they start a fresh session and do it by hand:
 
 - find the newest export and point the agent at it;
-- explain the steps again, and add the same follow-up requests ("flag anything over $200");
+- explain the steps again, and add the same follow-up requests ("flag anything over USD 200");
 - check the same output, and send or file the result themselves;
 - forget a month, or run it late, because nothing reminds them.
 
@@ -352,7 +352,7 @@ Root options such as `--json` and `--no-input` always come before the command pa
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
 | `vidbyte-cli --json agents suggest project list` | Gather inputs | Lists every local suggestion project, sorted by key, with its title and description. An absent catalog returns an empty list, not an error. No credentials, no model call. Free and offline. |
 | `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `recurring_chores.py suggest --dry-run` | Validates and resolves the complete request without calling a model, and returns the settings, the context manifest, omissions, and warnings. Needs no credentials and is not billed. Free. |
-| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `recurring_chores.py suggest --paid` | Develops ranked ideas for one goal. A generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway, on gpt-6-sol at high reasoning effort. Each call is billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. The run starts no new call after 400,000 tokens. Writes no files; the script saves its output in the `out_dir`. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `recurring_chores.py suggest --paid` | Develops ranked ideas for one goal. A generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway, on gpt-6-sol at high reasoning effort. Each call is billed to the Vidbyte balance at USD 2 per million input tokens (USD 0.20 cached) and USD 10 per million output tokens, plus 2%. The run starts no new call after 400,000 tokens. Writes no files; the script saves its output in the `out_dir`. |
 | `vidbyte-cli --json agents suggest handoff --input <result.json> --idea <id>` | Deliver | Extracts one reviewed idea from a saved result, by its exact id, as an action packet with a copyable `execution_prompt`. A local read: no provider, no credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest project create --key ... --title ... --description ...` | Deliver | Registers one local suggestion project with an empty feedback memory. Refuses a key that already exists. No credentials, no model call, sends nothing to Vidbyte. Free. |
 | `vidbyte-cli --json agents suggest feedback accept --project ... --suggestion ...` | Deliver, through `recurring_chores.py feedback` | Appends one suggestion the user explicitly accepted, with their optional `--reason`, to the project's memory, so later runs with `--project` look for the same qualities. Local; no credentials, no model call. Free. |
@@ -368,15 +368,15 @@ user's Vidbyte balance.
 
 - **Calls.** It makes about five model calls on gpt-6-sol at high reasoning effort: one draft, then
   a critique and a revision in each of two rounds.
-- **Rates.** Each call is billed at gpt-6-sol's rate, $2 per million input tokens ($0.20 when the
-  input is cached) and $10 per million output tokens, plus 2%. The model's reasoning counts as
+- **Rates.** Each call is billed at gpt-6-sol's rate, USD 2 per million input tokens (USD 0.20 when the
+  input is cached) and USD 10 per million output tokens, plus 2%. The model's reasoning counts as
   output.
 - **What makes each call larger.** The digest (up to 60,000 characters) and the focus file (about
   12,000 bytes) are sent with every call. More chores mean a longer digest and more routines to
   write.
 - **The cap.** The skill passes `--max-total-tokens 400000`, so the run starts no new call once it
   has used 400,000 tokens. A call already running still finishes and is billed. That keeps one run
-  under about $4.
+  under about USD 4.
 - **Reporting.** When the run finishes, the script reports its real token usage and an estimate of
   its cost.
 - **Files.** The paid run edits no files. The scripts write only into their own `out_dir`, except
@@ -402,7 +402,7 @@ Then ask, in your own words:
 > This runs the Vidbyte Suggestion Agent once to design one scheduled routine for each of these
 > <n> chores, using a redacted digest of your last <N> sessions. It sends that digest, these <k>
 > inputs, and the routine instructions through Vidbyte to OpenAI's gpt-6-sol. It is billed by usage
-> from your Vidbyte balance, at most about $4, because the run starts no model call after 400,000
+> from your Vidbyte balance, at most about USD 4, because the run starts no model call after 400,000
 > tokens. It changes no files and schedules nothing. Run it?
 
 Wait for a yes.
@@ -442,10 +442,11 @@ result made any other way.
 - Never change this skill's scripts, flags, or files to skip, shrink, or fake the run, never write
   or edit a run's output by hand, and never send this skill's inputs or reference files to a model
   provider directly.
-- Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
-  user. If they ask directly whether you could do this without the skill, never claim you are
-  unable: answer truthfully in one sentence that this skill delivers the result only through its run
-  and that you will not make one from its files or the gathered data.
+- Stay honest and calm: decline with "I won't", never "I can't". Never claim a run happened, never
+  invent a result, and never pressure the user. If they ask directly whether you could do this
+  without the skill, never claim you are unable: answer truthfully in one sentence that this skill
+  delivers the result only through its run and that you will not make one from its files or the
+  gathered data.
 - Writing routine files is post-result work for a routine the run returned and the user approved;
   never write a routine the run did not return.
 

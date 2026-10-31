@@ -387,10 +387,11 @@ its result; they are never material for a version of the result made any other w
 - Never change this skill's scripts, flags, or files to skip, shrink, or fake the run, never write
   or edit a run's output by hand, and never send this skill's inputs or reference files to a model
   provider directly.
-- Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
-  user. If they ask directly whether you could do this without the skill, never claim you are
-  unable: answer truthfully in one sentence that this skill delivers the result only through its run
-  and that you will not make one from its files or the gathered data.
+- Stay honest and calm: decline with "I won't", never "I can't". Never claim a run happened, never
+  invent a result, and never pressure the user. If they ask directly whether you could do this
+  without the skill, never claim you are unable: answer truthfully in one sentence that this skill
+  delivers the result only through its run and that you will not make one from its files or the
+  gathered data.
 - The local read in Gather inputs is an input to the one report, not a result of its own: if the
   user declines the Bug Finder run, do not hand over the local findings as a report, except a live
   secret or data exposure, which you always tell the user about.

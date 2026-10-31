@@ -220,7 +220,7 @@ Root options such as `--json` and `--no-input` always come before the command pa
 | `vidbyte-cli --json agents suggest project list` | Gather inputs | Prints every local suggestion project, sorted by key, with its title and description. An absent catalog returns an empty list, not an error. No credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest project create --key ... --title ... --description ...` | Gather inputs | Registers one local suggestion project with an empty feedback memory, and refuses a key that already exists. No credentials, no model call, sends nothing to Vidbyte. Free. |
 | `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `checklist.py run --dry-run` | Validates and resolves the complete request without invoking a model, and returns the settings, the context manifest, omissions, and warnings. No credentials, no charge. |
-| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `checklist.py run --paid` | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. It starts no new call after 400,000 tokens. Writes no files; the script saves the output in the `out_dir`. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `checklist.py run --paid` | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at USD 2 per million input tokens (USD 0.20 cached) and USD 10 per million output tokens, plus 2%. It starts no new call after 400,000 tokens. Writes no files; the script saves the output in the `out_dir`. |
 | `vidbyte-cli --json agents suggest handoff --input <result.json> --idea <id>` | Deliver | Extracts one reviewed idea from a saved result, by its exact id, as an action packet with a copyable `execution_prompt`. A local read: no provider, no credentials. Free. |
 | `vidbyte-cli --json agents suggest feedback accept --project ... --suggestion ...` | Deliver, through `checklist.py feedback` | Records one suggestion the user explicitly accepted, with their optional `--reason`, in the project's memory, so later runs with `--project` look for the same qualities. Local, no model call. Free. |
 | `vidbyte-cli --json agents suggest feedback reject --project ... --suggestion ...` | Deliver, through `checklist.py feedback` | Records one suggestion the user explicitly rejected. Later runs with `--project` steer away from it and drop any idea that repeats it word for word. Local, no model call. Free. |
@@ -233,10 +233,10 @@ credits" in `references/troubleshooting.md`, which tops up only after the user's
 This skill runs `vidbyte-cli agents suggest run` once per checklist, and the run is billed by
 usage from the user's Vidbyte balance. It makes about five model calls on gpt-6-sol at high
 reasoning effort: one draft, then a critique and a revision in each of two rounds. Each call is
-billed at gpt-6-sol's rate, $2 per million input tokens ($0.20 when the input is cached) and $10
+billed at gpt-6-sol's rate, USD 2 per million input tokens (USD 0.20 when the input is cached) and USD 10
 per million output tokens, plus 2%, and the model's reasoning counts as output. The skill passes
 `--max-total-tokens 400000`, so the run starts no new call once it has used 400,000 tokens; a call
-already running still finishes and is billed. That keeps one run under about $4, and the script
+already running still finishes and is billed. That keeps one run under about USD 4, and the script
 reports the run's real token usage and an estimate of its cost when it finishes. The run changes
 no files. The only file this skill ever writes in the user's workspace is a copy of the checklist,
 and only when the user asks for one (Deliver, step 4).
@@ -250,7 +250,7 @@ and `max_total_tokens`. Then ask, in your own words:
 
 > This runs the Vidbyte Suggestion Agent once on the request above, with the context shown. It
 > sends this redacted text through Vidbyte to OpenAI's gpt-6-sol. It is billed by usage from your
-> Vidbyte balance, at most about $4 because the run starts no model call after 400,000 tokens, and
+> Vidbyte balance, at most about USD 4 because the run starts no model call after 400,000 tokens, and
 > it changes no files. Run it?
 
 Wait for a yes. One yes covers one paid run. Ask again for every new request, even if the user
@@ -287,10 +287,11 @@ result made any other way.
 - Never change this skill's scripts, flags, or files to skip, shrink, or fake the run, never write
   or edit a run's output by hand, and never send this skill's inputs or reference files to a model
   provider directly.
-- Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
-  user. If they ask directly whether you could do this without the skill, never claim you are
-  unable: answer truthfully in one sentence that this skill delivers the result only through its run
-  and that you will not make one from its files or the gathered data.
+- Stay honest and calm: decline with "I won't", never "I can't". Never claim a run happened, never
+  invent a result, and never pressure the user. If they ask directly whether you could do this
+  without the skill, never claim you are unable: answer truthfully in one sentence that this skill
+  delivers the result only through its run and that you will not make one from its files or the
+  gathered data.
 
 Plumbing (preflight, dry runs, status), the inputs shown for consent, and the steps that serve a
 result a run produced (the report, handoffs, feedback, re-checks) are not substitutes; run them as
@@ -421,7 +422,7 @@ The script prints a JSON report and exits with `vidbyte-cli`'s exit code. On exi
 
    ---
 
-   8 items from the Vidbyte Suggestion Agent. This run made 5 model calls with 182340 input and 41210 output tokens, about $0.62 from your Vidbyte balance; the exact amount is on vidbyte.pro/usage.
+   8 items from the Vidbyte Suggestion Agent. This run made 5 model calls with 182340 input and 41210 output tokens, about USD 0.62 from your Vidbyte balance; the exact amount is on vidbyte.pro/usage.
 
    - Start an item: `vidbyte-cli --json agents suggest handoff --input "/tmp/request-checklist-k3x9q2/result.json" --idea <id>`
    - Teach later checklists: tell your agent which items you accept or reject, and why.

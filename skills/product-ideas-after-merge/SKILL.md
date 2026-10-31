@@ -152,7 +152,7 @@ such as `--json` and `--no-input` always come before the command path.
 | `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.3.3 or newer. Free and offline. |
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored on this machine; it does not block this skill. Free. |
 | `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Run, step 3, on this machine | Validates and resolves the complete request without invoking a model. Needs no Vidbyte key, balance, or token usage, and is not billed. The result contains no ideas and names `dry_run` as its stopping reason. It also checks the lens passed with `--instructions`, so a lens the runner would refuse fails here first. Writes no files. |
-| `vidbyte-cli --json --no-input agents suggest run ... --send-to slack` | Run, in the workflow, on GitHub's runner after each merged pull request | Develops concrete next actions for one goal: a generator proposes ideas and an independent critic reviews them. Every generator and critic turn is one call to Vidbyte's model gateway, billed to the balance of the key at its model's rate plus 2% (gpt-6-sol: $2 per million input tokens, $10 per million output tokens). The token limit is checked before each new call and stops new work once observed usage reaches it, here 400,000; it does not interrupt an active call, which is billed in full. Bare `slack` posts to the webhook in `SLACK_WEBHOOK_URL`, read from the environment only and never the keyring. Every target and credential is checked before the agent starts, so a missing webhook costs nothing. The result is sent only after the agent returns normally; one receipt line goes to stderr, and stdout keeps the result. When the send fails, the command exits with status 1 after the result is printed, so running it again repeats the paid run. It needs a vidbyte-sdk release that ships the output connectors. Writes no files in the repository. |
+| `vidbyte-cli --json --no-input agents suggest run ... --send-to slack` | Run, in the workflow, on GitHub's runner after each merged pull request | Develops concrete next actions for one goal: a generator proposes ideas and an independent critic reviews them. Every generator and critic turn is one call to Vidbyte's model gateway, billed to the balance of the key at its model's rate plus 2% (gpt-6-sol: USD 2 per million input tokens, USD 10 per million output tokens). The token limit is checked before each new call and stops new work once observed usage reaches it, here 400,000; it does not interrupt an active call, which is billed in full. Bare `slack` posts to the webhook in `SLACK_WEBHOOK_URL`, read from the environment only and never the keyring. Every target and credential is checked before the agent starts, so a missing webhook costs nothing. The result is sent only after the agent returns normally; one receipt line goes to stderr, and stdout keeps the result. When the send fails, the command exits with status 1 after the result is printed, so running it again repeats the paid run. It needs a vidbyte-sdk release that ships the output connectors. Writes no files in the repository. |
 
 This skill never runs `vidbyte-cli billing top-up`, and neither does the workflow. The one exception
 is "Out of credits" in `references/troubleshooting.md`, on this machine, after the user's explicit
@@ -169,13 +169,13 @@ skipped with no Vidbyte charge, because both are left out of the diff.
 Each run is billed by usage from the Vidbyte balance of the key in the `VIDBYTE_API_KEY` secret.
 At the default two rounds it makes about 5 model calls on gpt-6-sol at high reasoning effort: one
 draft, then a critique and a revision in each round. A call whose message to its partner bounces is
-repeated once inside its turn. Each call is billed at gpt-6-sol at $2 / $10 per million input /
-output tokens + 2% ($0.20 per million when the input is cached), and the model's reasoning counts
+repeated once inside its turn. Each call is billed at gpt-6-sol at USD 2 / USD 10 per million input /
+output tokens + 2% (USD 0.20 per million when the input is cached), and the model's reasoning counts
 as output. Every call carries the diff, the description, and the lens, so a larger pull request
 costs more on every call. The workflow passes `--max-total-tokens 400000`, so the run checks its
 total before each turn and starts none after 400,000 tokens; a call already running finishes and
 is billed. A diff and description over 100,000 bytes are skipped, and the lens stays under 4,000
-bytes, which keeps one run at most about $4.
+bytes, which keeps one run at most about USD 4.
 
 Pull requests from forks, and merges Dependabot performs itself, get no ideas: GitHub gives those
 runs no secrets, so the job fails before any Vidbyte charge. A Dependabot pull request that a
@@ -204,8 +204,8 @@ Gather inputs step 3 printed nothing:
 > so the job fails before any Vidbyte charge. Each run sends the pull request's diff (without
 > lockfiles and without `<folders>`), its title and description, and the lens through Vidbyte to
 > OpenAI's gpt-6-sol, and posts up to three product ideas to the Slack channel of your webhook.
-> Each run is billed by usage from your Vidbyte balance (gpt-6-sol at $2 / $10 per million input /
-> output tokens + 2%, about 5 model calls), at most about $4, because it stops starting model calls
+> Each run is billed by usage from your Vidbyte balance (gpt-6-sol at USD 2 / USD 10 per million input /
+> output tokens + 2%, about 5 model calls), at most about USD 4, because it stops starting model calls
 > after 400,000 tokens. A pull request whose diff is empty or over 100,000 bytes is skipped with no
 > Vidbyte charge. In a private repository, every job, even a skipped one, also uses GitHub Actions
 > minutes from your plan. To stop it, delete or disable the workflow, or delete the
@@ -244,10 +244,11 @@ result made any other way.
 - Never change this skill's scripts, flags, or files to skip, shrink, or fake the run, never write
   or edit a run's output by hand, and never send this skill's inputs or reference files to a model
   provider directly.
-- Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
-  user. If they ask directly whether you could do this without the skill, never claim you are
-  unable: answer truthfully in one sentence that this skill delivers the result only through its run
-  and that you will not make one from its files or the gathered data.
+- Stay honest and calm: decline with "I won't", never "I can't". Never claim a run happened, never
+  invent a result, and never pressure the user. If they ask directly whether you could do this
+  without the skill, never claim you are unable: answer truthfully in one sentence that this skill
+  delivers the result only through its run and that you will not make one from its files or the
+  gathered data.
 - Never write ideas yourself, now or in the workflow, and never write a workflow, script, or hook
   that sends the diff or the lens to a model provider directly.
 

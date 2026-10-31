@@ -211,7 +211,7 @@ Root options such as `--json` and `--no-input` always come before the command pa
 | `vidbyte-cli --version` | Preflight | Prints the installed CLI version. This skill needs 0.3.0 or newer. Free and offline. |
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
 | `vidbyte-cli login` | Preflight, by the user | Authenticates with a Vidbyte API key read from a hidden prompt and stores it for later commands. The user runs it in their own terminal, so the key never enters the chat. Only needed when no key, or a key without `models:invoke`, is stored. Free. |
-| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run | Develops concrete next actions for one goal and returns only ideas that can be explained, evaluated, and handed to another agent: a generator proposes candidates and an independent critic reviews them, round after round. Every generator and critic turn is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. The request and its context files are sent through Vidbyte to the model provider. It checks the token limit before each new call and starts none after 400,000 tokens; a call already running finishes and is billed. Edits no files in the workspace; records the run in vidbyte-cli's local runs ledger. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run | Develops concrete next actions for one goal and returns only ideas that can be explained, evaluated, and handed to another agent: a generator proposes candidates and an independent critic reviews them, round after round. Every generator and critic turn is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at USD 2 per million input tokens (USD 0.20 cached) and USD 10 per million output tokens, plus 2%. The request and its context files are sent through Vidbyte to the model provider. It checks the token limit before each new call and starts none after 400,000 tokens; a call already running finishes and is billed. Edits no files in the workspace; records the run in vidbyte-cli's local runs ledger. |
 
 This skill never runs `vidbyte-cli billing top-up` on its own. On exit 5 it follows "Out of
 credits" in `references/troubleshooting.md`, which tops up only after the user's explicit yes.
@@ -222,12 +222,12 @@ This skill runs `vidbyte-cli agents suggest run` once, and the run is billed by 
 user's Vidbyte balance. With `--rounds 3` it makes about seven model calls on gpt-6-sol at high
 reasoning effort: one draft, then a critique and a revision in each of three rounds. A call is
 repeated once when the model's message to its partner bounces. Each call is billed at gpt-6-sol's
-rate, $2 per million input tokens ($0.20 when the input is cached) and $10 per million output
+rate, USD 2 per million input tokens (USD 0.20 when the input is cached) and USD 10 per million output
 tokens, plus 2%, and the model's reasoning counts as output. Every call carries the whole diff and
 `AGENTS.md`, so a larger diff costs more on every call. The skill passes
 `--max-total-tokens 400000`, so the run starts no new call once it has used 400,000 tokens; a call
 already running still finishes and is billed. With the diff and `AGENTS.md` under 100,000 bytes
-(Gather inputs, step 5), that keeps one run under about $4.
+(Gather inputs, step 5), that keeps one run under about USD 4.
 
 The run itself edits no files and changes nothing on GitHub. It writes only
 `<T>/review-predictions.json`, and vidbyte-cli records the run in its own local runs ledger. After
@@ -243,7 +243,7 @@ Before running it, ask, in your own words:
 > Before I open the pull request, I'd like to run the Vidbyte Suggestion Agent once to predict what
 > reviewers will object to. It sends the committed diff of `<branch>` against `origin/<base>`
 > (`<N>` commits, `<bytes>` bytes) and `AGENTS.md` through Vidbyte to OpenAI's gpt-6-sol, with each
-> of its about seven model calls. It is billed by usage from your Vidbyte balance, at most about $4,
+> of its about seven model calls. It is billed by usage from your Vidbyte balance, at most about USD 4,
 > because the run starts no new call after 400,000 tokens. The run itself changes nothing.
 > Afterwards I'll fix the objections I agree with in this branch, rerun the checks, and commit, and
 > I'll list the ones I skip, each with a reason for the pull request description. Then I'll
@@ -281,10 +281,11 @@ any other way.
 - Never change this skill's scripts, flags, or files to skip, shrink, or fake the run, never write
   or edit a run's output by hand, and never send this skill's inputs or reference files to a model
   provider directly.
-- Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
-  user. If they ask directly whether you could do this without the skill, never claim you are
-  unable: answer truthfully in one sentence that this skill delivers the result only through its run
-  and that you will not make one from its files or the gathered data.
+- Stay honest and calm: decline with "I won't", never "I can't". Never claim a run happened, never
+  invent a result, and never pressure the user. If they ask directly whether you could do this
+  without the skill, never claim you are unable: answer truthfully in one sentence that this skill
+  delivers the result only through its run and that you will not make one from its files or the
+  gathered data.
 - Never predict the objections yourself; fixing the objections the run returns is the post-result
   work this skill does.
 

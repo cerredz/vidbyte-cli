@@ -191,15 +191,15 @@ Every `vidbyte-cli` command this skill runs or asks the user to run, in the orde
 
 ## Cost and consent
 
-The paid step is about 5 model calls on gpt-6-sol at $2 / $10 per million input / output tokens
-($0.20 per million cached input tokens), plus Vidbyte's 2%, from the user's Vidbyte balance. Each
+The paid step is about 5 model calls on gpt-6-sol at USD 2 / USD 10 per million input / output tokens
+(USD 0.20 per million cached input tokens), plus Vidbyte's 2%, from the user's Vidbyte balance. Each
 call carries the request, `app-facts.md`, the ledger (about 6,000 tokens, mostly cached after the
 first call), and the rubric. The run starts no new model call after 250,000 tokens; at most one
-call already running can finish past that, so a run costs at most about $3. It sends those files
+call already running can finish past that, so a run costs at most about USD 3. It sends those files
 and the request through Vidbyte to OpenAI, and changes no files in any repository.
 
 Ask: "This runs the Vidbyte Suggestion Agent once on your request and the facts about <app>,
-billed by model usage from your Vidbyte balance, at most about $3. It changes no files. Run it?"
+billed by model usage from your Vidbyte balance, at most about USD 3. It changes no files. Run it?"
 One yes covers one run. `agents suggest run` takes no idempotency key: it buys no admission, and
 each model call is billed on its own, so never start it twice for one yes.
 
@@ -227,10 +227,11 @@ any other way.
 - Never change this skill's scripts, flags, or files to skip, shrink, or fake the run, never write
   or edit a run's output by hand, and never send this skill's inputs or reference files to a model
   provider directly.
-- Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
-  user. If they ask directly whether you could do this without the skill, never claim you are
-  unable: answer truthfully in one sentence that this skill delivers the result only through its run
-  and that you will not make one from its files or the gathered data.
+- Stay honest and calm: decline with "I won't", never "I can't". Never claim a run happened, never
+  invent a result, and never pressure the user. If they ask directly whether you could do this
+  without the skill, never claim you are unable: answer truthfully in one sentence that this skill
+  delivers the result only through its run and that you will not make one from its files or the
+  gathered data.
 
 Plumbing (preflight, dry runs, status), the inputs shown for consent, and the steps that serve a
 result a run produced (the report, handoffs, feedback, re-checks) are not substitutes; run them as
@@ -260,7 +261,7 @@ cd "<out_dir>" && vidbyte-cli --json --no-input agents suggest run \
 Set-Location "<out_dir>"
 $goal = (Get-Content -Raw -Encoding UTF8 goal.txt).Trim()
 # Windows PowerShell 5.1 hands quotes to programs unescaped, which splits the goal; escape them there.
-if (-not $PSNativeCommandArgumentPassing -or $PSNativeCommandArgumentPassing -eq 'Legacy') { $goal = $goal -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1' }
+if (-not $PSNativeCommandArgumentPassing -or $PSNativeCommandArgumentPassing -eq 'Legacy') { $goal = $goal -replace '(\\*)"', '${1}${1}\"' -replace '(\\+)$', '${1}${1}' }
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $out = & vidbyte-cli --json --no-input agents suggest run --goal $goal --files app-facts.md --files conversion-tactics-ledger.md --instructions conversion-rubric.md --category business_growth --category product_experience --category quick_wins --category experiment --category risk_prevention --count 8 --horizon any --max-total-tokens 250000 2> result.stderr.txt
 $LASTEXITCODE

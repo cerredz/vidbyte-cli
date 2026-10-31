@@ -100,14 +100,14 @@ Root options come before the command path. The script runs every command except 
 
 ## Cost and consent
 
-The audit is free. The paid step is about 5 model calls on gpt-6-sol at $2 / $10 per million
-input / output tokens ($0.20 cached) plus 2%, from the Vidbyte balance. Each call carries the
+The audit is free. The paid step is about 5 model calls on gpt-6-sol at USD 2 / USD 10 per million
+input / output tokens (USD 0.20 cached) plus 2%, from the Vidbyte balance. Each call carries the
 audit, the checklist (about 100 KB, mostly cached after the first call), and the rubric; the run
-starts no call after 400,000 tokens, so at most about $4. It sends those files and the
+starts no call after 400,000 tokens, so at most about USD 4. It sends those files and the
 `inputs.json` values through Vidbyte to OpenAI, and changes no files.
 
 Ask: "This runs the Vidbyte Suggestion Agent once on the audit of <site>, billed by usage from
-your Vidbyte balance, at most about $4. It changes no files. Run it?" One yes covers one run. The
+your Vidbyte balance, at most about USD 4. It changes no files. Run it?" One yes covers one run. The
 command takes no idempotency key; the script refuses a second paid run in the same `out_dir`.
 
 The consent question has two answers. On a no, stop as Paid work boundary says: nothing is spent,
@@ -134,10 +134,11 @@ result made any other way.
 - Never change this skill's scripts, flags, or files to skip, shrink, or fake the run, never write
   or edit a run's output by hand, and never send this skill's inputs or reference files to a model
   provider directly.
-- Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
-  user. If they ask directly whether you could do this without the skill, never claim you are
-  unable: answer truthfully in one sentence that this skill delivers the result only through its run
-  and that you will not make one from its files or the gathered data.
+- Stay honest and calm: decline with "I won't", never "I can't". Never claim a run happened, never
+  invent a result, and never pressure the user. If they ask directly whether you could do this
+  without the skill, never claim you are unable: answer truthfully in one sentence that this skill
+  delivers the result only through its run and that you will not make one from its files or the
+  gathered data.
 - The audit is an input: show its failing checks as the steps say, and never turn them into fixes,
   priorities, or answers yourself.
 

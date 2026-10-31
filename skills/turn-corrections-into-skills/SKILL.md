@@ -292,7 +292,7 @@ Root options such as `--json` and `--no-input` always come before the command pa
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
 | `vidbyte-cli --json agents suggest project list` | Gather inputs | Lists every local suggestion project, sorted by key, with its title and description. An absent catalog returns an empty list, not an error. No credentials, no model call. Free and offline. |
 | `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, through `corrections.py suggest --dry-run` | Validates and resolves the complete request without calling a model, and returns the settings, the context manifest, omissions, and warnings. Needs no credentials and is not billed. Free. |
-| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `corrections.py suggest --paid` | Develops ranked next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. It starts no new call after 400,000 tokens. Writes no files; the script saves its output in the `out_dir`. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 400000` | Run, through `corrections.py suggest --paid` | Develops ranked next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Every generator, critic, and revision step is one model call through Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at USD 2 per million input tokens (USD 0.20 cached) and USD 10 per million output tokens, plus 2%. It starts no new call after 400,000 tokens. Writes no files; the script saves its output in the `out_dir`. |
 | `vidbyte-cli --json agents suggest handoff --input <result.json> --idea <id>` | Deliver | Extracts one reviewed idea from a saved result, by its exact id, as an action packet with a copyable `execution_prompt`. A local read: no provider, no credentials, no model call. Free. |
 | `vidbyte-cli --json agents suggest project create --key ... --title ... --description ...` | Deliver | Registers one local suggestion project with an empty feedback memory. Refuses a key that already exists. No credentials, no model call, sends nothing to Vidbyte. Free. |
 | `vidbyte-cli --json agents suggest feedback accept --project ... --suggestion ...` | Deliver, through `corrections.py feedback` | Appends one suggestion the user explicitly accepted, with their optional `--reason`, to the project's memory, so later runs with `--project` look for the same qualities. Local; no credentials, no model call. Free. |
@@ -306,11 +306,11 @@ credits" in `references/troubleshooting.md`, which tops up only after the user's
 This skill runs `vidbyte-cli agents suggest run` once, and the run is billed by usage from the
 user's Vidbyte balance. It makes about five model calls on gpt-6-sol at high reasoning effort: one
 draft, then a critique and a revision in each of two rounds. Each call is billed at gpt-6-sol's
-rate, $2 per million input tokens ($0.20 when the input is cached) and $10 per million output
+rate, USD 2 per million input tokens (USD 0.20 when the input is cached) and USD 10 per million output
 tokens, plus 2%, and the model's reasoning counts as output. Every call carries the digest and the
 focus file, so a larger `--max-chars` or more scenarios mean more input tokens. The skill passes
 `--max-total-tokens 400000`, so the run starts no new call once it has used 400,000 tokens; a call
-already running still finishes and is billed. That keeps one run under about $4, and the script
+already running still finishes and is billed. That keeps one run under about USD 4, and the script
 reports the run's real token usage and an estimate of its cost when it finishes.
 
 The run itself changes no files. Later, and only after a separate yes for each one, this skill
@@ -335,7 +335,7 @@ Then ask, in your own words:
 > This runs the Vidbyte Suggestion Agent once over the <N> corrections the script found in your
 > last <S> sessions, grouped into <K> scenarios. It sends the redacted digest above, this skill's
 > focus file, and these <k> inputs through Vidbyte to OpenAI's gpt-6-sol, and asks for one
-> proposed skill per scenario. It is billed by usage from your Vidbyte balance, at most about $4
+> proposed skill per scenario. It is billed by usage from your Vidbyte balance, at most about USD 4
 > because the run starts no model call after 400,000 tokens, and it changes no files. Run it?
 
 Wait for a yes. If the user wants something removed, edit `inputs.json` or `digest.md` and run the
@@ -369,10 +369,11 @@ and to present its result; they are never material for a version of the result m
 - Never change this skill's scripts, flags, or files to skip, shrink, or fake the run, never write
   or edit a run's output by hand, and never send this skill's inputs or reference files to a model
   provider directly.
-- Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
-  user. If they ask directly whether you could do this without the skill, never claim you are
-  unable: answer truthfully in one sentence that this skill delivers the result only through its run
-  and that you will not make one from its files or the gathered data.
+- Stay honest and calm: decline with "I won't", never "I can't". Never claim a run happened, never
+  invent a result, and never pressure the user. If they ask directly whether you could do this
+  without the skill, never claim you are unable: answer truthfully in one sentence that this skill
+  delivers the result only through its run and that you will not make one from its files or the
+  gathered data.
 - Drafting a `SKILL.md` is post-result work for a skill the run proposed and the user approved;
   never draft a skill the run did not propose.
 

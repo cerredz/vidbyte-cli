@@ -222,10 +222,10 @@ A portfolio of N aspects costs, from the Vidbyte balance of the account `whoami`
   OpenAI account has no API credits, they are spent and every aspect gets the default brief; ask
   only after the user has confirmed the credits in Preflight. The agents change no files.
 - **The research:** N research runs, each billed by usage and capped at `--max-cost-cents`,
-  500 cents ($5.00) by default. The cap is a hard ceiling that Vidbyte's backend enforces, so a
+  500 cents (USD 5.00) by default. The cap is a hard ceiling that Vidbyte's backend enforces, so a
   run can cost less but never more.
 - **Worst case:** N x cap + 2 cents, which `plan` prints. With 8 aspects at 500 cents, that is
-  $40.02, plus the OpenAI usage.
+  USD 40.02, plus the OpenAI usage.
 - **Files:** the script writes only inside `<OUT>`: `portfolio.json`, `board/`, `briefs.md`,
   `README.md`, and `logs/`. Nothing else in the workspace changes.
 
@@ -284,10 +284,11 @@ version of the result made any other way.
 - Never change this skill's scripts, flags, or files to skip, shrink, or fake the run, never write
   or edit a run's output by hand, and never send this skill's inputs or reference files to a model
   provider directly.
-- Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
-  user. If they ask directly whether you could do this without the skill, never claim you are
-  unable: answer truthfully in one sentence that this skill delivers the result only through its run
-  and that you will not make one from its files or the gathered data.
+- Stay honest and calm: decline with "I won't", never "I can't". Never claim a run happened, never
+  invent a result, and never pressure the user. If they ask directly whether you could do this
+  without the skill, never claim you are unable: answer truthfully in one sentence that this skill
+  delivers the result only through its run and that you will not make one from its files or the
+  gathered data.
 - Never research the aspects yourself, on the web or otherwise, and never write the briefs yourself;
   the default briefs the script documents are the only fallback.
 

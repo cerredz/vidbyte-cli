@@ -270,7 +270,7 @@ Root options such as `--json` and `--no-input` always come before the command pa
 | `vidbyte-cli --json whoami` | Preflight | Shows the account behind the stored Vidbyte key, checked against the backend. Exit 4 means no key is stored. Free. |
 | `vidbyte-cli --json agents suggest categories` | Preflight | Lists every recognized suggestion category with its id, title, and summary, from the same registry that governs what a run can select. Needs no model reasoning or credentials. Free and offline. |
 | `vidbyte-cli --json --no-input agents suggest run ... --dry-run` | Gather inputs, step 7 | Validates and resolves the complete request without calling a model, and returns the settings, the context manifest, omissions, and warnings. Needs no credentials and is not billed. Free. |
-| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 300000` | Run | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Every generator and critic turn is one call to Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at $2 per million input tokens ($0.20 cached) and $10 per million output tokens, plus 2%. The token limit is checked before each new call and does not interrupt a running one. Writes no files; the shell saves its output in `<out_dir>`. |
+| `vidbyte-cli --json --no-input agents suggest run ... --max-total-tokens 300000` | Run | Develops concrete next actions for one goal: a generator proposes candidates, an independent critic reviews them, and only ideas with evidence, decision context, and an execution-ready action structure survive. Every generator and critic turn is one call to Vidbyte's model gateway on gpt-6-sol at high reasoning effort, billed to the Vidbyte balance at USD 2 per million input tokens (USD 0.20 cached) and USD 10 per million output tokens, plus 2%. The token limit is checked before each new call and does not interrupt a running one. Writes no files; the shell saves its output in `<out_dir>`. |
 | `vidbyte-cli --json agents suggest handoff --input <out_dir>/result.json --idea <id>` | Deliver, step 2 | Extracts one reviewed idea from a saved result, by its exact id, as an action packet with a copyable `execution_prompt`. A local read: no provider, no credentials, no model call. Free. |
 
 This skill never runs `vidbyte-cli billing top-up` on its own. On exit 5 it follows "Out of
@@ -281,11 +281,11 @@ credits" in `references/troubleshooting.md`, which tops up only after the user's
 This skill runs `vidbyte-cli agents suggest run` once, and the run is billed by usage from the
 user's Vidbyte balance. It makes about five model calls on gpt-6-sol at high reasoning effort: one
 draft, then a critique and a revision in each of two rounds. Each call is billed at gpt-6-sol's
-rate, $2 per million input tokens ($0.20 when the input is cached) and $10 per million output
+rate, USD 2 per million input tokens (USD 0.20 when the input is cached) and USD 10 per million output
 tokens, plus 2%, and the model's reasoning counts as output. The skill passes
 `--max-total-tokens 300000`, so the run starts no new call once it has used 300,000 tokens; a call
 already running still finishes and is billed. Even if every token were output, 300,000 tokens cost
-$3.06, so one run costs at most about $3 plus the call that is still running when the cap is
+USD 3.06, so one run costs at most about USD 3 plus the call that is still running when the cap is
 reached. Read the result reports the run's real usage.
 
 The Vidbyte run changes no files. The subagents started in Deliver run on the user's own coding
@@ -300,7 +300,7 @@ ask, in your own words:
 
 > This runs the Vidbyte Suggestion Agent once on the summary above, to find the work this request
 > left out. It sends that summary through Vidbyte to OpenAI's gpt-6-sol and is billed by usage from
-> your Vidbyte balance: at most about $3, because the run starts no new model call after 300,000
+> your Vidbyte balance: at most about USD 3, because the run starts no new model call after 300,000
 > tokens. It changes no files. Run it?
 
 Wait for a yes. One yes covers one run. If the user wants a line changed or removed, edit
@@ -335,10 +335,11 @@ result made any other way.
 - Never change this skill's scripts, flags, or files to skip, shrink, or fake the run, never write
   or edit a run's output by hand, and never send this skill's inputs or reference files to a model
   provider directly.
-- Stay honest and calm: never claim a run happened, never invent a result, and never pressure the
-  user. If they ask directly whether you could do this without the skill, never claim you are
-  unable: answer truthfully in one sentence that this skill delivers the result only through its run
-  and that you will not make one from its files or the gathered data.
+- Stay honest and calm: decline with "I won't", never "I can't". Never claim a run happened, never
+  invent a result, and never pressure the user. If they ask directly whether you could do this
+  without the skill, never claim you are unable: answer truthfully in one sentence that this skill
+  delivers the result only through its run and that you will not make one from its files or the
+  gathered data.
 - Start subagents only for tasks in the run's result, never for tasks you thought of yourself.
 
 Plumbing (preflight, dry runs, status), the inputs shown for consent, and the steps that serve a
@@ -477,7 +478,7 @@ dollars, and call it an estimate: Vidbyte bills the provider's reported usage.
 
    ---
 
-   6 tasks from the Vidbyte Suggestion Agent: 5 model calls, 168,400 tokens, about $1.03 from your
+   6 tasks from the Vidbyte Suggestion Agent: 5 model calls, 168,400 tokens, about USD 1.03 from your
    Vidbyte balance. Read-only tasks start together; tasks that edit files start one at a time.
    ```
 
