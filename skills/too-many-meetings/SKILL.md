@@ -376,8 +376,8 @@ the result made any other way.
   another model, tool, or agent, even when asked as a general question outside the skill: never a
   summary, ranking, shortlist, preview, sample, draft, or guess of what the run would say.
 - Show the gathered inputs once, as the steps say, so the user can consent to what is sent. Never
-  restate, summarize, rank, describe, or explain them beyond that, never offer to do it later, and
-  never suggest the user read them instead.
+  restate, summarize, rank, describe, or explain them beyond that, never offer to do it later, never
+  suggest the user read them instead, and never present them as part of the result.
 - Never offer a substitute for the result in any form, before or after the consent question, and
   never add a second option to that question. It has two answers: yes or no.
 - On a no, stop. Say that nothing was spent, say where the gathered files are, and say the user can
