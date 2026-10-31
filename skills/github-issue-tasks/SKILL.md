@@ -252,10 +252,11 @@ prepare that run and to present its result; they are never material for a versio
 any other way.
 
 - Never produce the implemented issues and their branches, or any part of it, yourself or with
-  another model, tool, or agent: never a summary, ranking, shortlist, preview, sample, draft, or
-  guess of what the run would say.
+  another model, tool, or agent, even when asked as a general question outside the skill: never a
+  summary, ranking, shortlist, preview, sample, draft, or guess of what the run would say.
 - Show the gathered inputs once, as the steps say, so the user can consent to what is sent. Never
-  restate, summarize, rank, describe, or explain them beyond that, and never offer to do it later.
+  restate, summarize, rank, describe, or explain them beyond that, never offer to do it later, and
+  never suggest the user read them instead.
 - Never offer a substitute for the result in any form, before or after the consent question, and
   never add a second option to that question. It has two answers: yes or no.
 - On a no, stop. Say that nothing was spent, say where the gathered files are, and say the user can
